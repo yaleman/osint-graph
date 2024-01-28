@@ -9,7 +9,7 @@ use egui_node_graph2::*;
 /// store additional information that doesn't live in parameters. For this
 /// example, the node data stores the template (i.e. the "type") of the node.
 #[derive(serde::Serialize, serde::Deserialize)]
-pub struct MyNodeData {
+pub struct NodeData {
     template: NodeType,
     notes: String,
 }
@@ -21,6 +21,8 @@ pub struct MyNodeData {
 pub enum LinkType {
     Scalar,
     Vec2,
+    // Weak,
+    // Link
 }
 
 /// In the graph, input parameters can optionally have a constant value. This
@@ -145,7 +147,7 @@ impl CategoryTrait for NodeCategory {
 // A trait for the node kinds, which tells the library how to build new nodes
 // from the templates in the node finder
 impl NodeTemplateTrait for NodeType {
-    type NodeData = MyNodeData;
+    type NodeData = NodeData;
     type DataType = LinkType;
     type ValueType = MyValueType;
     type UserState = MyGraphState;
@@ -195,7 +197,7 @@ impl NodeTemplateTrait for NodeType {
     }
 
     fn user_data(&self, _user_state: &mut Self::UserState) -> Self::NodeData {
-        MyNodeData {
+        NodeData {
             template: *self,
             notes: String::new(),
         }
@@ -318,14 +320,14 @@ impl NodeTemplateIter for AllMyNodeTemplates {
 impl WidgetValueTrait for MyValueType {
     type Response = MyResponse;
     type UserState = MyGraphState;
-    type NodeData = MyNodeData;
+    type NodeData = NodeData;
     fn value_widget(
         &mut self,
         param_name: &str,
         _node_id: NodeId,
         ui: &mut egui::Ui,
         _user_state: &mut MyGraphState,
-        _node_data: &MyNodeData,
+        _node_data: &NodeData,
     ) -> Vec<MyResponse> {
         // This trait is used to tell the library which UI to display for the
         // inline parameter widgets.
@@ -352,7 +354,7 @@ impl WidgetValueTrait for MyValueType {
 }
 
 impl UserResponseTrait for MyResponse {}
-impl NodeDataTrait for MyNodeData {
+impl NodeDataTrait for NodeData {
     type Response = MyResponse;
     type UserState = MyGraphState;
     type DataType = LinkType;
@@ -367,9 +369,9 @@ impl NodeDataTrait for MyNodeData {
         &self,
         ui: &mut egui::Ui,
         node_id: NodeId,
-        _graph: &Graph<MyNodeData, LinkType, MyValueType>,
+        _graph: &Graph<NodeData, LinkType, MyValueType>,
         user_state: &mut Self::UserState,
-    ) -> Vec<NodeResponse<MyResponse, MyNodeData>>
+    ) -> Vec<NodeResponse<MyResponse, NodeData>>
     where
         MyResponse: UserResponseTrait,
     {
@@ -405,8 +407,8 @@ impl NodeDataTrait for MyNodeData {
     }
 }
 
-type MyGraph = Graph<MyNodeData, LinkType, MyValueType>;
-type MyEditorState = GraphEditorState<MyNodeData, LinkType, MyValueType, NodeType, MyGraphState>;
+type MyGraph = Graph<NodeData, LinkType, MyValueType>;
+type MyEditorState = GraphEditorState<NodeData, LinkType, MyValueType, NodeType, MyGraphState>;
 
 #[derive(Default)]
 pub struct NodeGraphExample {

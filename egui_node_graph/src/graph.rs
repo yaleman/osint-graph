@@ -6,8 +6,7 @@ use serde::{Deserialize, Serialize};
 /// A node inside the [`Graph`]. Nodes have input and output parameters, stored
 /// as ids. They also contain a custom `NodeData` struct with whatever data the
 /// user wants to store per-node.
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "persistence", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Node<NodeData> {
     pub id: NodeId,
     pub label: String,
@@ -18,8 +17,7 @@ pub struct Node<NodeData> {
 
 /// The three kinds of input params. These describe how the graph must behave
 /// with respect to inline widgets and connections for this parameter.
-#[derive(Debug, Clone, Copy)]
-#[cfg_attr(feature = "persistence", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum InputParamKind {
     /// No constant value can be set. Only incoming connections can produce it
     ConnectionOnly,
@@ -41,8 +39,7 @@ fn shown_inline_default() -> bool {
 /// The `DataType` generic parameter is used to restrict the range of input
 /// connections for this parameter, and the `ValueType` is use to represent the
 /// data for the inline widget (i.e. constant) value.
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "persistence", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InputParam<DataType, ValueType> {
     pub id: InputId,
     /// The data type of this node. Used to determine incoming connections. This
@@ -56,7 +53,7 @@ pub struct InputParam<DataType, ValueType> {
     /// Back-reference to the node containing this parameter.
     pub node: NodeId,
     /// When true, the node is shown inline inside the node graph.
-    #[cfg_attr(feature = "persistence", serde(default = "shown_inline_default"))]
+    #[serde(default = "shown_inline_default")]
     pub shown_inline: bool,
 }
 
@@ -64,8 +61,7 @@ pub struct InputParam<DataType, ValueType> {
 /// data that the node produces. Output parameters can be linked to the input
 /// parameters of other nodes. Unlike an [`InputParam`], output parameters
 /// cannot have a constant inline value.
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "persistence", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutputParam<DataType> {
     pub id: OutputId,
     /// Back-reference to the node containing this parameter.
@@ -76,8 +72,7 @@ pub struct OutputParam<DataType> {
 /// The graph, containing nodes, input parameters and output parameters. Because
 /// graphs are full of self-referential structures, this type uses the `slotmap`
 /// crate to represent all the inner references in the data.
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "persistence", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Graph<NodeData, DataType, ValueType> {
     /// The [`Node`]s of the graph
     pub nodes: SlotMap<NodeId, Node<NodeData>>,

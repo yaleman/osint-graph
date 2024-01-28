@@ -7,7 +7,7 @@ license = "MIT"
 version = "0.4.0-fork"
 keywords = ["ui", "egui", "graph", "node"]
 authors = ["setzer22", "James Hodgkinson"]
-edition = "2021"
+edition = { workspace = true }
 readme = "../README.md"
 workspace = ".."
 

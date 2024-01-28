@@ -1,8 +1,8 @@
-.PHONY: trunk
-trunk:
-	trunk build
+.PHONY: build
+build:
+	cd osint-graph && trunk build --dist ../dist/
 
 .PHONY: serve
-serve:
-	trunk serve
+serve: build
+	cd osint-graph && trunk serve
 

@@ -4,15 +4,13 @@ use std::marker::PhantomData;
 #[cfg(feature = "persistence")]
 use serde::{Deserialize, Serialize};
 
-#[derive(Default, Copy, Clone)]
-#[cfg_attr(feature = "persistence", derive(Serialize, Deserialize))]
+#[derive(Default, Copy, Clone, Serialize, Deserialize)]
 pub struct PanZoom {
     pub pan: egui::Vec2,
     pub zoom: f32,
 }
 
-#[derive(Clone)]
-#[cfg_attr(feature = "persistence", derive(Serialize, Deserialize))]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct GraphEditorState<NodeData, DataType, ValueType, NodeTemplate, UserState> {
     pub graph: Graph<NodeData, DataType, ValueType>,
     /// Nodes are drawn in this order. Draw order is important because nodes

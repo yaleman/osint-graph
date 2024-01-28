@@ -1,0 +1,15 @@
+[package]
+name = "osint-graph"
+version = { workspace = true }
+edition = { workspace = true }
+
+
+[dependencies]
+egui_node_graph2 = { path = "../egui_node_graph", features = ["persistence"] }
+eframe = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+wasm-bindgen-futures = "0.4.40"
+log = "0.4.20"
+getrandom = { version = "0.2.12", features = ["js"] }
+enum-iterator = "1.5.0"

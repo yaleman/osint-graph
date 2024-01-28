@@ -4,8 +4,7 @@ use crate::{color_hex_utils::*, CategoryTrait, NodeTemplateIter, NodeTemplateTra
 
 use egui::*;
 
-#[derive(Clone)]
-#[cfg_attr(feature = "persistence", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct NodeFinder<NodeTemplate> {
     pub query: String,
     /// Reset every frame. When set, the node finder will be moved at that position

@@ -3,6 +3,12 @@ name = "osint-graph"
 version = { workspace = true }
 edition = { workspace = true }
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "osint-graph-trunk"
+path = "src/main.rs"
 
 [dependencies]
 egui_node_graph2 = { path = "../egui_node_graph", features = ["persistence"] }
@@ -13,3 +19,9 @@ wasm-bindgen-futures = "0.4.40"
 log = "0.4.20"
 getrandom = { version = "0.2.12", features = ["js"] }
 enum-iterator = "1.5.0"
+egui-notify = "0.12.0"
+gloo-net = "0.5.0"
+gloo-console = "0.3.0"
+serde_json = "1.0.112"
+gloo-utils = "0.2.0"
+web-sys = { version = "0.3.67", features = ["Url"] }

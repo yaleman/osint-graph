@@ -12,25 +12,23 @@
 
         <!-- config for our rust wasm binary. go to https://trunkrs.dev/assets/#rust for more customization -->
         <!-- <link data-trunk rel="rust" data-wasm-opt="2" /> -->
-        <link data-trunk rel="rust" data-bin=osint-graph-trunk />
         <!-- this is the base url relative to which other urls will be constructed. trunk will insert this from the public-url option -->
-        <base data-trunk-public-url />
-
+        <!-- <base data-trunk-public-url /> -->
+        <script async src="/static/wasmloader.js"
+            type="module"></script>
         <!-- <link data-trunk rel="icon" href="assets/favicon.ico">/ -->
-
-        <link data-trunk rel="copy-file" href="assets/sw.js" />
         <!-- <link data-trunk rel="copy-file" href="assets/manifest.json" /> -->
         <!-- <link data-trunk rel="copy-file" href="assets/icon-1024.png" /> -->
         <!-- <link data-trunk rel="copy-file" href="assets/icon-256.png" /> -->
         <!-- <link data-trunk rel="copy-file" href="assets/icon_ios_touch_192.png" /> -->
         <!-- <link data-trunk rel="copy-file" href="assets/maskable_icon_x512.png" /> -->
 
-        <link rel="manifest" href="manifest.json">
+        <!-- <link rel="manifest" href="manifest.json"> -->
         <link rel="apple-touch-icon" href="icon_ios_touch_192.png">
-        <meta name="theme-color" media="(prefers-color-scheme: light)"
+        <!-- <meta name="theme-color" media="(prefers-color-scheme: light)"
             content="white">
         <meta name="theme-color" media="(prefers-color-scheme: dark)"
-            content="#404040">
+            content="#404040"> -->
 
         <style>
         html {
@@ -129,11 +127,11 @@
         <!-- Force refresh (Ctrl + F5) to load the latest files instead of cached files  -->
         <script>
         // We disable caching during development so that we always view the latest version.
-        if ('serviceWorker' in navigator && window.location.hash !== "#dev") {
+        /*if ('serviceWorker' in navigator && window.location.hash !== "#dev") {
             window.addEventListener('load', function () {
                 navigator.serviceWorker.register('sw.js');
             });
-        }
+        }*/
     </script>
     </body>
 

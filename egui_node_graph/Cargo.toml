@@ -1,0 +1,22 @@
+[package]
+name = "egui_node_graph2"
+description = "A helper library to create interactive node graphs using egui (forked from egui_node_graph)"
+homepage = "https://github.com/yaleman/osint-graph"
+repository = "https://github.com/yaleman/osint-graph"
+license = "MIT"
+version = "0.4.0-fork"
+keywords = ["ui", "egui", "graph", "node"]
+authors = ["setzer22", "James Hodgkinson"]
+edition = "2021"
+readme = "../README.md"
+workspace = ".."
+
+[features]
+persistence = ["slotmap/serde", "smallvec/serde", "egui/persistence"]
+
+[dependencies]
+egui = { workspace = true }
+slotmap = { version = "1.0" }
+smallvec = { version = "1.10.0" }
+serde = { workspace = true, features = ["derive"] }
+thiserror = "1.0"

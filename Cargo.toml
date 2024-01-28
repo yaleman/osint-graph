@@ -1,0 +1,32 @@
+[package]
+name = "osint-graph"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[workspace]
+members = ["./egui_node_graph", "."]
+
+[workspace.dependencies]
+serde = { version = "^1.0" }
+egui = "0.25.0"
+anyhow = "1.0"
+eframe = "0.25.0"
+
+# [lib]
+# crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+egui_node_graph2 = { path = "./egui_node_graph", features = ["persistence"] }
+eframe = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+wasm-bindgen-futures = "0.4.40"
+log = "0.4.20"
+
+[features]
+default = ["persistence"]
+persistence = ["egui_node_graph2/persistence", "eframe/persistence"]
+
+[profile.release]
+opt-level = 2 # fast and small wasm

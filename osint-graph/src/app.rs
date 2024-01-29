@@ -1,8 +1,9 @@
 use std::{borrow::Cow, collections::HashMap};
 
-use eframe::egui::{self, DragValue, TextStyle};
+use eframe::egui::{self, DragValue, TextStyle, Widget};
 use egui_node_graph2::*;
 use egui_notify::Toasts;
+use gloo_console::warn;
 use serde::{Deserialize, Serialize};
 
 use crate::storage::Backend;
@@ -479,6 +480,8 @@ pub struct OsintGraph {
 
     #[allow(dead_code)]
     storage: crate::storage::Backend,
+
+    adderbox: String,
 }
 
 const PERSISTENCE_KEY: &str = "osint-graph";
@@ -496,8 +499,14 @@ impl OsintGraph {
             user_state: MyGraphState::default(),
             messages: Toasts::default(),
             storage: Backend::default(),
+            adderbox: String::new(),
         }
     }
+}
+
+/// Takes the input from the adderbox and creates a new node from it.
+pub fn handle_adderbox(_ctx: &egui::Context, adderbox: String) {
+    warn!("New adderbox: {}", adderbox);
 }
 
 impl eframe::App for OsintGraph {
@@ -514,6 +523,14 @@ impl eframe::App for OsintGraph {
         egui::TopBottomPanel::top("top").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 egui::widgets::global_dark_light_mode_switch(ui);
+                let adderbox = egui::widgets::TextEdit::singleline(&mut self.adderbox)
+                    .hint_text("New node")
+                    .ui(ui);
+
+                if adderbox.lost_focus() {
+                    handle_adderbox(ctx, self.adderbox.clone());
+                    self.adderbox.clear();
+                }
             });
         });
         let graph_response = egui::CentralPanel::default()

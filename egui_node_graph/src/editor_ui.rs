@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use crate::color_hex_utils::*;
+use crate::constants::{THEME_NODE_DARK_BACKGROUND, THEME_NODE_DARK_TEXT};
 use crate::utils::ColorUtils;
 
 use super::*;
@@ -504,8 +505,8 @@ where
         let background_color;
         let text_color;
         if ui.visuals().dark_mode {
-            background_color = color_from_hex("#3f3f3f").unwrap();
-            text_color = color_from_hex("#fefefe").unwrap();
+            background_color = color_from_hex(THEME_NODE_DARK_BACKGROUND).unwrap();
+            text_color = color_from_hex(THEME_NODE_DARK_TEXT).unwrap();
         } else {
             background_color = color_from_hex("#ffffff").unwrap();
             text_color = color_from_hex("#505050").unwrap();
@@ -910,11 +911,14 @@ where
         let resp = ui.allocate_rect(rect, Sense::click());
 
         let dark_mode = ui.visuals().dark_mode;
+
+        // TODO: make the UI themable
+
         let color = if resp.clicked() {
             if dark_mode {
-                color_from_hex("#ffffff").unwrap()
+                color_from_hex(&Color32::BLACK.to_hex()).unwrap()
             } else {
-                color_from_hex("#000000").unwrap()
+                color_from_hex(&Color32::WHITE.to_hex()).unwrap()
             }
         } else if resp.hovered() {
             if dark_mode {

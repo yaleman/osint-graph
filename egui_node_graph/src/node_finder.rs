@@ -1,5 +1,9 @@
 use std::{collections::BTreeMap, marker::PhantomData};
 
+use crate::constants::{
+    THEME_GRAPH_DARK_BACKGROUND, THEME_GRAPH_DARK_TEXT, THEME_GRAPH_LIGHT_BACKGROUND,
+    THEME_GRAPH_LIGHT_TEXT,
+};
 use crate::{color_hex_utils::*, CategoryTrait, NodeTemplateIter, NodeTemplateTrait};
 
 use egui::*;
@@ -41,11 +45,11 @@ where
         let text_color;
 
         if ui.visuals().dark_mode {
-            background_color = color_from_hex("#3f3f3f").unwrap();
-            text_color = color_from_hex("#fefefe").unwrap();
+            background_color = color_from_hex(THEME_GRAPH_DARK_BACKGROUND).unwrap();
+            text_color = color_from_hex(THEME_GRAPH_DARK_TEXT).unwrap();
         } else {
-            background_color = color_from_hex("#fefefe").unwrap();
-            text_color = color_from_hex("#3f3f3f").unwrap();
+            background_color = color_from_hex(THEME_GRAPH_LIGHT_BACKGROUND).unwrap();
+            text_color = color_from_hex(THEME_GRAPH_LIGHT_TEXT).unwrap();
         }
 
         ui.visuals_mut().widgets.noninteractive.fg_stroke = Stroke::new(2.0, text_color);

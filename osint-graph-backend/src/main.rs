@@ -83,7 +83,7 @@ async fn main() {
     let fulladdr = format!("{}:{}", addr, port);
     // Run our app with hyper
     let listener = tokio::net::TcpListener::bind(&fulladdr).await.unwrap();
-    tracing::info!("listening on {}", listener.local_addr().unwrap());
+    tracing::info!("listening on http://{}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
 }
 

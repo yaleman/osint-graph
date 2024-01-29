@@ -4,8 +4,12 @@ build:
 
 .PHONY: backend
 backend:
-	cargo watch -s 'cargo run --bin osint-graph-backend'
-
+	cargo run --bin osint-graph-backend
 
 .PHONY: serve
 serve: build backend
+
+
+.PHONY: reload
+reload:
+	cargo watch -s 'make serve'

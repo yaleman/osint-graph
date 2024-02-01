@@ -1,6 +1,6 @@
 .PHONY: build
 build:
-	cd osint-graph &&  trunk build --dist ../dist/ --filehash false
+	cd osint-graph &&  trunk build
 
 .PHONY: backend
 backend:

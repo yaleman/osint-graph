@@ -35,7 +35,7 @@ impl<NodeData, DataType, ValueType> Graph<NodeData, DataType, ValueType> {
     pub fn add_input_param(
         &mut self,
         node_id: NodeId,
-        name: String,
+        name: impl ToString,
         typ: DataType,
         value: ValueType,
         kind: InputParamKind,
@@ -49,7 +49,9 @@ impl<NodeData, DataType, ValueType> Graph<NodeData, DataType, ValueType> {
             node: node_id,
             shown_inline,
         });
-        self.nodes[node_id].inputs.push((name, input_id));
+        self.nodes[node_id]
+            .inputs
+            .push((name.to_string(), input_id));
         input_id
     }
 
@@ -67,13 +69,20 @@ impl<NodeData, DataType, ValueType> Graph<NodeData, DataType, ValueType> {
         self.connections.retain(|_, o| *o != param);
     }
 
-    pub fn add_output_param(&mut self, node_id: NodeId, name: String, typ: DataType) -> OutputId {
+    pub fn add_output_param(
+        &mut self,
+        node_id: NodeId,
+        name: impl ToString,
+        typ: DataType,
+    ) -> OutputId {
         let output_id = self.outputs.insert_with_key(|output_id| OutputParam {
             id: output_id,
             node: node_id,
             typ,
         });
-        self.nodes[node_id].outputs.push((name, output_id));
+        self.nodes[node_id]
+            .outputs
+            .push((name.to_string(), output_id));
         output_id
     }
 

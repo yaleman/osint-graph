@@ -3,7 +3,7 @@ use std::{borrow::Cow, collections::HashMap};
 use eframe::egui::{self, DragValue, TextStyle, Widget};
 use egui_node_graph2::*;
 use egui_notify::Toasts;
-use gloo_console::warn;
+use gloo_console::{info, warn};
 use serde::{Deserialize, Serialize};
 
 use crate::storage::Backend;
@@ -16,6 +16,7 @@ use crate::storage::Backend;
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct NodeData {
     template: NodeType,
+    value: String,
     notes: String,
 }
 
@@ -50,6 +51,7 @@ pub enum ValueType {
     Vec2 { value: egui::Vec2 },
     Scalar { value: f32 },
     Person { value: PersonData },
+    Related,
     Weak,
 }
 
@@ -58,7 +60,7 @@ impl Default for ValueType {
         // NOTE: This is just a dummy `Default` implementation. The library
         // requires it to circumvent some internal borrow checker issues.
         // Self::Scalar { value: 0.0 }
-        Self::Weak
+        Self::Related
     }
 }
 
@@ -94,22 +96,31 @@ pub enum NodeType {
     AddVector,
     SubtractVector,
     VectorTimesScalar,
-    GenericURL,
+
     File,
     Image,
     Audio,
     Video,
+
     Person,
+    Url,
 }
 
 /// The response type is used to encode side-effects produced when drawing a
 /// node in the graph. Most side-effects (creating new nodes, deleting existing
 /// nodes, handling connections...) are already handled by the library, but this
 /// mechanism allows creating additional side effects from user code.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MyResponse {
+    #[allow(dead_code)]
     SetActiveNode(NodeId),
+    #[allow(dead_code)]
     ClearActiveNode,
+    UpdateNodeNotes(NodeId, String),
+    UpdateNodeValue(NodeId, String),
+    #[allow(dead_code)]
+    /// For when you want to remove a link between two nodes
+    ClearNodeLink(NodeId, NodeId),
 }
 
 /// The graph 'global' state. This state struct is passed around to the node and
@@ -148,9 +159,7 @@ impl DataTypeTrait<MyGraphState> for LinkType {
 pub enum NodeCategory {
     Scalar,
     Vector,
-    URLs,
     File,
-    People,
 }
 
 impl CategoryTrait for NodeCategory {
@@ -158,9 +167,7 @@ impl CategoryTrait for NodeCategory {
         match self {
             NodeCategory::Scalar => "Scalar",
             NodeCategory::Vector => "Vector",
-            NodeCategory::URLs => "URLs",
             NodeCategory::File => "Files",
-            NodeCategory::People => "People",
         }
         .to_string()
     }
@@ -184,7 +191,7 @@ impl NodeTemplateTrait for NodeType {
             NodeType::AddVector => "Vector add",
             NodeType::SubtractVector => "Vector subtract",
             NodeType::VectorTimesScalar => "Vector times scalar",
-            NodeType::GenericURL => "Generic URL",
+            NodeType::Url => "URL",
             NodeType::File => "File",
             NodeType::Image => "Image",
             NodeType::Audio => "Audio",
@@ -202,25 +209,30 @@ impl NodeTemplateTrait for NodeType {
             NodeType::MakeVector | NodeType::AddVector | NodeType::SubtractVector => {
                 vec![NodeCategory::Vector]
             }
-            NodeType::GenericURL => vec![NodeCategory::URLs],
 
             NodeType::VectorTimesScalar => vec![NodeCategory::Vector, NodeCategory::Scalar],
             NodeType::Image | NodeType::File | NodeType::Audio | NodeType::Video => {
                 vec![NodeCategory::File]
             }
-            NodeType::Person => vec![NodeCategory::People],
+            // empty because they're in the base category
+            NodeType::Url => vec![],
+            NodeType::Person => vec![],
         }
     }
 
     fn node_graph_label(&self, user_state: &mut Self::UserState) -> String {
         // It's okay to delegate this to node_finder_label if you don't want to
         // show different names in the node finder and the node itself.
+
+        // TODO: this should be based on the node type and its value
+
         self.node_finder_label(user_state).into()
     }
 
     fn user_data(&self, _user_state: &mut Self::UserState) -> Self::NodeData {
         NodeData {
             template: *self,
+            value: String::new(),
             notes: String::new(),
         }
     }
@@ -259,45 +271,46 @@ impl NodeTemplateTrait for NodeType {
             );
         };
 
-        // let input_parent = |graph: &mut MyGraph, name: &str| {
-        //     graph.add_input_param(
-        //         node_id,
-        //         name.to_string(),
-        //         LinkType::Parent,
-        //         ValueType::Weak,
-        //         InputParamKind::ConnectionOnly,
-        //         true,
-        //     );
-        // };
-
         let output_scalar = |graph: &mut MyGraph, name: &str| {
             graph.add_output_param(node_id, name.to_string(), LinkType::Scalar);
         };
         let output_vector = |graph: &mut MyGraph, name: &str| {
             graph.add_output_param(node_id, name.to_string(), LinkType::Vec2);
         };
-        let output_child = |graph: &mut MyGraph, name: &str| {
-            graph.add_output_param(node_id, name.to_string(), LinkType::Parent);
-        };
+
+        // let output_child = |graph: &mut MyGraph, name: &str| {
+        //     graph.add_output_param(node_id, name.to_string(), LinkType::Parent);
+        // };
 
         match self {
             NodeType::Person => {
                 graph.add_input_param(
                     node_id,
-                    "".to_string(),
-                    LinkType::Parent,
-                    ValueType::Weak,
+                    "Parent",
+                    LinkType::Related,
+                    ValueType::Related,
                     InputParamKind::ConnectionOnly,
                     true,
                 );
-                // input_parent(graph, "parent");
-                output_child(graph, "Child");
+                graph.add_output_param(node_id, "Relation", LinkType::Related);
+                // input_parent(graph, "");
+                // output_child(graph, "Child");
             }
-            NodeType::Image => todo!(),
-            NodeType::File => todo!(),
-            NodeType::Audio => todo!(),
-            NodeType::Video => todo!(),
-            NodeType::GenericURL => todo!(),
+            NodeType::Image => {}
+            NodeType::File => {}
+            NodeType::Audio => {}
+            NodeType::Video => {}
+            NodeType::Url => {
+                graph.add_input_param(
+                    node_id,
+                    "Incoming",
+                    LinkType::Related,
+                    ValueType::Related,
+                    InputParamKind::ConnectionOnly,
+                    true,
+                );
+                graph.add_output_param(node_id, "Outgoing Link", LinkType::Related);
+            }
             NodeType::AddScalar => {
                 // The first input param doesn't use the closure so we can comment
                 // it in more detail.
@@ -305,7 +318,7 @@ impl NodeTemplateTrait for NodeType {
                     node_id,
                     // This is the name of the parameter. Can be later used to
                     // retrieve the value. Parameter names should be unique.
-                    "A".into(),
+                    "A",
                     // The data type for this input. In this case, a scalar
                     LinkType::Scalar,
                     // The value type for this input. We store zero as default
@@ -357,9 +370,6 @@ impl NodeTemplateIter for AllMyNodeTemplates {
     type Item = NodeType;
 
     fn all_kinds(&self) -> Vec<Self::Item> {
-        // This function must return a list of node kinds, which the node finder
-        // will use to display it to the user. Crates like strum can reduce the
-        // boilerplate in enumerating all variants of an enum.
         enum_iterator::all::<Self::Item>().collect::<Vec<_>>()
     }
 }
@@ -379,15 +389,19 @@ impl WidgetValueTrait for ValueType {
         // This trait is used to tell the library which UI to display for the
         // inline parameter widgets.
         match self {
+            ValueType::Related => {
+                ui.label(param_name);
+            }
+            ValueType::Weak => {
+                ui.label(param_name);
+                // ui.label("");
+            }
+
             ValueType::Person { value } => {
                 ui.label(param_name);
                 ui.horizontal(|ui| {
                     ui.add(egui::widgets::TextEdit::singleline(&mut value.name).hint_text("Name"));
                 });
-            }
-            ValueType::Weak => {
-                ui.label(param_name);
-                // ui.label("");
             }
             ValueType::Vec2 { value } => {
                 ui.label(param_name);
@@ -426,8 +440,8 @@ impl NodeDataTrait for NodeData {
         &self,
         ui: &mut egui::Ui,
         node_id: NodeId,
-        _graph: &Graph<NodeData, LinkType, ValueType>,
-        user_state: &mut Self::UserState,
+        graph: &Graph<NodeData, LinkType, ValueType>,
+        _user_state: &mut Self::UserState,
     ) -> Vec<NodeResponse<MyResponse, NodeData>>
     where
         MyResponse: UserResponseTrait,
@@ -437,28 +451,60 @@ impl NodeDataTrait for NodeData {
         // the value stored in the global user state, and draw different button
         // UIs based on that.
 
+        let node = graph.nodes.get(node_id).unwrap();
+        info!(format!(
+            "Node: inputs: {:?} outputs: {:?} notes: {:?}",
+            node.inputs, node.outputs, node.user_data.notes
+        ));
+
+        let mut notes_string = node.user_data.notes.to_string();
+        let mut value_string = node.user_data.value.to_string();
         let mut responses = vec![];
-        let is_active = user_state
-            .active_node
-            .map(|id| id == node_id)
-            .unwrap_or(false);
+
+        // TODO: value should be based on the node type
+        ui.label("Value");
+        let node_value = egui::widgets::TextEdit::singleline(&mut value_string).ui(ui);
+        if node_value.lost_focus() || value_string != node.user_data.value {
+            responses.push(NodeResponse::User(MyResponse::UpdateNodeValue(
+                node_id,
+                value_string,
+            )));
+        }
+
+        ui.label("Notes");
+        let notes_box = egui::TextEdit::multiline(&mut notes_string)
+            .desired_rows(3)
+            .hint_text("Notes")
+            .ui(ui);
+
+        if notes_box.lost_focus() || notes_string != node.user_data.notes {
+            responses.push(NodeResponse::User(MyResponse::UpdateNodeNotes(
+                node_id,
+                notes_string,
+            )));
+        }
+
+        // let is_active = user_state
+        //     .active_node
+        //     .map(|id| id == node_id)
+        //     .unwrap_or(false);
 
         // Pressing the button will emit a custom user response to either set,
         // or clear the active node. These responses do nothing by themselves,
         // the library only makes the responses available to you after the graph
         // has been drawn. See below at the update method for an example.
-        if !is_active {
-            if ui.button("👁 Set active").clicked() {
-                responses.push(NodeResponse::User(MyResponse::SetActiveNode(node_id)));
-            }
-        } else {
-            let button =
-                egui::Button::new(egui::RichText::new("👁 Active").color(egui::Color32::BLACK))
-                    .fill(egui::Color32::GOLD);
-            if ui.add(button).clicked() {
-                responses.push(NodeResponse::User(MyResponse::ClearActiveNode));
-            }
-        }
+        // if !is_active {
+        //     if ui.button("👁 Set active").clicked() {
+        //         responses.push(NodeResponse::User(MyResponse::SetActiveNode(node_id)));
+        //     }
+        // } else {
+        //     let button =
+        //         egui::Button::new(egui::RichText::new("👁 Active").color(egui::Color32::BLACK))
+        //             .fill(egui::Color32::GOLD);
+        //     if ui.add(button).clicked() {
+        //         responses.push(NodeResponse::User(MyResponse::ClearActiveNode));
+        //     }
+        // }
 
         responses
     }
@@ -478,7 +524,6 @@ pub struct OsintGraph {
     #[allow(dead_code)]
     messages: Toasts,
 
-    #[allow(dead_code)]
     storage: crate::storage::Backend,
 
     adderbox: String,
@@ -531,6 +576,15 @@ impl eframe::App for OsintGraph {
                     handle_adderbox(ctx, self.adderbox.clone());
                     self.adderbox.clear();
                 }
+
+                let getbutton = egui::Button::new("Get").ui(ui);
+                if getbutton.clicked() {
+                    self.storage.get("test", ctx);
+                }
+                let setbutton = egui::Button::new("Set").ui(ui);
+                if setbutton.clicked() {
+                    self.storage.set("test", "test", ctx);
+                }
             });
         });
         let graph_response = egui::CentralPanel::default()
@@ -551,6 +605,25 @@ impl eframe::App for OsintGraph {
                 match user_event {
                     MyResponse::SetActiveNode(node) => self.user_state.active_node = Some(node),
                     MyResponse::ClearActiveNode => self.user_state.active_node = None,
+                    MyResponse::UpdateNodeNotes(nodeid, notes) => {
+                        self.state
+                            .graph
+                            .nodes
+                            .get_mut(nodeid)
+                            .unwrap()
+                            .user_data
+                            .notes = notes;
+                    }
+                    MyResponse::UpdateNodeValue(nodeid, value) => {
+                        self.state
+                            .graph
+                            .nodes
+                            .get_mut(nodeid)
+                            .unwrap()
+                            .user_data
+                            .value = value;
+                    }
+                    MyResponse::ClearNodeLink(_left, _right) => todo!("Implement ClearNodeLink"),
                 }
             }
         }
@@ -640,11 +713,11 @@ pub fn evaluate_node(
     let mut evaluator = Evaluator::new(graph, outputs_cache, node_id);
     match node.user_data.template {
         NodeType::Person => Err(anyhow::anyhow!("Not implemented")),
-        NodeType::File => todo!(),
-        NodeType::Image => todo!(),
-        NodeType::Audio => todo!(),
-        NodeType::Video => todo!(),
-        NodeType::GenericURL => todo!(),
+        NodeType::File => Err(anyhow::anyhow!("Not implemented")),
+        NodeType::Image => Err(anyhow::anyhow!("Not implemented")),
+        NodeType::Audio => Err(anyhow::anyhow!("Not implemented")),
+        NodeType::Video => Err(anyhow::anyhow!("Not implemented")),
+        NodeType::Url => Err(anyhow::anyhow!("Not implemented")),
         NodeType::AddScalar => {
             let a = evaluator.input_scalar("A")?;
             let b = evaluator.input_scalar("B")?;

@@ -1,3 +1,6 @@
+use ehttp::{fetch, Headers, Request, Response};
+use gloo_console::{error, info};
+
 pub struct Backend {
     #[allow(dead_code)]
     url: String,
@@ -12,44 +15,91 @@ impl Default for Backend {
 }
 
 impl Backend {
-    /// Ensure you prepend a `/` to the endpoint
+    /// If you don't prepend the endpoint with a forward-slash we're going to do it for you!
     ///
-    #[allow(dead_code)]
     pub fn make_url(&self, endpoint: &str) -> String {
-        format!("{}{}", self.url, endpoint)
+        if !endpoint.starts_with('/') {
+            return format!("{}/{}", self.url, endpoint);
+        }
+        let res = format!("{}{}", self.url, endpoint);
+        info!(
+            "Self.url: {} endpoint: {} res: {}",
+            &self.url, endpoint, &res
+        );
+        res
     }
 }
-
-use gloo_net::http::Request;
 
 use crate::get_backend_base_url;
 
 impl Backend {
     #[allow(dead_code)]
-    pub async fn get(&self, key: &str) -> Option<String> {
-        let resp = Request::get(&self.make_url(&format!("/get/{}", key)))
-            .send()
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), 200);
-        match resp.text().await {
-            Ok(text) => Some(text),
-            Err(e) => {
-                gloo_console::error!("Error getting string: {}", e.to_string());
-                None
+    pub fn get(&self, key: &str, egui_ctx: &eframe::egui::Context) {
+        let req = Request::get(self.make_url(&format!("/get/{}", key)));
+        let egui_ctx = egui_ctx.clone();
+        let key = key.to_string();
+        fetch(req, move |response: Result<Response, String>| {
+            match response {
+                Ok(resp) => {
+                    if resp.status != 200 {
+                        error!("Failed to perform get request: {}", resp.status);
+                    } else {
+                        info!(format!(
+                            "Got response for get: {} status: {} value: {:?}",
+                            key,
+                            resp.status,
+                            resp.text()
+                        ));
+                    }
+                }
+                Err(err) => {
+                    println!("Failed to perform get request: {}", err);
+                }
             }
-        }
+
+            egui_ctx.request_repaint();
+        });
+        // .expect("Failed to perform get request");
+        // assert_eq!(resp.status, 200);
+        // resp.text().map(|s| s.to_string())
     }
 
-    #[allow(dead_code)]
-    pub async fn set(&mut self, key: &str, value: String) {
-        let resp = Request::post(&self.make_url(&format!("/set/{}", key)))
-            .json(&value)
-            .unwrap()
-            .send()
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), 200);
+    pub fn set(&mut self, key: &str, value: &str, egui_ctx: &eframe::egui::Context) {
+        let url = self.make_url(&format!("/set/{}", key));
+        info!("Dest url: {}", &url);
+        let headers: Headers = Headers::new(&[("Content-Type", "application/json; charset=utf-8")]);
+        let req = Request {
+            url,
+            method: "POST".into(),
+            headers,
+            body: serde_json::to_string(value)
+                .expect("Failed to serialise data!")
+                .into(),
+        };
+        // ::post(&url, value.as_bytes().into());
+        // req.set_header("Content-Type", "text/plain");
+
+        let egui_ctx = egui_ctx.clone();
+        fetch(req, move |response: Result<Response, String>| {
+            match response {
+                Ok(resp) => {
+                    if resp.status != 200 {
+                        error!(format!(
+                            "Failed to perform set request: status={} body={}",
+                            resp.status,
+                            resp.text().unwrap_or("No body")
+                        ));
+                    } else {
+                        info!("Got response: {}", resp.status);
+                    }
+                }
+                Err(err) => {
+                    println!("Failed to perform get request: {}", err);
+                }
+            }
+
+            egui_ctx.request_repaint();
+        });
     }
 
     // fn flush(&mut self) {}

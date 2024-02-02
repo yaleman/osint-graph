@@ -3,7 +3,7 @@ use std::{borrow::Cow, collections::HashMap};
 use eframe::egui::{self, DragValue, TextStyle, Widget};
 use egui_node_graph2::*;
 use egui_notify::Toasts;
-use gloo_console::{info, warn};
+use gloo_console::warn;
 use serde::{Deserialize, Serialize};
 
 use crate::storage::Backend;
@@ -104,6 +104,7 @@ pub enum NodeType {
 
     Person,
     Url,
+    Note,
 }
 
 /// The response type is used to encode side-effects produced when drawing a
@@ -197,6 +198,7 @@ impl NodeTemplateTrait for NodeType {
             NodeType::Audio => "Audio",
             NodeType::Video => "Video",
             NodeType::Person => "Person",
+            NodeType::Note => "Note",
         })
     }
 
@@ -217,6 +219,7 @@ impl NodeTemplateTrait for NodeType {
             // empty because they're in the base category
             NodeType::Url => vec![],
             NodeType::Person => vec![],
+            NodeType::Note => vec![],
         }
     }
 
@@ -283,6 +286,16 @@ impl NodeTemplateTrait for NodeType {
         // };
 
         match self {
+            NodeType::Note => {
+                graph.add_input_param(
+                    node_id,
+                    "Related",
+                    LinkType::Related,
+                    ValueType::Related,
+                    InputParamKind::ConnectionOnly,
+                    true,
+                );
+            }
             NodeType::Person => {
                 graph.add_input_param(
                     node_id,
@@ -452,10 +465,6 @@ impl NodeDataTrait for NodeData {
         // UIs based on that.
 
         let node = graph.nodes.get(node_id).unwrap();
-        info!(format!(
-            "Node: inputs: {:?} outputs: {:?} notes: {:?}",
-            node.inputs, node.outputs, node.user_data.notes
-        ));
 
         let mut notes_string = node.user_data.notes.to_string();
         let mut value_string = node.user_data.value.to_string();
@@ -606,13 +615,10 @@ impl eframe::App for OsintGraph {
                     MyResponse::SetActiveNode(node) => self.user_state.active_node = Some(node),
                     MyResponse::ClearActiveNode => self.user_state.active_node = None,
                     MyResponse::UpdateNodeNotes(nodeid, notes) => {
-                        self.state
-                            .graph
-                            .nodes
-                            .get_mut(nodeid)
-                            .unwrap()
-                            .user_data
-                            .notes = notes;
+                        // if there's notes, then update the node data
+                        if let Some(node) = self.state.graph.nodes.get_mut(nodeid) {
+                            node.user_data.notes = notes;
+                        }
                     }
                     MyResponse::UpdateNodeValue(nodeid, value) => {
                         self.state
@@ -712,12 +718,13 @@ pub fn evaluate_node(
     let node = &graph[node_id];
     let mut evaluator = Evaluator::new(graph, outputs_cache, node_id);
     match node.user_data.template {
-        NodeType::Person => Err(anyhow::anyhow!("Not implemented")),
-        NodeType::File => Err(anyhow::anyhow!("Not implemented")),
-        NodeType::Image => Err(anyhow::anyhow!("Not implemented")),
-        NodeType::Audio => Err(anyhow::anyhow!("Not implemented")),
-        NodeType::Video => Err(anyhow::anyhow!("Not implemented")),
-        NodeType::Url => Err(anyhow::anyhow!("Not implemented")),
+        NodeType::Note => anyhow::Result::Ok(ValueType::Related),
+        NodeType::Person => anyhow::Result::Ok(ValueType::Related),
+        NodeType::File => anyhow::Result::Ok(ValueType::Related),
+        NodeType::Image => anyhow::Result::Ok(ValueType::Related),
+        NodeType::Audio => anyhow::Result::Ok(ValueType::Related),
+        NodeType::Video => anyhow::Result::Ok(ValueType::Related),
+        NodeType::Url => anyhow::Result::Ok(ValueType::Related),
         NodeType::AddScalar => {
             let a = evaluator.input_scalar("A")?;
             let b = evaluator.input_scalar("B")?;

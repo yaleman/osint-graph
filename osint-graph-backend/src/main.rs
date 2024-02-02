@@ -1,56 +1,21 @@
 use axum::{
-    // body::Bytes,
     error_handling::HandleErrorLayer,
-    extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Json,
     Router,
+};
+use osint_graph_backend::{
+    kvstore::{get_key, post_set},
+    SharedState,
 };
 use tower_http::services::ServeDir;
 use tracing::info;
 
-use std::{
-    borrow::Cow,
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::{borrow::Cow, sync::Arc, time::Duration};
 use tower::{BoxError, ServiceBuilder};
-use tower_http::{
-    // compression::CompressionLayer, limit::RequestBodyLimitLayer,
-    trace::TraceLayer,
-    // validate_request::ValidateRequestHeaderLayer,
-};
+use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-async fn get_key(Path(key): Path<String>, State(state): State<SharedState>) -> impl IntoResponse {
-    eprintln!("Got get for key: {}", key);
-    match state.read().unwrap().db.get(&key) {
-        Ok(val) => (StatusCode::OK, val.unwrap_or("".to_string())),
-        Err(err) => {
-            eprintln!("Failed to get key={} err='{:?}'", key, err);
-            (StatusCode::NOT_FOUND, "".to_string())
-        }
-    }
-}
-
-async fn post_set(
-    Path(key): Path<String>,
-    State(state): State<SharedState>,
-    Json(payload): Json<serde_json::Value>,
-) -> &'static str {
-    eprintln!("Got post for key: {} value: {:?}", key, payload);
-
-    state
-        .write()
-        .unwrap()
-        .db
-        .set(&key, &payload.to_string())
-        .expect("Failed to save to DB!");
-
-    "OK"
-}
 
 #[tokio::main]
 async fn main() {
@@ -95,13 +60,6 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(&fulladdr).await.unwrap();
     tracing::info!("listening on http://{}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
-}
-
-type SharedState = Arc<RwLock<AppState>>;
-
-#[derive(Default)]
-struct AppState {
-    db: osint_graph_backend::storage::Storage,
 }
 
 async fn handle_error(error: BoxError) -> impl IntoResponse {

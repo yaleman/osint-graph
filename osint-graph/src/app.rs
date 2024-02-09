@@ -1,12 +1,17 @@
+use std::sync::{Arc, RwLock};
 use std::{borrow::Cow, collections::HashMap};
 
+use chrono::{DateTime, Utc};
 use eframe::egui::{self, DragValue, TextStyle, Widget};
 use egui_node_graph2::*;
 use egui_notify::Toasts;
-use gloo_console::warn;
+use ehttp::{fetch, Request, Response};
+use gloo_console::{info, warn};
+use osint_graph_shared::project::Project;
 use serde::{Deserialize, Serialize};
 
-use crate::storage::Backend;
+const WINDOW_OPEN_X: f32 = 10.0;
+const WINDOW_OPEN_Y: f32 = 30.0;
 
 // ========= First, define your user data types =============
 
@@ -130,6 +135,12 @@ pub enum MyResponse {
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct MyGraphState {
     pub active_node: Option<NodeId>,
+    pub last_change: Option<DateTime<Utc>>,
+    pub current_project: Option<Project>,
+
+    pub showing_project_manager: bool,
+
+    pub showing_project_info: bool,
 }
 
 // =========== Then, you need to implement some traits ============
@@ -183,6 +194,7 @@ impl NodeTemplateTrait for NodeType {
     type UserState = MyGraphState;
     type CategoryType = NodeCategory;
 
+    /// Used in the menu for starting a new node
     fn node_finder_label(&self, _user_state: &mut Self::UserState) -> Cow<'_, str> {
         Cow::Borrowed(match self {
             NodeType::MakeScalar => "New scalar",
@@ -202,7 +214,7 @@ impl NodeTemplateTrait for NodeType {
         })
     }
 
-    // this is what allows the library to show collapsible lists in the node finder.
+    /// Allows the library to show collapsible lists in the node finder.
     fn node_finder_categories(&self, _user_state: &mut Self::UserState) -> Vec<NodeCategory> {
         match self {
             NodeType::MakeScalar | NodeType::AddScalar | NodeType::SubtractScalar => {
@@ -229,7 +241,7 @@ impl NodeTemplateTrait for NodeType {
 
         // TODO: this should be based on the node type and its value
 
-        self.node_finder_label(user_state).into()
+        self.node_finder_label(user_state).to_string()
     }
 
     fn user_data(&self, _user_state: &mut Self::UserState) -> Self::NodeData {
@@ -280,10 +292,6 @@ impl NodeTemplateTrait for NodeType {
         let output_vector = |graph: &mut MyGraph, name: &str| {
             graph.add_output_param(node_id, name.to_string(), LinkType::Vec2);
         };
-
-        // let output_child = |graph: &mut MyGraph, name: &str| {
-        //     graph.add_output_param(node_id, name.to_string(), LinkType::Parent);
-        // };
 
         match self {
             NodeType::Note => {
@@ -536,6 +544,26 @@ pub struct OsintGraph {
     storage: crate::storage::Backend,
 
     adderbox: String,
+
+    project_list: Arc<RwLock<Vec<Project>>>,
+}
+
+impl OsintGraph {
+    fn sorted_project_list(&mut self) -> Vec<Project> {
+        let mut res = self.project_list.read().unwrap().to_vec();
+        res.sort_by(|a, b| {
+            let a = match a.last_updated {
+                Some(val) => val,
+                None => a.creationdate,
+            };
+            let b = match b.last_updated {
+                Some(val) => val,
+                None => b.creationdate,
+            };
+            a.cmp(&b)
+        });
+        res
+    }
 }
 
 const PERSISTENCE_KEY: &str = "osint-graph";
@@ -550,10 +578,7 @@ impl OsintGraph {
             .unwrap_or_default();
         Self {
             state,
-            user_state: MyGraphState::default(),
-            messages: Toasts::default(),
-            storage: Backend::default(),
-            adderbox: String::new(),
+            ..Default::default()
         }
     }
 }
@@ -577,6 +602,20 @@ impl eframe::App for OsintGraph {
         egui::TopBottomPanel::top("top").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 egui::widgets::global_dark_light_mode_switch(ui);
+
+                let project_manager_button = egui::Button::new("Projects")
+                    .selected(self.user_state.showing_project_manager)
+                    .ui(ui);
+                if project_manager_button.clicked() {
+                    info!(
+                        "Project manager button clicked: {:?}",
+                        self.user_state.showing_project_manager
+                    );
+                    self.user_state.showing_project_manager =
+                        !self.user_state.showing_project_manager;
+                    self.list_projects(&ctx);
+                }
+
                 let adderbox = egui::widgets::TextEdit::singleline(&mut self.adderbox)
                     .hint_text("New node")
                     .ui(ui);
@@ -593,6 +632,30 @@ impl eframe::App for OsintGraph {
                 let setbutton = egui::Button::new("Set").ui(ui);
                 if setbutton.clicked() {
                     self.storage.set("test", "test", ctx);
+                }
+
+                self.project_manager_window(ctx);
+                self.project_info_window(ctx);
+
+                let save_button = egui::Button::new("Save").ui(ui);
+                if save_button.clicked() {
+                    info!("Would save");
+                    // TODO: Save the project
+                }
+
+                if let Some(project) = self.user_state.current_project.as_ref() {
+                    ui.label(format!(
+                        "Current project: {} ({})",
+                        project.name,
+                        project.id.to_string()
+                    ));
+                }
+
+                let project_info_button = egui::Button::new("Project Info")
+                    .selected(self.user_state.showing_project_info)
+                    .ui(ui);
+                if project_info_button.clicked() {
+                    self.user_state.showing_project_info = !self.user_state.showing_project_info;
                 }
             });
         });
@@ -651,6 +714,90 @@ impl eframe::App for OsintGraph {
                 self.user_state.active_node = None;
             }
         }
+    }
+}
+
+impl OsintGraph {
+    fn project_manager_window(&mut self, ctx: &egui::Context) {
+        let sorted_project_list = self.sorted_project_list();
+
+        egui::Window::new("Project Manager")
+            .open(&mut self.user_state.showing_project_manager)
+            .resizable(true)
+            .default_pos((WINDOW_OPEN_X, WINDOW_OPEN_Y))
+            .show(ctx, |ui| {
+                let new_project = egui::Button::new("New Project").ui(ui);
+                if new_project.clicked() {
+                    info!("Would create new project");
+                }
+
+                for project in sorted_project_list {
+                    let proj_button = egui::Button::new(project.name.clone()).frame(false).ui(ui);
+                    if proj_button.clicked() {
+                        info!(format!("Would load {}", project.id));
+                        self.user_state.current_project = Some(project);
+                        // TODO: reload the global graph state from here
+                    }
+                }
+            });
+    }
+    fn project_info_window(&mut self, ctx: &egui::Context) {
+        egui::Window::new("Project Info")
+            .open(&mut self.user_state.showing_project_info)
+            .resizable(true)
+            .default_pos((WINDOW_OPEN_X, WINDOW_OPEN_Y))
+            .show(ctx, |ui| {
+                match self.user_state.current_project.as_ref() {
+                    Some(project) => {
+                        ui.label(format!(
+                            "Current project: {} ({})",
+                            project.name,
+                            project.id.to_string()
+                        ));
+                    }
+                    None => {
+                        ui.label("No project saved!");
+                    }
+                };
+            });
+    }
+
+    fn list_projects(&mut self, egui_ctx: &eframe::egui::Context) {
+        let url = self.storage.make_url("/projects");
+        let req = Request::get(url);
+        let egui_ctx = egui_ctx.clone();
+
+        let project_list = self.project_list.clone();
+
+        fetch(req, move |response: Result<Response, String>| {
+            let res = match response {
+                Ok(resp) => {
+                    if resp.status != 200 {
+                        gloo_console::error!(format!(
+                            "Failed to perform set request: status={} body={}",
+                            resp.status,
+                            resp.text().unwrap_or("No body")
+                        ));
+                        Vec::<Project>::new()
+                    } else {
+                        info!("Got response: {}", resp.status);
+                        let res: Vec<Project> =
+                            serde_json::from_str(&resp.text().unwrap_or("[]")).unwrap();
+
+                        res
+                    }
+                }
+                Err(err) => {
+                    println!("Failed to perform get request: {}", err);
+                    Vec::<Project>::new()
+                }
+            };
+
+            let mut write_txn = project_list.write().unwrap();
+            write_txn.clear();
+            write_txn.extend(res);
+            egui_ctx.request_repaint();
+        });
     }
 }
 

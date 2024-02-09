@@ -766,6 +766,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "chrono"
+version = "0.4.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f13690e35a5e4ace198e7beea2895d29f3a9cc55015fcebe6336bd2010af9eb"
+dependencies = [
+ "js-sys",
+ "num-traits",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "clipboard-win"
 version = "4.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2277,6 +2289,7 @@ name = "osint-graph"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "chrono",
  "eframe",
  "egui-notify",
  "egui_node_graph2",
@@ -2287,6 +2300,7 @@ dependencies = [
  "gloo-net",
  "gloo-utils",
  "log",
+ "osint-graph-shared",
  "regex",
  "serde",
  "serde_json",
@@ -2299,6 +2313,7 @@ name = "osint-graph-backend"
 version = "0.0.1"
 dependencies = [
  "axum",
+ "osint-graph-shared",
  "redb",
  "serde",
  "serde_json",
@@ -2310,11 +2325,17 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+ "uuid",
 ]
 
 [[package]]
 name = "osint-graph-shared"
 version = "0.0.1"
+dependencies = [
+ "chrono",
+ "serde",
+ "uuid",
+]
 
 [[package]]
 name = "overload"
@@ -3413,6 +3434,16 @@ name = "utf-8"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
+
+[[package]]
+name = "uuid"
+version = "1.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f00cc9702ca12d3c81455259621e676d0f7251cec66a21e98fe2e9a37db93b2a"
+dependencies = [
+ "getrandom",
+ "serde",
+]
 
 [[package]]
 name = "valuable"

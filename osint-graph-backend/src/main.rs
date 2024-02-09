@@ -7,8 +7,10 @@ use axum::{
 };
 use osint_graph_backend::{
     kvstore::{get_key, post_set},
+    project::{get_project, get_projects, post_project},
     SharedState,
 };
+use osint_graph_shared::AddrInfo;
 use tower_http::services::ServeDir;
 use tracing::info;
 
@@ -33,6 +35,9 @@ async fn main() {
     let app = Router::new()
         .route("/set/:key", post(post_set))
         .route("/get/:key", get(get_key))
+        .route("/project", post(post_project))
+        .route("/project/:id", get(get_project))
+        .route("/projects", get(get_projects))
         .nest_service(
             "/",
             ServeDir::new("./dist/").append_index_html_on_directories(true),
@@ -53,12 +58,13 @@ async fn main() {
         )
         .with_state(Arc::clone(&shared_state));
 
-    let addr = std::env::var("OSINT_GRAPH_ADDR").unwrap_or_else(|_| "127.0.0.1".to_string());
-    let port = std::env::var("OSINT_GRAPH_PORT").unwrap_or_else(|_| "8089".to_string());
-    let fulladdr = format!("{}:{}", addr, port);
+    let addrinfo = AddrInfo::from_env();
+
     // Run our app with hyper
-    let listener = tokio::net::TcpListener::bind(&fulladdr).await.unwrap();
-    tracing::info!("listening on http://{}", listener.local_addr().unwrap());
+    let listener = tokio::net::TcpListener::bind(&addrinfo.as_addr())
+        .await
+        .unwrap();
+    tracing::info!("listening on {}", addrinfo.as_url());
     axum::serve(listener, app).await.unwrap();
 }
 

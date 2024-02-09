@@ -4,6 +4,7 @@
 
 mod app;
 mod parser;
+mod projects;
 mod storage;
 pub use app::OsintGraph;
 

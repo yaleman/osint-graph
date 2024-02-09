@@ -101,6 +101,4 @@ impl Backend {
             egui_ctx.request_repaint();
         });
     }
-
-    // fn flush(&mut self) {}
 }

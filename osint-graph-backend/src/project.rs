@@ -23,7 +23,7 @@ pub async fn post_project(
 
     (
         StatusCode::OK,
-        format!("{}", serde_json::to_string_pretty(&res).unwrap()),
+        serde_json::to_string_pretty(&res).expect("Failed to serialise post project response"),
     )
 }
 
@@ -40,7 +40,8 @@ pub async fn get_project(
     match state.read().await.db.load_project(&project_id.to_string()) {
         Ok(Some(project)) => (
             StatusCode::OK,
-            format!("{}", serde_json::to_string_pretty(&project).unwrap()),
+            serde_json::to_string_pretty(&project)
+                .expect("Failed to serialise get project response"),
         ),
         Ok(None) => (StatusCode::NOT_FOUND, "Project not found".to_string()),
         Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", err)),
@@ -50,7 +51,10 @@ pub async fn get_project(
 pub async fn get_projects(State(state): State<SharedState>) -> impl IntoResponse {
     let res = state.read().await.db.list_projects();
     match res {
-        Ok(val) => (StatusCode::OK, serde_json::to_string(&val).unwrap()),
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", err)).into(),
+        Ok(val) => (
+            StatusCode::OK,
+            serde_json::to_string_pretty(&val).expect("Failed to serialize project list response"),
+        ),
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", err)),
     }
 }

@@ -6,7 +6,7 @@ use eframe::egui::{self, DragValue, TextStyle, Widget};
 use egui_node_graph2::*;
 use egui_notify::Toasts;
 use ehttp::{fetch, Request, Response};
-use gloo_console::{info, warn};
+use gloo_console::{debug, error, info, warn};
 use osint_graph_shared::project::Project;
 use serde::{Deserialize, Serialize};
 
@@ -21,6 +21,7 @@ const WINDOW_OPEN_Y: f32 = 30.0;
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct NodeData {
     template: NodeType,
+    project: Option<uuid::Uuid>,
     value: String,
     notes: String,
 }
@@ -247,6 +248,7 @@ impl NodeTemplateTrait for NodeType {
     fn user_data(&self, _user_state: &mut Self::UserState) -> Self::NodeData {
         NodeData {
             template: *self,
+            project: None,
             value: String::new(),
             notes: String::new(),
         }
@@ -613,7 +615,7 @@ impl eframe::App for OsintGraph {
                     );
                     self.user_state.showing_project_manager =
                         !self.user_state.showing_project_manager;
-                    self.list_projects(&ctx);
+                    self.list_projects(ctx);
                 }
 
                 let adderbox = egui::widgets::TextEdit::singleline(&mut self.adderbox)
@@ -646,8 +648,7 @@ impl eframe::App for OsintGraph {
                 if let Some(project) = self.user_state.current_project.as_ref() {
                     ui.label(format!(
                         "Current project: {} ({})",
-                        project.name,
-                        project.id.to_string()
+                        project.name, project.id
                     ));
                 }
 
@@ -718,6 +719,7 @@ impl eframe::App for OsintGraph {
 }
 
 impl OsintGraph {
+    /// Creates the load/save/etc project manager window
     fn project_manager_window(&mut self, ctx: &egui::Context) {
         let sorted_project_list = self.sorted_project_list();
 
@@ -741,6 +743,8 @@ impl OsintGraph {
                 }
             });
     }
+
+    /// Creates the Project Information window
     fn project_info_window(&mut self, ctx: &egui::Context) {
         egui::Window::new("Project Info")
             .open(&mut self.user_state.showing_project_info)
@@ -751,8 +755,7 @@ impl OsintGraph {
                     Some(project) => {
                         ui.label(format!(
                             "Current project: {} ({})",
-                            project.name,
-                            project.id.to_string()
+                            project.name, project.id
                         ));
                     }
                     None => {
@@ -762,6 +765,7 @@ impl OsintGraph {
             });
     }
 
+    /// Pulls the list of projects from the backend storage
     fn list_projects(&mut self, egui_ctx: &eframe::egui::Context) {
         let url = self.storage.make_url("/projects");
         let req = Request::get(url);
@@ -780,11 +784,20 @@ impl OsintGraph {
                         ));
                         Vec::<Project>::new()
                     } else {
-                        info!("Got response: {}", resp.status);
-                        let res: Vec<Project> =
-                            serde_json::from_str(&resp.text().unwrap_or("[]")).unwrap();
+                        let text = resp.text().unwrap_or("[]");
+                        #[cfg(any(debug_assertions, test))]
+                        debug!(format!(
+                            "Got response: status={} body={} ",
+                            resp.status, &text
+                        ));
 
-                        res
+                        match serde_json::from_str::<Vec<Project>>(text) {
+                            Ok(val) => val,
+                            Err(err) => {
+                                error!(format!("Failed to deserialize list of projects from backend: data={}, err={:?}", text, err));
+                                Vec::<Project>::new()
+                            }
+                        }
                     }
                 }
                 Err(err) => {

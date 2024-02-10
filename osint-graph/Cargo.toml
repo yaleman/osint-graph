@@ -26,9 +26,11 @@ gloo-console = "0.3.0"
 gloo-net = "0.5.0"
 gloo-utils = "0.2.0"
 osint-graph-shared = { path = "../osint-graph-shared" }
-log = "0.4.20"
+log = { workspace = true }
 regex = "1.10.3"
 serde = { workspace = true }
 serde_json = "1.0.112"
 wasm-bindgen-futures = "0.4.40"
 web-sys = { version = "0.3.67", features = ["Url"] }
+egui_extras = "0.26.0"
+uuid = { workspace = true, features = ["v4", "js"] }

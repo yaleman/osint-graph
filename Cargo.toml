@@ -16,17 +16,17 @@ edition = "2021"
 
 
 [workspace.dependencies]
-serde = { version = "^1.0" }
-egui = "0.25.0"
 anyhow = "1.0"
-eframe = { version = "0.25.0", features = ["persistence"] }
 chrono = { version = "0.4.33", default-features = false, features = [
     "now",
     "std",
 ] }
-
-# [lib]
-# crate-type = ["cdylib", "rlib"]
+egui = "0.25.0"
+eframe = { version = "0.25.0", features = ["persistence"] }
+log = { version = "0.4.20" }
+serde = { version = "^1.0" }
+serde_json = { version = "1.0.113" }
+uuid = { version = "1.7.0" }
 
 [profile.release]
 opt-level = 2 # fast and small wasm

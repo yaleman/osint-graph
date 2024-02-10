@@ -8,4 +8,4 @@ edition.workspace = true
 [dependencies]
 chrono = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
-uuid = { version = "1.7.0", features = ["v4", "serde"] }
+uuid = { workspace = true, features = ["v4", "serde"] }

@@ -92,7 +92,7 @@ impl Storage {
             .iter()?
             .map(|row| {
                 let (_uuid, row) = row.unwrap();
-                serde_json::from_str(&row.value()).unwrap()
+                serde_json::from_str(row.value()).unwrap()
             })
             .collect();
         Ok(res)

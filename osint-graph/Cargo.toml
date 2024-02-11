@@ -13,10 +13,7 @@ path = "src/main.rs"
 [dependencies]
 eframe = { workspace = true }
 anyhow = { workspace = true }
-chrono = { workspace = true, default-features = false, features = [
-    "wasm-bindgen",
-    "js-sys",
-] }
+chrono = { workspace = true, default-features = false, features = ["wasmbind"] }
 egui_node_graph2 = { path = "../egui_node_graph", features = ["persistence"] }
 egui-notify = "0.12.0"
 ehttp = { version = "0.4.0", features = ["native-async"] }
@@ -34,3 +31,4 @@ wasm-bindgen-futures = "0.4.40"
 web-sys = { version = "0.3.67", features = ["Url"] }
 egui_extras = "0.26.0"
 uuid = { workspace = true, features = ["v4", "js"] }
+gloo-storage = "0.3.0"

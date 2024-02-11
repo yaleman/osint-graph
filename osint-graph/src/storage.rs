@@ -1,6 +1,7 @@
 use ehttp::{fetch, Headers, Request, Response};
 use gloo_console::{error, info};
 
+use crate::get_backend_base_url;
 pub struct Backend {
     #[allow(dead_code)]
     url: String,
@@ -28,11 +29,7 @@ impl Backend {
         );
         res
     }
-}
 
-use crate::get_backend_base_url;
-
-impl Backend {
     #[allow(dead_code)]
     pub fn get(&self, key: &str, egui_ctx: &eframe::egui::Context) {
         let req = Request::get(self.make_url(&format!("/get/{}", key)));

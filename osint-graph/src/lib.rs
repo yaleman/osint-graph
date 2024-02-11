@@ -3,6 +3,7 @@
 #![warn(clippy::all, rust_2018_idioms)]
 
 mod app;
+mod model;
 mod parser;
 mod projects;
 mod storage;

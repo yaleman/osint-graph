@@ -8,8 +8,10 @@ use serde::{Deserialize, Serialize};
 pub struct Project {
     #[serde(default = "uuid::Uuid::new_v4")]
     pub id: uuid::Uuid,
+    /// Project name
     pub name: String,
-    pub user: String,
+    /// Owner/creator of the project
+    pub user: uuid::Uuid,
     /// UTC timestamp of the project creation
     #[serde(with = "chrono::serde::ts_milliseconds", default = "Utc::now")]
     pub creationdate: DateTime<Utc>,

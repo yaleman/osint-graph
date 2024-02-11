@@ -7,11 +7,19 @@ use egui_node_graph2::*;
 use egui_notify::Toasts;
 use ehttp::{fetch, Request, Response};
 use gloo_console::{debug, error, info, warn};
+use gloo_storage::{LocalStorage, Storage};
+
 use osint_graph_shared::project::Project;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+use crate::model::valuetype::ValueType;
 
 const WINDOW_OPEN_X: f32 = 10.0;
 const WINDOW_OPEN_Y: f32 = 30.0;
+
+/// Used when storing the egui state in local storage
+const PERSISTENCE_KEY: &str = "osint-graph";
 
 // ========= First, define your user data types =============
 
@@ -43,51 +51,6 @@ pub enum LinkType {
 pub struct PersonData {
     name: String,
     aliases: Vec<String>,
-}
-
-/// In the graph, input parameters can optionally have a constant value. This
-/// value can be directly edited in a widget inside the node itself.
-///
-/// There will usually be a correspondence between DataTypes and ValueTypes. But
-/// this library makes no attempt to check this consistency. For instance, it is
-/// up to the user code in this example to make sure no parameter is created
-/// with a DataType of Scalar and a ValueType of Vec2.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum ValueType {
-    Vec2 { value: egui::Vec2 },
-    Scalar { value: f32 },
-    Person { value: PersonData },
-    Related,
-    Weak,
-}
-
-impl Default for ValueType {
-    fn default() -> Self {
-        // NOTE: This is just a dummy `Default` implementation. The library
-        // requires it to circumvent some internal borrow checker issues.
-        // Self::Scalar { value: 0.0 }
-        Self::Related
-    }
-}
-
-impl ValueType {
-    /// Tries to downcast this value type to a vector
-    pub fn try_to_vec2(self) -> anyhow::Result<egui::Vec2> {
-        if let ValueType::Vec2 { value } = self {
-            Ok(value)
-        } else {
-            anyhow::bail!("Invalid cast from {:?} to vec2", self)
-        }
-    }
-
-    /// Tries to downcast this value type to a scalar
-    pub fn try_to_scalar(self) -> anyhow::Result<f32> {
-        if let ValueType::Scalar { value } = self {
-            Ok(value)
-        } else {
-            anyhow::bail!("Invalid cast from {:?} to scalar", self)
-        }
-    }
 }
 
 /// NodeTemplate is a mechanism to define node templates. It's what the graph
@@ -134,21 +97,24 @@ pub enum MyResponse {
 /// parameter drawing callbacks. The contents of this struct are entirely up to
 /// the user. For this example, we use it to keep track of the 'active' node.
 #[derive(Default, serde::Serialize, serde::Deserialize)]
-pub struct MyGraphState {
+pub struct UserState {
     pub active_node: Option<NodeId>,
     pub last_change: Option<DateTime<Utc>>,
     pub current_project: Option<Project>,
 
+    // flags for visible windows
     pub showing_project_manager: bool,
-
     pub showing_project_info: bool,
+    pub showing_debug_window: bool,
+    // TODO: replace this with a hash of the graph state
+    pub unsaved_changes: bool,
 }
 
 // =========== Then, you need to implement some traits ============
 
 // A trait for the data types, to tell the library how to display them
-impl DataTypeTrait<MyGraphState> for LinkType {
-    fn data_type_color(&self, _user_state: &mut MyGraphState) -> egui::Color32 {
+impl DataTypeTrait<UserState> for LinkType {
+    fn data_type_color(&self, _user_state: &mut UserState) -> egui::Color32 {
         match self {
             LinkType::Scalar => egui::Color32::from_rgb(38, 109, 211),
             LinkType::Vec2 => egui::Color32::from_rgb(238, 207, 109),
@@ -192,7 +158,7 @@ impl NodeTemplateTrait for NodeType {
     type NodeData = NodeData;
     type DataType = LinkType;
     type ValueType = ValueType;
-    type UserState = MyGraphState;
+    type UserState = UserState;
     type CategoryType = NodeCategory;
 
     /// Used in the menu for starting a new node
@@ -245,6 +211,7 @@ impl NodeTemplateTrait for NodeType {
         self.node_finder_label(user_state).to_string()
     }
 
+    // uhhh... what is this even?
     fn user_data(&self, _user_state: &mut Self::UserState) -> Self::NodeData {
         NodeData {
             template: *self,
@@ -254,6 +221,7 @@ impl NodeTemplateTrait for NodeType {
         }
     }
 
+    /// Build a visual representation of a node when the display updates
     fn build_node(
         &self,
         graph: &mut Graph<Self::NodeData, Self::DataType, Self::ValueType>,
@@ -399,14 +367,14 @@ impl NodeTemplateIter for AllMyNodeTemplates {
 
 impl WidgetValueTrait for ValueType {
     type Response = MyResponse;
-    type UserState = MyGraphState;
+    type UserState = UserState;
     type NodeData = NodeData;
     fn value_widget(
         &mut self,
         param_name: &str,
         _node_id: NodeId,
         ui: &mut egui::Ui,
-        _user_state: &mut MyGraphState,
+        _user_state: &mut UserState,
         _node_data: &NodeData,
     ) -> Vec<MyResponse> {
         // This trait is used to tell the library which UI to display for the
@@ -450,7 +418,7 @@ impl WidgetValueTrait for ValueType {
 impl UserResponseTrait for MyResponse {}
 impl NodeDataTrait for NodeData {
     type Response = MyResponse;
-    type UserState = MyGraphState;
+    type UserState = UserState;
     type DataType = LinkType;
     type ValueType = ValueType;
 
@@ -530,17 +498,29 @@ impl NodeDataTrait for NodeData {
 }
 
 type MyGraph = Graph<NodeData, LinkType, ValueType>;
-type MyEditorState = GraphEditorState<NodeData, LinkType, ValueType, NodeType, MyGraphState>;
+type MyEditorState = GraphEditorState<NodeData, LinkType, ValueType, NodeType, UserState>;
+
+trait EditorStateFunctions {
+    fn new(&mut self);
+}
+
+impl EditorStateFunctions for MyEditorState {
+    fn new(&mut self) {
+        self.graph = MyGraph::new();
+        self.node_order = vec![];
+    }
+}
 
 #[derive(Default)]
 pub struct OsintGraph {
-    // The `GraphEditorState` is the top-level object. You "register" all your
-    // custom types by specifying it as its generic parameters.
+    /// The `GraphEditorState` is the top-level object. You "register" all your
+    /// custom types by specifying it as its generic parameters.
     state: MyEditorState,
 
-    user_state: MyGraphState,
+    user_state: UserState,
 
     #[allow(dead_code)]
+    /// This is the notifications thing I really should wire up one day
     messages: Toasts,
 
     storage: crate::storage::Backend,
@@ -548,41 +528,8 @@ pub struct OsintGraph {
     adderbox: String,
 
     project_list: Arc<RwLock<Vec<Project>>>,
-}
 
-impl OsintGraph {
-    fn sorted_project_list(&mut self) -> Vec<Project> {
-        let mut res = self.project_list.read().unwrap().to_vec();
-        res.sort_by(|a, b| {
-            let a = match a.last_updated {
-                Some(val) => val,
-                None => a.creationdate,
-            };
-            let b = match b.last_updated {
-                Some(val) => val,
-                None => b.creationdate,
-            };
-            a.cmp(&b)
-        });
-        res
-    }
-}
-
-const PERSISTENCE_KEY: &str = "osint-graph";
-
-impl OsintGraph {
-    /// If the persistence feature is enabled, Called once before the first frame.
-    /// Load previous app state (if any).
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let state = cc
-            .storage
-            .and_then(|storage| eframe::get_value(storage, PERSISTENCE_KEY))
-            .unwrap_or_default();
-        Self {
-            state,
-            ..Default::default()
-        }
-    }
+    user_id: Option<Uuid>,
 }
 
 /// Takes the input from the adderbox and creates a new node from it.
@@ -638,11 +585,22 @@ impl eframe::App for OsintGraph {
 
                 self.project_manager_window(ctx);
                 self.project_info_window(ctx);
+                self.debug_window(ctx);
+
+                let new_project = egui::Button::new("New Project").ui(ui);
+                if new_project.clicked() {
+                    self.new_project(ctx);
+                }
 
                 let save_button = egui::Button::new("Save").ui(ui);
                 if save_button.clicked() {
-                    info!("Would save");
-                    // TODO: Save the project
+                    if let Err(err) = self.save_project(ctx) {
+                        warn!("Failed to save project: {}", err);
+                    };
+                }
+                let debug_button = egui::Button::new("Debug").ui(ui);
+                if debug_button.clicked() {
+                    self.user_state.showing_debug_window = !self.user_state.showing_debug_window;
                 }
 
                 if let Some(project) = self.user_state.current_project.as_ref() {
@@ -719,6 +677,53 @@ impl eframe::App for OsintGraph {
 }
 
 impl OsintGraph {
+    /// Called once before the first frame.
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        // Load previous app state (if any).
+        let state = cc
+            .storage
+            .and_then(|storage| eframe::get_value(storage, PERSISTENCE_KEY))
+            .unwrap_or_default();
+
+        // make sure we've got a user ID stored in LocalStorage
+        let user_id = LocalStorage::get("user_id").unwrap_or_else(|_| {
+            let new_id = uuid::Uuid::new_v4().to_string();
+            LocalStorage::set("user_id", &new_id)
+                .map_err(|err| {
+                    error!(format!(
+                        "Failed to store user_id in localstorage: {:?}",
+                        err
+                    ));
+                })
+                .unwrap();
+            new_id
+        });
+
+        let user_id = Uuid::parse_str(&user_id).ok();
+
+        Self {
+            state,
+            user_id,
+            ..Default::default()
+        }
+    }
+
+    fn sorted_project_list(&mut self) -> Vec<Project> {
+        let mut res = self.project_list.read().unwrap().to_vec();
+        res.sort_by(|a, b| {
+            let a = match a.last_updated {
+                Some(val) => val,
+                None => a.creationdate,
+            };
+            let b = match b.last_updated {
+                Some(val) => val,
+                None => b.creationdate,
+            };
+            a.cmp(&b)
+        });
+        res
+    }
+
     /// Creates the load/save/etc project manager window
     fn project_manager_window(&mut self, ctx: &egui::Context) {
         let sorted_project_list = self.sorted_project_list();
@@ -763,6 +768,91 @@ impl OsintGraph {
                     }
                 };
             });
+    }
+
+    fn debug_window(&mut self, _egui_ctx: &eframe::egui::Context) {
+        egui::Window::new("Debug")
+            .open(&mut self.user_state.showing_debug_window)
+            .resizable(true)
+            .default_pos((WINDOW_OPEN_X, WINDOW_OPEN_Y))
+            .show(_egui_ctx, |ui| {
+                ui.label("Debugging stuff");
+                ui.label(format!(
+                    "User ID: {}",
+                    self.user_id
+                        .map(|u| u.to_string())
+                        .unwrap_or("<error>".to_string())
+                ));
+            });
+    }
+
+    fn new_project(&mut self, _egui_ctx: &eframe::egui::Context) {
+        // TODO: if there's nodes and state, then ask to save
+        if self.user_state.unsaved_changes {
+            debug!("We really should prompt for unsaved changes things...");
+        }
+        let user_id = self.user_id.unwrap_or_else(|| {
+            self.user_id = Some(Uuid::new_v4());
+            self.user_id.unwrap()
+        });
+        let project = Project {
+            id: uuid::Uuid::new_v4(),
+            name: "Untitled".to_string(),
+            user: user_id,
+            creationdate: Utc::now(),
+            last_updated: None,
+        };
+
+        self.user_state.current_project = Some(project);
+
+        self.state.new();
+        // todo!()
+    }
+
+    fn save_project(&mut self, _egui_ctx: &eframe::egui::Context) -> Result<(), String> {
+        let url = self.storage.make_url("/projects");
+
+        // let egui_ctx = egui_ctx.clone();
+
+        let project = match self.user_state.current_project.as_ref() {
+            Some(project) => project.clone(),
+            // TODO: turn the current state into a project.
+            None => return Err("There's no project!".to_string()),
+        };
+
+        let project_serialized = serde_json::to_string(&project).map_err(|err| {
+            error!(format!("Failed to serialize project: {:?}", err));
+            "Failed to serialize project".to_string()
+        })?;
+
+        let req = Request::post(url, project_serialized.into());
+        fetch(req, move |response: Result<Response, String>| {
+            match response {
+                Ok(resp) => {
+                    if resp.status != 200 {
+                        gloo_console::error!(format!(
+                            "Failed to save project: status={} body={}",
+                            resp.status,
+                            resp.text().unwrap_or("No body")
+                        ));
+                    } else {
+                        let text = resp.text().unwrap_or("[]");
+                        #[cfg(any(debug_assertions, test))]
+                        debug!(format!(
+                            "Got response: status={} body={} ",
+                            resp.status, &text
+                        ));
+                    }
+                }
+                Err(err) => {
+                    println!("Failed to push project to backend: {}", err);
+                }
+            };
+        });
+
+        // TODO: save all the nodes as well!
+
+        todo!()
     }
 
     /// Pulls the list of projects from the backend storage

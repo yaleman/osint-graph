@@ -25,4 +25,9 @@ impl Project {
         self.last_updated = Some(Utc::now());
         self.clone()
     }
+
+    /// Set the name
+    pub fn name(&mut self, name: String) {
+        self.name = name
+    }
 }

@@ -1,5 +1,3 @@
-// .route("/project", post(post_project))
-
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;

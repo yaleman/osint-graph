@@ -26,18 +26,19 @@ const PERSISTENCE_KEY: &str = "osint-graph";
 /// The NodeData holds a custom data struct inside each node. It's useful to
 /// store additional information that doesn't live in parameters. For this
 /// example, the node data stores the template (i.e. the "type") of the node.
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct NodeData {
     template: NodeType,
     project: Option<uuid::Uuid>,
     value: String,
     notes: String,
+    user: Uuid,
 }
 
 /// `DataType`s are what defines the possible range of connections when
 /// attaching two ports together. The graph UI will make sure to not allow
 /// attaching incompatible datatypes.
-#[derive(PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(PartialEq, Eq, serde::Serialize, serde::Deserialize, Clone)]
 pub enum LinkType {
     Scalar,
     Vec2,
@@ -56,7 +57,7 @@ pub struct PersonData {
 /// NodeTemplate is a mechanism to define node templates. It's what the graph
 /// will display in the "new node" popup. The user code needs to tell the
 /// library how to convert a NodeTemplate into a Node.
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, enum_iterator::Sequence)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, enum_iterator::Sequence, Debug)]
 pub enum NodeType {
     MakeScalar,
     AddScalar,
@@ -108,6 +109,8 @@ pub struct UserState {
     pub showing_debug_window: bool,
     // TODO: replace this with a hash of the graph state
     pub unsaved_changes: bool,
+
+    pub user_id: Uuid,
 }
 
 // =========== Then, you need to implement some traits ============
@@ -212,12 +215,13 @@ impl NodeTemplateTrait for NodeType {
     }
 
     // uhhh... what is this even?
-    fn user_data(&self, _user_state: &mut Self::UserState) -> Self::NodeData {
+    fn user_data(&self, user_state: &mut Self::UserState) -> Self::NodeData {
         NodeData {
             template: *self,
             project: None,
             value: String::new(),
             notes: String::new(),
+            user: user_state.user_id,
         }
     }
 
@@ -505,6 +509,7 @@ trait EditorStateFunctions {
 }
 
 impl EditorStateFunctions for MyEditorState {
+    /// Reset the graph state
     fn new(&mut self) {
         self.graph = MyGraph::new();
         self.node_order = vec![];
@@ -574,15 +579,6 @@ impl eframe::App for OsintGraph {
                     self.adderbox.clear();
                 }
 
-                let getbutton = egui::Button::new("Get").ui(ui);
-                if getbutton.clicked() {
-                    self.storage.get("test", ctx);
-                }
-                let setbutton = egui::Button::new("Set").ui(ui);
-                if setbutton.clicked() {
-                    self.storage.set("test", "test", ctx);
-                }
-
                 self.project_manager_window(ctx);
                 self.project_info_window(ctx);
                 self.debug_window(ctx);
@@ -604,10 +600,7 @@ impl eframe::App for OsintGraph {
                 }
 
                 if let Some(project) = self.user_state.current_project.as_ref() {
-                    ui.label(format!(
-                        "Current project: {} ({})",
-                        project.name, project.id
-                    ));
+                    ui.label(format!("Current project: {}", project.name));
                 }
 
                 let project_info_button = egui::Button::new("Project Info")
@@ -725,25 +718,25 @@ impl OsintGraph {
     }
 
     /// Creates the load/save/etc project manager window
-    fn project_manager_window(&mut self, ctx: &egui::Context) {
+    fn project_manager_window(&mut self, egui_ctx: &egui::Context) {
         let sorted_project_list = self.sorted_project_list();
 
         egui::Window::new("Project Manager")
             .open(&mut self.user_state.showing_project_manager)
             .resizable(true)
             .default_pos((WINDOW_OPEN_X, WINDOW_OPEN_Y))
-            .show(ctx, |ui| {
-                let new_project = egui::Button::new("New Project").ui(ui);
-                if new_project.clicked() {
-                    info!("Would create new project");
-                }
-
-                for project in sorted_project_list {
-                    let proj_button = egui::Button::new(project.name.clone()).frame(false).ui(ui);
-                    if proj_button.clicked() {
-                        info!(format!("Would load {}", project.id));
-                        self.user_state.current_project = Some(project);
-                        // TODO: reload the global graph state from here
+            .show(egui_ctx, |ui| {
+                if sorted_project_list.is_empty() {
+                    ui.label("No projects saved!");
+                } else {
+                    for project in sorted_project_list {
+                        let proj_button =
+                            egui::Button::new(project.name.clone()).frame(false).ui(ui);
+                        if proj_button.clicked() {
+                            debug!(format!("Loaded {}", project.id));
+                            self.user_state.current_project = Some(project);
+                            // TODO: reload the global graph state from here
+                        }
                     }
                 }
             });
@@ -756,11 +749,19 @@ impl OsintGraph {
             .resizable(true)
             .default_pos((WINDOW_OPEN_X, WINDOW_OPEN_Y))
             .show(ctx, |ui| {
-                match self.user_state.current_project.as_ref() {
+                match self.user_state.current_project.as_mut() {
                     Some(project) => {
+                        ui.label("Name:");
+                        egui::TextEdit::singleline(&mut project.name).ui(ui);
+
+                        ui.label(format!("ID: {}", project.id));
+                        ui.label(format!("Created: {}", project.creationdate.to_rfc3339()));
                         ui.label(format!(
-                            "Current project: {} ({})",
-                            project.name, project.id
+                            "Last updated: {}",
+                            project
+                                .last_updated
+                                .map(|dt| dt.to_rfc3339())
+                                .unwrap_or("Never".to_string())
                         ));
                     }
                     None => {
@@ -786,7 +787,7 @@ impl OsintGraph {
             });
     }
 
-    fn new_project(&mut self, _egui_ctx: &eframe::egui::Context) {
+    fn new_project(&mut self, _egui_ctx: &eframe::egui::Context) -> Project {
         // TODO: if there's nodes and state, then ask to save
         if self.user_state.unsaved_changes {
             debug!("We really should prompt for unsaved changes things...");
@@ -803,21 +804,21 @@ impl OsintGraph {
             last_updated: None,
         };
 
-        self.user_state.current_project = Some(project);
+        self.user_state.current_project = Some(project.clone());
 
         self.state.new();
-        // todo!()
+        project
     }
 
-    fn save_project(&mut self, _egui_ctx: &eframe::egui::Context) -> Result<(), String> {
-        let url = self.storage.make_url("/projects");
+    fn save_project(&mut self, egui_ctx: &eframe::egui::Context) -> Result<(), String> {
+        let url = self.storage.make_url("/api/v1/project");
 
-        // let egui_ctx = egui_ctx.clone();
+        let egui_ctx = egui_ctx.clone();
 
         let project = match self.user_state.current_project.as_ref() {
             Some(project) => project.clone(),
             // TODO: turn the current state into a project.
-            None => return Err("There's no project!".to_string()),
+            None => self.new_project(&egui_ctx),
         };
 
         let project_serialized = serde_json::to_string(&project).map_err(|err| {
@@ -825,7 +826,13 @@ impl OsintGraph {
             "Failed to serialize project".to_string()
         })?;
 
-        let req = Request::post(url, project_serialized.into());
+        let mut req = Request::post(url, project_serialized.into());
+        req.headers
+            .insert("Content-Type".to_string(), "application/json".to_string());
+
+        let graph_state = self.state.graph.clone();
+
+        let nodes_url = self.storage.make_url("/api/v1/nodes");
         fetch(req, move |response: Result<Response, String>| {
             match response {
                 Ok(resp) => {
@@ -845,19 +852,42 @@ impl OsintGraph {
                     }
                 }
                 Err(err) => {
-                    println!("Failed to push project to backend: {}", err);
+                    error!(format!("Failed to push project to backend: {}", err));
                 }
             };
+            // egui_ctx.request_repaint();
+
+            let project_id = Some(project.id.clone());
+            graph_state.nodes.iter().for_each(|(nodeid, nodedata)| {
+                let mut user_data = nodedata.user_data.clone();
+                if user_data.project.is_none() {
+                    user_data.project = project_id;
+                }
+
+                debug!(format!("Saving nodeid={:?} data={:?}", nodeid, user_data));
+                let serialized_node = match serde_json::to_string(&user_data) {
+                    Ok(val) => val,
+                    Err(err) => {
+                        error!(format!("Failed to serialize node data: {:?}", err));
+                        return;
+                    }
+                };
+                let mut req = Request::post(nodes_url.clone(), serialized_node.into());
+                req.headers
+                    .insert("Content-Type".to_string(), "application/json".to_string());
+            });
+
+            egui_ctx.request_repaint()
         });
 
         // TODO: save all the nodes as well!
 
-        todo!()
+        Ok(())
     }
 
     /// Pulls the list of projects from the backend storage
     fn list_projects(&mut self, egui_ctx: &eframe::egui::Context) {
-        let url = self.storage.make_url("/projects");
+        let url = self.storage.make_url("/api/v1/projects");
         let req = Request::get(url);
         let egui_ctx = egui_ctx.clone();
 

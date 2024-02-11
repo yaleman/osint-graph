@@ -6,7 +6,6 @@ use axum::{
     Router,
 };
 use osint_graph_backend::{
-    kvstore::{get_key, post_set},
     project::{get_project, get_projects, post_project},
     SharedState,
 };
@@ -33,11 +32,10 @@ async fn main() {
 
     // Build our application by composing routes
     let app = Router::new()
-        .route("/set/:key", post(post_set))
-        .route("/get/:key", get(get_key))
-        .route("/project", post(post_project))
-        .route("/project/:id", get(get_project))
-        .route("/projects", get(get_projects))
+        .route("/api/v1/project", post(post_project))
+        .route("/api/v1/project/:id", get(get_project))
+        .route("/api/v1/projects", get(get_projects))
+        // .route("/api/v1/nodes", get(async { "" }))
         .nest_service(
             "/",
             ServeDir::new("./dist/").append_index_html_on_directories(true),

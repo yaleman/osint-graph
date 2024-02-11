@@ -18,9 +18,9 @@ impl Default for Storage {
             Err(_) => shellexpand::tilde("~/.cache/osint-graph.redb").to_string(),
         };
 
-        Self {
-            db: Database::create(db_path).expect("Failed to start DB"),
-        }
+        let db = Database::create(db_path).expect("Failed to start DB");
+
+        Self { db }
     }
 }
 
@@ -72,7 +72,21 @@ impl Storage {
 
     pub fn load_project(&self, id: &str) -> Result<Option<Project>, redb::Error> {
         let read_txn = self.db.begin_read()?;
-        let table = read_txn.open_table(PROJECT_TABLE)?;
+        let table = match read_txn.open_table(PROJECT_TABLE) {
+            Ok(val) => val,
+            Err(err) => match err {
+                TableError::TypeDefinitionChanged { .. }
+                | TableError::TableAlreadyOpen(_, _)
+                | TableError::Storage(_)
+                | TableError::TableIsNotMultimap(_)
+                | TableError::TableIsMultimap(_)
+                | TableError::TableTypeMismatch { .. } => return Err(err.into()),
+                // if the table doesn't exist we haven't saved to it yet, so there's no projects.
+                TableError::TableDoesNotExist(_) => return Ok(None),
+
+                _ => todo!(),
+            },
+        };
 
         let res = table.get(id)?.map(|v| v.value().to_string());
         match res {
@@ -86,13 +100,29 @@ impl Storage {
 
     pub fn list_projects(&self) -> Result<Vec<Project>, redb::Error> {
         let read_txn = self.db.begin_read()?;
-        let table = read_txn.open_table(PROJECT_TABLE)?;
+        let table = match read_txn.open_table(PROJECT_TABLE) {
+            Ok(val) => val,
+            Err(err) => match err {
+                TableError::TypeDefinitionChanged { .. }
+                | TableError::TableAlreadyOpen(_, _)
+                | TableError::Storage(_)
+                | TableError::TableIsNotMultimap(_)
+                | TableError::TableIsMultimap(_)
+                | TableError::TableTypeMismatch { .. } => return Err(err.into()),
+                // if the table doesn't exist we haven't saved to it yet, so there's no projects.
+                TableError::TableDoesNotExist(_) => return Ok(Vec::new()),
+
+                _ => todo!(),
+            },
+        };
 
         let res = table
             .iter()?
             .map(|row| {
                 let (_uuid, row) = row.unwrap();
-                serde_json::from_str(row.value()).unwrap()
+                let row_value = row.value();
+                // eprintln!("Got uuid={} data={}", uuid.value(), row.value());
+                serde_json::from_str(row_value).expect("Failed to deserialize value")
             })
             .collect();
         Ok(res)

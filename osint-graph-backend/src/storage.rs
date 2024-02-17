@@ -1,5 +1,6 @@
 use osint_graph_shared::project::Project;
 use redb::*;
+use tracing::error;
 
 const TABLE: TableDefinition<&str, &str> = TableDefinition::new("data");
 const PROJECT_TABLE: TableDefinition<&str, &str> = TableDefinition::new("projects");
@@ -83,8 +84,7 @@ impl Storage {
                 | TableError::TableTypeMismatch { .. } => return Err(err.into()),
                 // if the table doesn't exist we haven't saved to it yet, so there's no projects.
                 TableError::TableDoesNotExist(_) => return Ok(None),
-
-                _ => todo!(),
+                _ => return Ok(None),
             },
         };
 
@@ -112,7 +112,10 @@ impl Storage {
                 // if the table doesn't exist we haven't saved to it yet, so there's no projects.
                 TableError::TableDoesNotExist(_) => return Ok(Vec::new()),
 
-                _ => todo!(),
+                _ => {
+                    error!("Failed to connect to table: {:?}", err);
+                    return Ok(Vec::new());
+                }
             },
         };
 

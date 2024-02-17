@@ -3,6 +3,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Project {
@@ -29,5 +30,18 @@ impl Project {
     /// Set the name
     pub fn name(&mut self, name: String) {
         self.name = name
+    }
+}
+
+impl Default for Project {
+    fn default() -> Self {
+        let creationdate = Utc::now();
+        Self {
+            id: Uuid::new_v4(),
+            name: creationdate.format("%Y-%m-%d %H:%M:%S").to_string(),
+            user: Default::default(),
+            creationdate,
+            last_updated: None,
+        }
     }
 }

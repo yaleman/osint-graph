@@ -4,6 +4,7 @@ use tokio::sync::RwLock;
 
 pub mod identifier;
 pub mod kvstore;
+pub mod middleware;
 pub mod project;
 pub mod storage;
 

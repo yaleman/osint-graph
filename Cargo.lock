@@ -2421,6 +2421,7 @@ name = "osint-graph-backend"
 version = "0.0.1"
 dependencies = [
  "axum",
+ "http-body-util",
  "osint-graph-shared",
  "redb",
  "serde",

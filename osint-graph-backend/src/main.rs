@@ -1,6 +1,7 @@
 use axum::{
+    body::Body,
     error_handling::HandleErrorLayer,
-    http::StatusCode,
+    http::{header, Response, StatusCode},
     response::IntoResponse,
     routing::{get, post},
     Router,
@@ -10,7 +11,7 @@ use osint_graph_backend::{
     SharedState,
 };
 use osint_graph_shared::AddrInfo;
-use tower_http::services::ServeDir;
+use tower_http::{services::ServeDir, set_header::SetResponseHeaderLayer};
 use tracing::info;
 
 use std::{borrow::Cow, sync::Arc, time::Duration};
@@ -30,24 +31,31 @@ async fn main() {
 
     let shared_state = SharedState::default();
 
+    let static_service = ServeDir::new("./dist/").append_index_html_on_directories(true);
+
     // Build our application by composing routes
     let app = Router::new()
         .route("/api/v1/project", post(post_project))
         .route("/api/v1/project/:id", get(get_project))
         .route("/api/v1/projects", get(get_projects))
         // .route("/api/v1/nodes", get(async { "" }))
-        .nest_service(
-            "/",
-            ServeDir::new("./dist/").append_index_html_on_directories(true),
-        )
-        .nest_service(
-            "/static",
-            ServeDir::new("./dist").append_index_html_on_directories(true),
-        )
+        .nest_service("/", static_service.clone())
+        .nest_service("/static", static_service)
         // Add middleware to all routes
         .layer(
             ServiceBuilder::new()
                 // Handle errors from middleware
+                .layer(osint_graph_backend::middleware::corslayer())
+                .layer(SetResponseHeaderLayer::overriding(
+                    header::CACHE_CONTROL,
+                    |response: &Response<Body>| {
+                        if response.status() == StatusCode::OK {
+                            "private no-transform max-age=15".parse().ok()
+                        } else {
+                            None
+                        }
+                    },
+                ))
                 .layer(HandleErrorLayer::new(handle_error))
                 .load_shed()
                 .concurrency_limit(1024)

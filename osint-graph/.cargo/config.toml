@@ -1,0 +1,4 @@
+[build]
+# this enables copy and paste for eframe <https://docs.rs/eframe/0.26.2/eframe/index.html#compiling-for-web>target = "wasm32-unknown-unknown"
+rustflags = ["--cfg=web_sys_unstable_apis"]
+target = "wasm32-unknown-unknown"

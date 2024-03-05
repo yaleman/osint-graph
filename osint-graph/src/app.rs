@@ -6,13 +6,14 @@ use chrono::{DateTime, Utc};
 use eframe::egui::{self, DragValue, TextStyle, Widget};
 
 use egui_node_graph2::*;
-use egui_notify::Toasts;
 use ehttp::{fetch, Request, Response};
 use gloo_console::{debug, error, info, warn};
 use gloo_storage::{LocalStorage, Storage};
 
+use osint_graph_shared::node::NodeUpdateList;
 use osint_graph_shared::project::Project;
 use serde::{Deserialize, Serialize};
+use slotmap::SlotMap;
 use uuid::Uuid;
 
 use crate::model::valuetype::ValueType;
@@ -30,11 +31,13 @@ const PERSISTENCE_KEY: &str = "osint-graph";
 /// example, the node data stores the template (i.e. the "type") of the node.
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct NodeData {
+    id: Uuid,
     template: NodeType,
     project: Option<uuid::Uuid>,
     value: String,
     notes: String,
     user: Uuid,
+    updated: DateTime<Utc>,
 }
 
 /// `DataType`s are what defines the possible range of connections when
@@ -99,7 +102,7 @@ pub enum MyResponse {
 /// The graph 'global' state. This state struct is passed around to the node and
 /// parameter drawing callbacks. The contents of this struct are entirely up to
 /// the user. For this example, we use it to keep track of the 'active' node.
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct UserState {
     pub active_node: Option<NodeId>,
     pub last_change: Option<DateTime<Utc>>,
@@ -235,11 +238,13 @@ impl NodeTemplateTrait for NodeType {
     // uhhh... what is this even?
     fn user_data(&self, user_state: &mut Self::UserState) -> Self::NodeData {
         NodeData {
+            id: Uuid::new_v4(),
             template: *self,
             project: None,
             value: String::new(),
             notes: String::new(),
             user: user_state.user_id,
+            updated: Utc::now(),
         }
     }
 
@@ -523,18 +528,18 @@ type MyGraph = Graph<NodeData, LinkType, ValueType>;
 type MyEditorState = GraphEditorState<NodeData, LinkType, ValueType, NodeType, UserState>;
 
 trait EditorStateFunctions {
-    fn new(&mut self);
+    fn reset(&mut self);
 }
 
 impl EditorStateFunctions for MyEditorState {
     /// Reset the graph state
-    fn new(&mut self) {
+    fn reset(&mut self) {
         self.graph = MyGraph::new();
         self.node_order = vec![];
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct OsintGraph {
     /// The `GraphEditorState` is the top-level object. You "register" all your
     /// custom types by specifying it as its generic parameters.
@@ -544,8 +549,7 @@ pub struct OsintGraph {
 
     #[allow(dead_code)]
     /// This is the notifications thing I really should wire up one day
-    messages: Toasts,
-
+    // messages: Toasts,
     storage: crate::storage::Backend,
 
     adderbox: String,
@@ -558,6 +562,54 @@ pub struct OsintGraph {
 /// Takes the input from the adderbox and creates a new node from it.
 pub fn handle_adderbox(_ctx: &egui::Context, adderbox: String) {
     warn!("New adderbox: {}", adderbox);
+}
+
+/// Set of changes to send to the server.
+#[allow(dead_code)]
+#[derive(Serialize, Deserialize)]
+pub struct Changes {
+    new: Vec<(NodeId, Node<NodeData>)>,
+    delete: Vec<NodeId>,
+    update: Vec<(NodeId, Node<NodeData>)>,
+
+    calculation_time: DateTime<Utc>,
+}
+
+impl Default for Changes {
+    fn default() -> Self {
+        Self {
+            new: Vec::default(),
+            delete: Vec::default(),
+            update: Vec::default(),
+            calculation_time: Utc::now(),
+        }
+    }
+}
+
+/// Identify, based on two sets of nodes, if we need to send updates to the backend.
+#[allow(dead_code)]
+pub fn calculate_updates(
+    server_nodes: &SlotMap<NodeId, Node<NodeData>>,
+    current_nodes: &SlotMap<NodeId, Node<NodeData>>,
+) -> Changes {
+    let mut changes = Changes::default();
+    for (current_nodeid, current_node) in current_nodes.clone() {
+        if !server_nodes.contains_key(current_nodeid) {
+            changes.new.push((current_nodeid, current_node));
+        } else if let Some(server_node) = server_nodes.get(current_nodeid) {
+            if server_node != &current_node {
+                changes.update.push((current_nodeid, current_node));
+            }
+        }
+    }
+
+    for (server_nodeid, _) in server_nodes {
+        if !current_nodes.contains_key(server_nodeid) {
+            changes.delete.push(server_nodeid);
+        }
+    }
+
+    changes
 }
 
 impl eframe::App for OsintGraph {
@@ -670,7 +722,7 @@ impl eframe::App for OsintGraph {
             }
         }
 
-        if let Some(node) = self.user_state.active_node.clone() {
+        if let Some(node) = self.user_state.active_node {
             if self.state.graph.nodes.contains_key(node) {
                 let text = match evaluate_node(&self.state.graph, node, &mut HashMap::new()) {
                     Ok(value) => format!("The result is: {:?}", value),
@@ -757,6 +809,7 @@ impl OsintGraph {
                             let new_project = project.clone();
                             debug!(format!("Loading {}", project.id.clone()));
 
+                            debug!(format!("Project contents: {:?}", project));
                             let mut writer = self.user_state.current_project.write().unwrap();
 
                             *writer = new_project;
@@ -807,6 +860,29 @@ impl OsintGraph {
                     "Project ID: {}",
                     self.user_state.current_project.read().unwrap().id
                 ));
+
+                let yeet_button = egui::Button::new("Force-push project to server").ui(ui);
+                if yeet_button.clicked() {
+                    let current_project = self.user_state.current_project.read().unwrap().clone();
+
+                    let mut nodes: NodeUpdateList = NodeUpdateList::new();
+
+                    self.state
+                        .graph
+                        .nodes
+                        .iter()
+                        .for_each(|(_nodeid, nodedata)| {
+                            nodes
+                                .0
+                                .insert(nodedata.user_data.id, nodedata.user_data.updated);
+                        });
+
+                    // TODO: yeet this to the server already
+                    let _serialized_project = Project {
+                        nodes,
+                        ..current_project
+                    };
+                }
             });
     }
 
@@ -819,7 +895,7 @@ impl OsintGraph {
 
         *self.user_state.current_project.write().unwrap() = project.clone();
 
-        self.state.new();
+        self.state.reset();
         project
     }
 
@@ -845,11 +921,13 @@ impl OsintGraph {
         req.headers
             .insert("Content-Type".to_string(), "application/json".to_string());
 
+        let _changes = calculate_updates(&SlotMap::default(), &self.state.graph.nodes);
+
         let graph_state = self.state.graph.clone();
 
         let nodes_url = self.storage.make_url("/api/v1/nodes");
 
-        let project_id = current_project.read().unwrap().id.clone();
+        let project_id = current_project.read().unwrap().id;
         let current_project = self.user_state.current_project.clone();
         fetch(req, move |response: Result<Response, String>| {
             match response {
@@ -867,7 +945,7 @@ impl OsintGraph {
                             "Got response: status={} body={} ",
                             resp.status, &text
                         ));
-                        let project: Project = match serde_json::from_str(&text) {
+                        let project: Project = match serde_json::from_str(text) {
                             Ok(val) => val,
                             Err(err) => {
                                 error!(format!(
@@ -965,6 +1043,15 @@ impl OsintGraph {
 
 type OutputsCache = HashMap<OutputId, ValueType>;
 
+impl TryFrom<&OsintGraph> for Project {
+    type Error = String;
+
+    fn try_from(value: &OsintGraph) -> Result<Self, Self::Error> {
+        let project = value.user_state.current_project.read().unwrap().clone();
+        Ok(project)
+    }
+}
+
 /// Recursively evaluates all dependencies of this node, then evaluates the node itself.
 pub fn evaluate_node(
     graph: &MyGraph,
@@ -991,7 +1078,7 @@ pub fn evaluate_node(
         }
         fn evaluate_input(&mut self, name: &str) -> anyhow::Result<ValueType> {
             // Calling `evaluate_input` recursively evaluates other nodes in the
-            // graph until the input value for a paramater has been computed.
+            // graph until the input value for a parameter has been computed.
             evaluate_input(self.graph, self.node_id, name, self.outputs_cache)
         }
         fn populate_output(&mut self, name: &str, value: ValueType) -> anyhow::Result<ValueType> {

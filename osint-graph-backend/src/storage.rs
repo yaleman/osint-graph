@@ -1,9 +1,12 @@
+use osint_graph_shared::node::Node;
 use osint_graph_shared::project::Project;
 use redb::*;
 use tracing::error;
+use uuid::Uuid;
 
 const TABLE: TableDefinition<&str, &str> = TableDefinition::new("data");
 const PROJECT_TABLE: TableDefinition<&str, &str> = TableDefinition::new("projects");
+const NODE_TABLE: TableDefinition<&str, &str> = TableDefinition::new("nodes");
 
 pub struct Storage {
     db: redb::Database,
@@ -128,6 +131,43 @@ impl Storage {
                 serde_json::from_str(row_value).expect("Failed to deserialize value")
             })
             .collect();
+        Ok(res)
+    }
+
+    pub fn save_node(&self, node: Node) -> Result<Node, redb::Error> {
+        let write_txn = self.db.begin_write()?;
+        {
+            let mut table: Table<'_, '_, &str, &str> = write_txn.open_table(NODE_TABLE)?;
+            let node_id = node.id.to_string();
+            let node_value = serde_json::to_string(&node).unwrap();
+            table.insert(node_id.as_str(), node_value.as_str())?;
+        }
+        Ok(node)
+    }
+    pub fn get_node(&self, id: Uuid) -> Result<Option<Node>, redb::Error> {
+        let read_txn = self.db.begin_read()?;
+        let table = match read_txn.open_table(PROJECT_TABLE) {
+            Ok(val) => val,
+            Err(err) => match err {
+                TableError::TypeDefinitionChanged { .. }
+                | TableError::TableAlreadyOpen(_, _)
+                | TableError::Storage(_)
+                | TableError::TableIsNotMultimap(_)
+                | TableError::TableIsMultimap(_)
+                | TableError::TableTypeMismatch { .. } => return Err(err.into()),
+                // if the table doesn't exist we haven't saved to it yet, so there's no projects.
+                TableError::TableDoesNotExist(_) => return Ok(None),
+
+                _ => {
+                    error!("Failed to connect to table: {:?}", err);
+                    return Ok(None);
+                }
+            },
+        };
+        let node_id = id.to_string();
+        let res: Option<Node> = table
+            .get(node_id.as_str())?
+            .and_then(|v| serde_json::from_str(v.value()).ok());
         Ok(res)
     }
 }

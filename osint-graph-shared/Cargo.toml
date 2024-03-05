@@ -6,6 +6,10 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-chrono = { workspace = true, features = ["serde"] }
+
+chrono = { workspace = true, features = ["serde", "alloc"] }
 serde = { workspace = true, features = ["derive"] }
 uuid = { workspace = true, features = ["v4", "serde"] }
+enum-iterator = { workspace = true }
+
+slotmap = { workspace = true }

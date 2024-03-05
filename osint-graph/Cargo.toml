@@ -17,7 +17,7 @@ chrono = { workspace = true, default-features = false, features = ["wasmbind"] }
 egui_node_graph2 = { path = "../egui_node_graph", features = ["persistence"] }
 egui-notify = "0.12.0"
 ehttp = { version = "0.4.0", features = ["native-async"] }
-enum-iterator = "1.5.0"
+enum-iterator = { workspace = true }
 getrandom = { version = "0.2.12", features = ["js"] }
 gloo-console = "0.3.0"
 gloo-net = "0.5.0"
@@ -27,6 +27,7 @@ log = { workspace = true }
 regex = "1.10.3"
 serde = { workspace = true }
 serde_json = "1.0.112"
+slotmap = { workspace = true }
 wasm-bindgen-futures = "0.4.40"
 web-sys = { version = "0.3.67", features = ["Url"] }
 egui_extras = "0.26.0"

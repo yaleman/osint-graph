@@ -15,6 +15,12 @@ pub struct Node<NodeData> {
     pub user_data: NodeData,
 }
 
+impl<T> PartialEq for Node<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
 /// The three kinds of input params. These describe how the graph must behave
 /// with respect to inline widgets and connections for this parameter.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

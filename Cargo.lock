@@ -2411,6 +2411,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "slotmap",
  "uuid",
  "wasm-bindgen-futures",
  "web-sys",
@@ -2442,7 +2443,9 @@ name = "osint-graph-shared"
 version = "0.0.1"
 dependencies = [
  "chrono",
+ "enum-iterator",
  "serde",
+ "slotmap",
  "uuid",
 ]
 

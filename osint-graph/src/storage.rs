@@ -1,6 +1,8 @@
 use gloo_console::*;
 
 use crate::get_backend_base_url;
+
+#[derive(Clone)]
 pub struct Backend {
     #[allow(dead_code)]
     url: String,

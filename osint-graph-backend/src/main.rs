@@ -7,7 +7,7 @@ use axum::{
     Router,
 };
 use osint_graph_backend::{
-    project::{get_project, get_projects, post_project},
+    project::{get_node, get_project, get_projects, post_node, post_project},
     SharedState,
 };
 use osint_graph_shared::AddrInfo;
@@ -35,6 +35,8 @@ async fn main() {
 
     // Build our application by composing routes
     let app = Router::new()
+        .route("/api/v1/node", post(post_node))
+        .route("/api/v1/node/:id", get(get_node))
         .route("/api/v1/project", post(post_project))
         .route("/api/v1/project/:id", get(get_project))
         .route("/api/v1/projects", get(get_projects))

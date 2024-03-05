@@ -5,6 +5,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::node::NodeUpdateList;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Project {
     #[serde(default = "uuid::Uuid::new_v4")]
@@ -19,6 +21,8 @@ pub struct Project {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// UTC timestamp of the last update time
     pub last_updated: Option<DateTime<Utc>>,
+    #[serde(default = "NodeUpdateList::new")]
+    pub nodes: NodeUpdateList,
 }
 
 impl Project {
@@ -42,6 +46,7 @@ impl Default for Project {
             user: Default::default(),
             creationdate,
             last_updated: None,
+            nodes: NodeUpdateList::new(),
         }
     }
 }

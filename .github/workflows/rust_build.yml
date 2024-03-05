@@ -35,6 +35,8 @@ jobs:
         with:
           # Optional version of trunk to install(eg. 'v0.16.0', 'latest')
           version: 'latest'
+      - name: "Install the WASM target"
+        run: rustup target add wasm32-unknown-unknown
       - name: "Build the workspace"
         run: make build
 

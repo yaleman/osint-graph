@@ -31,7 +31,10 @@ jobs:
         with:
           version: "v0.4.2"
       - name: Install trunk
-        run: cargo install trunk
+        uses: jetli/trunk-action@v0.4.0
+        with:
+          # Optional version of trunk to install(eg. 'v0.16.0', 'latest')
+          version: 'latest'
       - name: "Build the workspace"
         run: make build
 

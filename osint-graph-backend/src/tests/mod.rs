@@ -35,11 +35,14 @@ async fn setup_test_server() -> TestServer {
 #[tokio::test]
 async fn test_failing_setup_server() {
     // I sure hope this path isn't writeable!
-    crate::storage::test_db(Some(format!(
-        "/asdfasdf{}/asd{}fsadfdf",
-        Uuid::new_v4(),
-        Uuid::new_v4()
-    )))
+    crate::storage::start_db(
+        Some(format!(
+            "/asdfasdf{}/asd{}fsadfdf",
+            Uuid::new_v4(),
+            Uuid::new_v4()
+        )),
+        None,
+    )
     .await
     .expect_err("Should fail to open DB");
 }

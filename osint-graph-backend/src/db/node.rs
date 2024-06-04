@@ -95,13 +95,13 @@ mod tests {
     use osint_graph_shared::node::NodeUpdateList;
     use osint_graph_shared::project::Project;
 
-    use crate::storage::test_db;
+    use crate::storage::start_db;
 
     use super::*;
 
     #[tokio::test]
     async fn test_create_table() {
-        let pool = test_db(None).await.unwrap();
+        let pool = start_db(None, None).await.unwrap();
         Node::create_table(&pool)
             .await
             .expect("Failed to create in-memory table for Node");
@@ -109,7 +109,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_crud() {
-        let conn = test_db(None).await.unwrap();
+        let conn = start_db(None, None).await.unwrap();
         Node::create_table(&conn)
             .await
             .expect("Failed to create in-memory table for Node");

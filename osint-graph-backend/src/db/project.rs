@@ -93,13 +93,13 @@ mod tests {
 
     use chrono::DateTime;
 
-    use crate::storage::test_db;
+    use crate::storage::start_db;
 
     use super::*;
 
     #[tokio::test]
     async fn test_node_create_table() {
-        let conn = test_db(None).await.unwrap();
+        let conn = start_db(None,None).await.unwrap();
         Project::create_table(&conn)
             .await
             .expect("Failed to create in-memory table for Project");
@@ -107,7 +107,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_crud() {
-        let conn = test_db(None).await.unwrap();
+        let conn = start_db(None,None).await.unwrap();
         Project::create_table(&conn)
             .await
             .expect("Failed to create in-memory table for Project");

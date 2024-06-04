@@ -14,16 +14,24 @@ use uuid::Uuid;
 
 use sqlx::SqlitePool;
 
+// Start the database
 pub async fn new() -> Result<SqlitePool, std::io::Error> {
     let db_path = match std::env::var("OSINT_GRAPH_DB_PATH") {
         // If the OSINT_GRAPH_DB_PATH environment variable is set, use that.
         Ok(path) => path,
-
         // Otherwise, use the default path.
         Err(_) => shellexpand::tilde("~/.cache/osint-graph.sqlite3").to_string(),
     };
 
-    let db_url = format!("sqlite://{db_path}?mode=rwc");
+    start_db(Some(db_path), Some(1000)).await
+}
+
+pub async fn start_db(
+    db_path: Option<String>,
+    slow_query_ms: Option<u64>,
+) -> Result<SqlitePool, std::io::Error> {
+    let db_path = db_path.unwrap_or(":memory:".to_string());
+    let db_url = format!("sqlite://{}?mode=rwc", db_path);
     debug!("Opening Database: {db_url}");
 
     let options = match SqliteConnectOptions::from_str(&db_url) {
@@ -34,15 +42,12 @@ pub async fn new() -> Result<SqlitePool, std::io::Error> {
                 format!("connection failed: {error:?}"),
             ))
         }
-    };
-    let options =
-            // let options = if config_reader.sql_log_statements {
-                // options.log_statements(log::LevelFilter::Trace)
-            // } else {
-                options.log_statements(log::LevelFilter::Off);
-    // };
-
-    let options = options.log_slow_statements(log::LevelFilter::Warn, Duration::from_secs(1));
+    }
+    .log_statements(log::LevelFilter::Trace)
+    .log_slow_statements(
+        log::LevelFilter::Warn,
+        Duration::from_micros(slow_query_ms.unwrap_or(500)),
+    );
 
     let conn = SqlitePool::connect_with(options).await.map_err(|err| {
         std::io::Error::new(ErrorKind::Other, format!("connection failed: {err:?}"))
@@ -65,35 +70,6 @@ pub async fn create_tables(conn: &SqlitePool) -> Result<(), std::io::Error> {
         .expect("Failed to create NodeLink table");
 
     Ok(())
-}
-
-#[cfg(test)]
-pub async fn test_db(url: Option<String>) -> Result<SqlitePool, std::io::Error> {
-    let db_url = format!(
-        "sqlite://{}?mode=rwc",
-        url.unwrap_or(":memory:".to_string())
-    );
-    debug!("Opening Database: {db_url}");
-
-    let options = match SqliteConnectOptions::from_str(&db_url) {
-        Ok(value) => value,
-        Err(error) => {
-            return Err(std::io::Error::new(
-                ErrorKind::Other,
-                format!("connection failed: {error:?}"),
-            ))
-        }
-    }
-    .log_statements(log::LevelFilter::Trace)
-    .log_slow_statements(log::LevelFilter::Warn, Duration::from_micros(100));
-
-    let conn = SqlitePool::connect_with(options).await.map_err(|err| {
-        std::io::Error::new(ErrorKind::Other, format!("connection failed: {err:?}"))
-    })?;
-
-    create_tables(&conn).await?;
-
-    Ok(conn)
 }
 
 //     pub fn set(&mut self, _key: &str, _value: &str) -> Result<(), std::io::Error> {

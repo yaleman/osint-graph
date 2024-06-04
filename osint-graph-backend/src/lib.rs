@@ -41,7 +41,7 @@ impl AppState {
 
     #[cfg(test)]
     pub async fn test() -> Self {
-        let db = storage::test_db(None)
+        let db = storage::start_db(None, None)
             .await
             .expect("Failed to start test DB");
         Self { conn: db }

@@ -1,5 +1,11 @@
 import type { Node, NodeTypes } from "reactflow";
 import { PositionLoggerNode } from "./PositionLoggerNode";
+import type { SimulationNodeDatum } from "d3-force";
+
+export interface CustomNode extends Node, SimulationNodeDatum {
+}
+
+
 
 export const initialNodes = [
   { id: "a", type: "input", position: { x: 0, y: 0 }, data: { label: "wire" } },

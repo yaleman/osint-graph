@@ -21,3 +21,14 @@ export const newProject = async (): Promise<AxiosResponse<Project, string>> => {
 	});
 	return response;
 };
+
+/** Takes the project list and sends back a list */
+export function projectLis(projects: Project[]) {
+	return (
+		<ul>
+			{projects.map((project) => {
+				return <li key={project.id}>{project.name}</li>;
+			})}
+		</ul>
+	);
+}

@@ -33,8 +33,19 @@ impl Project {
     }
 
     /// Set the name
-    pub fn name(&mut self, name: String) {
-        self.name = name
+    pub fn name(&mut self, name: String) -> Self {
+        self.name = name;
+        self.to_owned()
+    }
+    /// Set the id
+    pub fn id(&mut self, id: Uuid) -> Self {
+        self.id = id;
+        self.to_owned()
+    }
+    /// Set the user
+    pub fn user(&mut self, user: Uuid) -> Self {
+        self.user = user;
+        self.to_owned()
     }
 }
 

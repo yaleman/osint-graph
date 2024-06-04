@@ -25,7 +25,7 @@ use std::{borrow::Cow, sync::Arc, time::Duration};
 use tokio::sync::RwLock;
 use tower::{BoxError, ServiceBuilder};
 use tower_http::{services::ServeDir, set_header::SetResponseHeaderLayer, trace::TraceLayer};
-use tracing::info;
+use tracing::error;
 
 pub type SharedState = Arc<RwLock<AppState>>;
 
@@ -99,11 +99,30 @@ async fn handle_error(error: BoxError) -> impl IntoResponse {
 
     if error.is::<tower::load_shed::error::Overloaded>() {
         let msg = "service is overloaded, try again later";
-        info!("{}", msg);
+        error!("{}", msg);
         return (StatusCode::SERVICE_UNAVAILABLE, Cow::from(msg));
     }
 
     let msg = format!("Unhandled internal error: {error}");
-    info!("{}", msg);
+    error!("{}", msg);
     (StatusCode::INTERNAL_SERVER_ERROR, Cow::from(msg))
+}
+
+#[tokio::test]
+async fn test_handle_error() {
+    let err = tower::timeout::error::Elapsed::new();
+    let res = handle_error(Box::new(err)).await.into_response();
+    let expected = (StatusCode::REQUEST_TIMEOUT, Cow::from("request timed out")).into_response();
+
+    assert_eq!(res.status(), expected.status());
+
+    let err = tower::load_shed::error::Overloaded::new();
+    let res = handle_error(Box::new(err)).await.into_response();
+    let expected = (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Cow::from("service is overloaded, try again later"),
+    )
+        .into_response();
+
+    assert_eq!(res.status(), expected.status());
 }

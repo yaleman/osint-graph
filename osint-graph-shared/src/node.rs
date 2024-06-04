@@ -6,13 +6,13 @@ use sqlx::{Decode, Encode, FromRow};
 
 use uuid::Uuid;
 
-#[derive(Encode, Decode, FromRow, Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+#[derive(Encode, Decode, FromRow, Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
 pub struct NodePosition {
     pub x: i32,
     pub y: i32,
 }
 
-#[derive(Encode, Decode, FromRow, Debug, Serialize, Deserialize, Clone, Eq, PartialEq, Default)]
+#[derive(Encode, Decode, FromRow, Debug, Clone, Eq, PartialEq, Default, Deserialize, Serialize)]
 pub struct Node {
     pub project_id: Uuid,
     #[serde(default = "Uuid::new_v4")]
@@ -26,7 +26,7 @@ pub struct Node {
     pub pos_y: Option<i32>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, sqlx::Type, FromRow)]
+#[derive(Debug, Clone, sqlx::Type, FromRow, Deserialize, Serialize)]
 pub struct NodeUpdateList(HashMap<Uuid, DateTime<Utc>>);
 
 impl Default for NodeUpdateList {

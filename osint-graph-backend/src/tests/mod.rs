@@ -12,7 +12,7 @@ use uuid::Uuid;
 async fn setup_test_server() -> TestServer {
     tracing_subscriber::registry()
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
+            tracing_subscriber::EnvFilter::try_from("debug")
                 .unwrap_or_else(|_| "osint_graph_backend=debug,tower_http=debug".into()),
         )
         .with(tracing_subscriber::fmt::layer())

@@ -51,5 +51,7 @@ coverage/grcov:
 
 .PHONY: coverage
 coverage: ## Run all the coverage tests
-coverage: coverage/test coverage/grcov
-	echo "Coverage report is in ./target/coverage/html/index.html"
+coverage: #coverage/test coverage/grcov
+#echo "Coverage report is in ./target/coverage/html/index.html"
+	cargo llvm-cov clean --workspace && \
+	cargo llvm-cov --html  --ignore-filename-regex main

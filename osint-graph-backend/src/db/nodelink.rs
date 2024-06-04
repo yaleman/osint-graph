@@ -189,13 +189,7 @@ mod tests {
 
         node.save(&conn).await.expect("Failed to save node");
 
-        let mut link = NodeLink {
-            id: Uuid::new_v4(),
-            left: node.id,
-            right: node.id,
-            project_id,
-            linktype: LinkType::Omni,
-        };
+        let mut link = NodeLink::new(node.id, node.id, project_id, LinkType::Omni);
 
         link.save(&conn).await.expect("Failed to save link");
 
@@ -231,5 +225,14 @@ mod tests {
             .await
             .expect("Failed to get_by_node_id");
         assert!(links.is_empty());
+
+        let _: NodeLink = serde_json::from_value(serde_json::json!({
+            "id" : Uuid::new_v4(),
+            "left" : Uuid::new_v4(),
+            "right" : Uuid::new_v4(),
+            "project_id" : Uuid::new_v4(),
+            "linktype" : "Directional"
+        }))
+        .expect("Failed to deserialise NodeLink");
     }
 }

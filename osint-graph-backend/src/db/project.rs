@@ -92,7 +92,6 @@ impl DBProjectExt for Project {
 mod tests {
 
     use chrono::DateTime;
-    use osint_graph_shared::node::NodeUpdateList;
 
     use crate::storage::test_db;
 
@@ -116,17 +115,10 @@ mod tests {
         let id = Uuid::new_v4();
         let user = Uuid::new_v4();
         let name = "Foo".to_string();
-        let mut project = Project {
-            id,
-            name,
-            user,
-            creationdate: DateTime::from(std::time::SystemTime::now()),
-            last_updated: None,
-            nodes: NodeUpdateList::new(),
-        };
+        let mut project = Project::default().name(name).user(user).id(id);
         project.save(&conn).await.expect("Failed to save");
 
-        project.last_updated = Some(DateTime::from(std::time::SystemTime::now()));
+        project.updated();
 
         project.save(&conn).await.expect("Failed to update");
 

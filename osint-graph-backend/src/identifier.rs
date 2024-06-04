@@ -1,9 +1,7 @@
 //* Functionality to identify contents / nodes
 //*
 
-use serde::{Deserialize, Serialize};
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum SocialNode {
     Facebook(String),
     Twitter(String),
@@ -15,7 +13,7 @@ pub enum SocialNode {
     Mastodon(String),
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum UrlNode {
     Unknown,
     Social(SocialNode),

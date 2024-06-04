@@ -1,13 +1,13 @@
 //! Project-related schema
 //!
 
+use crate::node::NodeUpdateList;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::{Decode, Encode, FromRow};
 use uuid::Uuid;
 
-use crate::node::NodeUpdateList;
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Encode, Decode, FromRow, Debug, Serialize, Deserialize, Clone)]
 pub struct Project {
     #[serde(default = "uuid::Uuid::new_v4")]
     pub id: uuid::Uuid,
@@ -22,6 +22,7 @@ pub struct Project {
     /// UTC timestamp of the last update time
     pub last_updated: Option<DateTime<Utc>>,
     #[serde(default = "NodeUpdateList::new")]
+    #[sqlx(json)]
     pub nodes: NodeUpdateList,
 }
 

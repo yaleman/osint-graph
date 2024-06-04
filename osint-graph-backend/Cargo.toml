@@ -16,7 +16,13 @@ redb = { version = "1.5.0", features = ["cache_metrics", "log"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 shellexpand = "3.1.0"
-sqlx = { version = "0.7.4", features = ["sqlite", "runtime-tokio", "chrono", "json", "uuid"] }
+sqlx = { version = "0.7.4", features = [
+    "sqlite",
+    "runtime-tokio",
+    "chrono",
+    "json",
+    "uuid",
+] }
 tokio = { version = "1.0", features = ["full"] }
 tower = { version = "0.4", features = [
     "util",
@@ -27,7 +33,8 @@ tower = { version = "0.4", features = [
 tower-http = { version = "0.5.0", features = [
     "add-extension",
     "auth",
-    "compression-full",
+    "compression-gzip",
+    "compression-deflate",
     "cors",
     "limit",
     "set-header",

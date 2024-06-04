@@ -4,8 +4,11 @@ use axum::response::IntoResponse;
 use axum::Json;
 use osint_graph_shared::node::Node;
 use osint_graph_shared::project::Project;
+use tracing::debug;
 use uuid::Uuid;
 
+use crate::db::project::DBProjectExt;
+use crate::storage::DBEntity;
 use crate::SharedState;
 
 /// POST handler for project things
@@ -13,53 +16,64 @@ pub async fn post_project(
     State(state): State<SharedState>,
     Json(project): Json<Project>,
 ) -> impl IntoResponse {
-    let res = state
-        .write()
+    project
+        .save(&state.read().await.conn)
         .await
-        .db
-        .save_project(project.clone())
+        .map_err(|err| {
+            debug!("Error saving project: {:?}", err);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Error saving project: {:?}", err),
+            )
+        })
         .unwrap();
 
-    (
-        StatusCode::OK,
-        serde_json::to_string_pretty(&res).expect("Failed to serialise post project response"),
-    )
+    (StatusCode::OK, "")
 }
 
 /// Pulls a project from storage.
 pub async fn get_project(
-    Path(id): Path<String>,
+    Path(id): Path<Uuid>,
     State(state): State<SharedState>,
 ) -> impl IntoResponse {
-    let project_id: Uuid = match Uuid::parse_str(&id) {
-        Ok(val) => val,
-        Err(_) => return (StatusCode::BAD_REQUEST, "Invalid Uuid".to_string()),
-    };
+    let res = Project::get(&state.read().await.conn, &id).await;
 
-    match state.read().await.db.load_project(&project_id.to_string()) {
+    match res {
         Ok(Some(project)) => (
             StatusCode::OK,
             serde_json::to_string_pretty(&project)
-                .expect("Failed to serialise get project response"),
+                .expect("Failed to serialise get project response"), // TODO: handle this better
         ),
         Ok(None) => (StatusCode::NOT_FOUND, "Project not found".to_string()),
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", err)),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Error: {:?}", err),
+        ),
     }
 }
 
 pub async fn get_projects(State(state): State<SharedState>) -> impl IntoResponse {
-    let res = state.read().await.db.list_projects();
-    match res {
+    match Project::get_all(&state.read().await.conn).await {
         Ok(val) => (
             StatusCode::OK,
-            serde_json::to_string_pretty(&val).expect("Failed to serialize project list response"),
+            serde_json::to_string_pretty(&val)
+                .map_err(|err| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Failed to serialize project list response: {:?}", err),
+                    )
+                })
+                .unwrap(),
         ),
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", err)),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Error: {:?}", err),
+        ),
     }
 }
 
 pub async fn get_node(Path(id): Path<Uuid>, State(state): State<SharedState>) -> impl IntoResponse {
-    match state.read().await.db.get_node(id) {
+    match Node::get(&state.read().await.conn, &id).await {
         Ok(val) => match val {
             Some(val) => (
                 StatusCode::OK,
@@ -67,19 +81,27 @@ pub async fn get_node(Path(id): Path<Uuid>, State(state): State<SharedState>) ->
             ),
             None => (StatusCode::NOT_FOUND, "".to_string()),
         },
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", err)),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Error: {:?}", err),
+        ),
     }
 }
+
 pub async fn post_node(
     State(state): State<SharedState>,
     Json(node): Json<Node>,
 ) -> impl IntoResponse {
-    let res = state.write().await.db.save_node(node);
+    let res = node.save(&state.read().await.conn).await;
+    debug!("Saved node: {:?}", res);
     match res {
         Ok(val) => (
             StatusCode::OK,
             serde_json::to_string_pretty(&val).expect("Failed to serialize project list response"),
         ),
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", err)),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Error: {:?}", err),
+        ),
     }
 }

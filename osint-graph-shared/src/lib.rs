@@ -1,5 +1,10 @@
+use std::net::TcpListener;
+
+use rand::Rng;
+
 pub mod data;
 pub mod node;
+pub mod nodelink;
 pub mod project;
 pub mod storage;
 
@@ -32,6 +37,26 @@ impl AddrInfo {
             addr: std::env::var("OSINT_GRAPH_ADDR").unwrap_or_else(|_| "127.0.0.1".to_string()),
             port: std::env::var("OSINT_GRAPH_PORT").unwrap_or_else(|_| "8189".to_string()),
             https,
+        }
+    }
+
+    pub fn test() -> Self {
+        // select a random port
+        let mut rng = rand::thread_rng();
+
+        let mut port: i32 = rng.gen_range(32768..65535);
+        loop {
+            // check if we can connect to it
+            if TcpListener::bind(format!("127.0.0.69:{}", port)).is_ok() {
+                break;
+            }
+            port = rng.gen_range(32768..65535);
+        }
+
+        Self {
+            https: false,
+            addr: "127.0.0.69".to_string(),
+            port: port.to_string(),
         }
     }
 }

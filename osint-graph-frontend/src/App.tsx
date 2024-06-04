@@ -1,5 +1,7 @@
-import type { OnConnect } from "reactflow";
+import type { OnConnect, Node } from "reactflow";
+// import { applyNodeChanges } from "reactflow";
 
+import { v4 as uuidv4 } from "uuid";
 import { useCallback, useEffect, useState } from "react";
 import {
 	Background,
@@ -39,14 +41,33 @@ function listProjects(projects: Project[]) {
 	);
 }
 
+function newNode(
+	nodes: Node[],
+	setNodes: React.Dispatch<React.SetStateAction<Node[]>>,
+) {
+	console.log("New node button pressed");
+
+	const newNode = {
+		id: uuidv4(),
+		data: { label: "Hello" },
+		position: { x: 0, y: 0 },
+		type: "input",
+	};
+	setNodes([...nodes, newNode]);
+}
+
 export default function App() {
 	const [projectNodes, setProjectNodes] = useState<Project[]>([]);
-	const [nodes, , onNodesChange] = useNodesState(initialNodes);
+	const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
 	const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+	// handler for when a connection is made
 	const onConnect: OnConnect = useCallback(
 		(connection) => setEdges((edges) => addEdge(connection, edges)),
 		[setEdges],
 	);
+
+	// on startup, pull the project list
 	useEffect(() => {
 		updateProjects(setProjectNodes);
 	}, []); // Empty array means this effect runs once on component mount
@@ -66,6 +87,14 @@ export default function App() {
 			<MiniMap />
 			<Controls />
 			<Panel position="top-right">
+				<button
+					type="button"
+					onClick={() => {
+						newNode(nodes, setNodes);
+					}}
+				>
+					New Node
+				</button>
 				<button
 					type="button"
 					onClick={() => {

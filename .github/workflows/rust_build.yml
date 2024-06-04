@@ -1,10 +1,7 @@
 ---
 name: "Linux Build and Test"
-# Trigger the workflow on push to main or pull request
 "on":
   push:
-    branches:
-      - main
   pull_request:
 
 env:

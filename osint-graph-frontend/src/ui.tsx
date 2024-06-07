@@ -1,14 +1,13 @@
-import type { Node } from "reactflow";
-
 import { v4 as uuidv4 } from "uuid";
+import type { CustomNode } from "./nodes";
 
 export function newNode(
-	nodes: Node[],
-	setNodes: React.Dispatch<React.SetStateAction<Node[]>>,
+	nodes: CustomNode[],
+	setNodes: React.Dispatch<React.SetStateAction<CustomNode[]>>,
 ) {
-	console.log("New node button pressed");
+	console.debug("New node button pressed");
 
-	const newNode = {
+	const newNode: CustomNode = {
 		id: uuidv4(),
 		data: { label: "Hello" },
 		position: { x: 0, y: 0 },

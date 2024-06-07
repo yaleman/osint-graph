@@ -3,12 +3,17 @@ import { PositionLoggerNode } from "./PositionLoggerNode";
 import type { SimulationNodeDatum } from "d3-force";
 
 export interface CustomNode extends Node, SimulationNodeDatum {
+  id: string;
+  vx?: number;
+  vy?: number;
+
 }
 
 
 
+
 export const initialNodes = [
-  { id: "a", type: "input", position: { x: 0, y: 0 }, data: { label: "wire" } },
+  { id: "a", type: "input", position: { x: 0, y: 0 }, vx: 0.0, vy: 0.0, data: { label: "wire" } },
   {
     id: "b",
     type: "position-logger",
@@ -22,7 +27,7 @@ export const initialNodes = [
     position: { x: 0, y: 200 },
     data: { label: "with React Flow" },
   },
-] satisfies Node[];
+] satisfies CustomNode[];
 
 export const nodeTypes = {
   "position-logger": PositionLoggerNode,

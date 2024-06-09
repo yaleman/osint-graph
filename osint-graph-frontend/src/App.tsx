@@ -1,9 +1,12 @@
 import {
 	useCallback,
 	useEffect,
-	// useMemo,
 	useState,
+
+
 } from "react";
+
+import type { MouseEvent as ReactMouseEvent } from "react";
 
 import {
 	Background,
@@ -26,6 +29,7 @@ import type { Project } from "./types";
 import { newNode } from "./ui";
 import {
 	forceCenter,
+	forceCollide,
 	forceLink,
 	forceManyBody,
 	forceSimulation,
@@ -40,11 +44,11 @@ function updateProjects(
 	});
 }
 
-// const RADIUS = 8;
-// const FORCE_RADIUS_FACTOR = 1.5;
+const RADIUS = 8;
+const FORCE_RADIUS_FACTOR = 1.5;
 // const LINK_WIDTH = 3;
 // const LINK_DISTANCE = 30;
-// const NODE_STRENGTH = -50;
+const NODE_STRENGTH = -50;
 // const width = 800;
 // const height = 600;
 
@@ -78,86 +82,73 @@ function updateProjects(
 export default function App() {
 	const [projectNodes, setProjectNodes] = useState<Project[]>([]);
 
-	// below should be in your component
-	// const newLinks = useMemo(() => {
-	// 	const sources = initialEdges.map((link) => link.edge.source);
-	// 	const targets = initialEdges.map((link) => link.edge.target);
-	// 	const nodesMap = d3Map(initialNodes, getId, (d) => d.id);
-
-	// 	const newLinks = initialEdges.map((_, i) => ({
-	// 		source: nodesMap.get(sources[i]),
-	// 		target: nodesMap.get(targets[i]),
-	// 		strength: _.strength,
-	// 	}));
-	// 	return newLinks;
-	// }, []);
-
 	const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
 	const [edges, setEdges, onEdgesChange] = useEdgesState(
 		initialEdges.map((customEdge) => customEdge.edge),
 	);
 
-	// const [reactFlowInstance, _setReactFlowInstance] = useState();
+	const [_windowSize, setWindowSize] = useState({
+		width: window.innerWidth,
+		height: window.innerHeight,
+	});
 
-	// const { _formattedEdges, _formattedNodes } = simulateGraph({
-	// 	edges,
-	// 	nodes,
-	// });
+
+	// we use the useEffect hook to listen to the window resize event
+	useEffect(() => {
+		window.onresize = () => {
+			setWindowSize({
+				width: window.innerWidth,
+				height: window.innerHeight,
+			});
+		};
+	}, []);
 
 	useEffect(() => {
-		// if (!reactFlowInstance) return;
 		// Create the D3 simulation
 		const simulation = forceSimulation(nodes as CustomNode[])
 			.force(
 				"link",
 				forceLink<CustomNode, CustomEdge>()
 					.id((node: CustomNode) => node.id)
-					.distance(0.1)
-					.strength(0.1),
+					.distance((edge: CustomEdge) => {
+						const source = nodes.find((n) => n.id === edge.source);
+						const target = nodes.find((n) => n.id === edge.target);
+						const distance = Math.sqrt(
+							((source?.position?.x || 0) - (target?.position?.x || 0)) ^ 2 +
+							((source?.position?.y || 0) - (target?.position?.y || 0)) ^ 2);
+						return distance;
+						// const horizDistance = (source?.position?.x || 0) - (target?.position?.x || 0);
+						// const vertDistance = (source?.position?.y || 0) - (target?.position?.y || 0);
+					})
+					.strength(-0.01),
 			)
-			.force("charge", forceManyBody())
-			.force("center", forceCenter(0, 0));
+			.force("charge", forceManyBody().strength(NODE_STRENGTH / 10))
+			.force("collide", forceCollide(RADIUS + FORCE_RADIUS_FACTOR))
+			.force("center", forceCenter(0, 0).strength(1))
+			;
 
 		// Update the node positions after each tick
 		simulation.on("tick", () => {
-			setNodes((els) =>
-				els.map((el) => {
-					const node = simulation.find(el.position.x, el.position.y);
-					if (node) {
-						el.position = { x: node.x || 0, y: node.y || 0.0 };
+			setNodes((theseNodes) =>
+				theseNodes.map((thisNode) => {
+					const node = simulation.nodes().find((n) => n.id === thisNode.id);
+					// const node = simulation.find(el.position.x, el.position.y);
+					if (node !== undefined) {
+						if (node.x !== undefined && node.y !== undefined) {
+							thisNode.position = { x: node.x, y: node.y };
+						}
 					}
-					return el;
+					return thisNode;
 				}),
 			);
 		});
+		return () => {
+			simulation.stop();
+		};
 	}, [nodes, setNodes]);
 
 	// const onLoad = (reactFlowInstance: OnLoadParams) =>
 	// 		setReactFlowInstance(reactFlowInstance);
-
-	// useEffect(() => {
-	// 	const simulation = forceSimulation<CustomNode, CustomEdge>(nodes)
-	// 		// .force(
-	// 		// 	"link",
-	// 		// 	forceLink<CustomNode, CustomEdge>(newLinks)
-	// 		// 		.strength(0.1)
-	// 		// 		.id((d) => d.id)
-	// 		// 		.distance(LINK_DISTANCE),
-	// 		// )
-	// 		.force("center", forceCenter(width / 2, height / 2).strength(0.05))
-	// 		.force("charge", forceManyBody().strength(NODE_STRENGTH))
-	// 		.force("collision", forceCollide(RADIUS * FORCE_RADIUS_FACTOR));
-
-	// 	// update state on every frame
-	// 	simulation.on("tick", () => {
-	// 		setNodes([...simulation.nodes()]);
-	// 		setEdges([...initialEdges.map((customEdge) => customEdge.edge)]);
-	// 	});
-
-	// 	return () => {
-	// 		simulation.stop();
-	// 	};
-	// }, [nodes, setNodes, setEdges]);
 
 	// handler for when a connection is made
 	const onConnect: OnConnect = useCallback(
@@ -169,8 +160,6 @@ export default function App() {
 
 	// on startup, pull the project list
 	useEffect(() => {
-		// const reactFlow = useReactFlow();
-		// console.info("viewport", reactFlow.getViewport());
 		updateProjects(setProjectNodes);
 	}, []); // Empty array means this effect runs once on component mount
 
@@ -178,6 +167,11 @@ export default function App() {
 		<ReactFlow
 			nodes={nodes}
 			nodeTypes={nodeTypes}
+			onNodeDragStop={(event: ReactMouseEvent, eventNode: CustomNode, eventNodes: CustomNode[]) => {
+
+				console.debug("onNodeDragStop", event, eventNode, eventNodes);
+				setNodes(nodes);
+			}}
 			onNodesChange={onNodesChange}
 			edges={edges}
 			edgeTypes={edgeTypes}

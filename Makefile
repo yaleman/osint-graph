@@ -4,24 +4,28 @@
 help:
 	@grep -E -h '\s##\s' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: lint ## run linters
+.PHONY: lint
+lint: ## run linters
 lint: codespell
 	cargo clippy
 	biome lint osint-graph-frontend
 
 .PHONY: frontend
+frontend: ## Build the frontend
 frontend:
 	cd osint-graph-frontend && vite build --emptyOutDir
 
 .PHONY: backend
+backend: ## Run the backend
 backend:
 	cargo run --bin osint-graph-backend
 
 .PHONY: serve
+serve: ## Run the frontend and backend in serve mode
 serve: frontend backend
 
-
 .PHONY: reload
+reload: ## Rebuild and reload on changes
 reload:
 	cargo watch -s 'make serve' --why
 
@@ -55,7 +59,6 @@ coverage/grcov:
 
 .PHONY: coverage
 coverage: ## Run all the coverage tests
-coverage: #coverage/test coverage/grcov
-#echo "Coverage report is in ./target/coverage/html/index.html"
+coverage:
 	cargo llvm-cov clean --workspace && \
 	cargo llvm-cov --html  --ignore-filename-regex main

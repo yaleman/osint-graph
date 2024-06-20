@@ -1,4 +1,0 @@
-# https://github.com/trunk-rs/trunk/blob/main/Trunk.toml
-[build]
-dist = "../dist/"
-filehash = false

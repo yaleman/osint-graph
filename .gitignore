@@ -1,4 +1,3 @@
+dist/*
 /target
-*/dist/*
-**/dist/*
 osint-graph/.DS_Store

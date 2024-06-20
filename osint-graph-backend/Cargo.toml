@@ -7,12 +7,16 @@ name = "osint-graph-backend"
 
 [dependencies]
 axum = { version = "0.7.4", features = ["ws", "http2", "macros"] }
+futures = "0.3.30"
 http-body-util = "0.1.0"
+log = "0.4.21"
 osint-graph-shared = { path = "../osint-graph-shared" }
+rand = "0.8.5"
 redb = { version = "1.5.0", features = ["cache_metrics", "log"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 shellexpand = "3.1.0"
+sqlx = { workspace = true }
 tokio = { version = "1.0", features = ["full"] }
 tower = { version = "0.4", features = [
     "util",
@@ -23,7 +27,8 @@ tower = { version = "0.4", features = [
 tower-http = { version = "0.5.0", features = [
     "add-extension",
     "auth",
-    "compression-full",
+    "compression-gzip",
+    "compression-deflate",
     "cors",
     "limit",
     "set-header",
@@ -35,3 +40,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.5.0"
 uuid = { workspace = true, features = ["serde", "v4"] }
+
+[dev-dependencies]
+axum-test = "14.10.0"
+chrono.workspace = true

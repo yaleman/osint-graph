@@ -1,9 +1,7 @@
 //* Functionality to identify contents / nodes
 //*
 
-use serde::{Deserialize, Serialize};
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum SocialNode {
     Facebook(String),
     Twitter(String),
@@ -15,14 +13,14 @@ pub enum SocialNode {
     Mastodon(String),
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum UrlNode {
     Unknown,
     Social(SocialNode),
 }
 
 pub fn identify_url(input: &str) -> Result<UrlNode, String> {
-    let url = url::Url::parse(input).expect("Failed to parse URL");
+    let url = url::Url::parse(input).map_err(|e| format!("Failed to parse url: {}", e))?;
 
     let host: String = match url.host() {
         None => return Err(format!("No host in url: {}", input)),
@@ -40,7 +38,7 @@ pub fn identify_url(input: &str) -> Result<UrlNode, String> {
         || host.ends_with(".x.com")
     {
         Ok(UrlNode::Social(SocialNode::Twitter(input.to_string())))
-    } else if host == "tiktok.com" || host.ends_with(".twitter.com") {
+    } else if host == "tiktok.com" || host.ends_with(".tiktok.com") {
         Ok(UrlNode::Social(SocialNode::Tiktok(input.to_string())))
     } else if host == "facebook.com" || host.ends_with(".facebook.com") {
         Ok(UrlNode::Social(SocialNode::Facebook(input.to_string())))
@@ -78,6 +76,37 @@ mod tests {
         assert_eq!(
             identify_url(url).unwrap(),
             UrlNode::Social(SocialNode::Facebook(url.to_string()))
+        );
+
+        identify_url("https:///").expect_err("this should fail to parse the URL");
+        identify_url("data:text/plain,Stuff").expect_err("this should fail to find a host");
+
+        let tiktok_url = "https://tiktok.com/something";
+        assert_eq!(
+            identify_url(tiktok_url).unwrap(),
+            UrlNode::Social(SocialNode::Tiktok(tiktok_url.to_string()))
+        );
+
+        // twittery things
+        let twitter_url = "https://twitter.com/something";
+        assert_eq!(
+            identify_url(twitter_url).unwrap(),
+            UrlNode::Social(SocialNode::Twitter(twitter_url.to_string()))
+        );
+        let twitter_url = "https://x.com/something";
+        assert_eq!(
+            identify_url(twitter_url).unwrap(),
+            UrlNode::Social(SocialNode::Twitter(twitter_url.to_string()))
+        );
+        let youtube_url = "https://youtube.com/something";
+        assert_eq!(
+            identify_url(youtube_url).unwrap(),
+            UrlNode::Social(SocialNode::Youtube(youtube_url.to_string()))
+        );
+        let other_url = "https://example.com/something";
+        assert_eq!(
+            identify_url(other_url).unwrap(),
+            UrlNode::Unknown //(other_url.to_string())
         );
     }
 }

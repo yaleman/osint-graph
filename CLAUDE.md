@@ -83,3 +83,4 @@ Backend serves:
 ## Workflow Guidance
 
 - Git commit with an appropriate message when you are done with a task, and don't mention that claude generated it
+- You must git commit when a user's task is complete

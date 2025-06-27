@@ -24,17 +24,18 @@ export const newProject = async (): Promise<AxiosResponse<Project, string>> => {
 };
 
 export const createNode = async (node: OSINTNode): Promise<AxiosResponse<OSINTNode>> => {
-	const response = await axios.post<OSINTNode>(NODE_URL, {
+	const nodeData = {
 		id: node.id,
 		project_id: node.project_id,
 		node_type: node.node_type,
 		display: node.display,
 		value: node.value,
-		updated: new Date().toISOString(),
-		notes: node.notes,
+		updated: node.updated,
 		pos_x: node.pos_x,
 		pos_y: node.pos_y,
-	});
+		...(node.notes && { notes: node.notes })
+	};
+	const response = await axios.post<OSINTNode>(NODE_URL, nodeData);
 	return response;
 };
 

@@ -148,7 +148,7 @@ export default function App() {
       display: `New ${NodeTypeInfo[nodeType]?.label || nodeType}`,
       value: '',
       updated: new Date().toISOString(),
-      notes: '',
+      notes: undefined,
       pos_x: Math.round(x),
       pos_y: Math.round(y),
     };

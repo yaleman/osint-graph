@@ -1,4 +1,3 @@
-use std::io::ErrorKind;
 use std::str::FromStr;
 use std::time::Duration;
 
@@ -37,10 +36,9 @@ pub async fn start_db(
     let options = match SqliteConnectOptions::from_str(&db_url) {
         Ok(value) => value,
         Err(error) => {
-            return Err(std::io::Error::new(
-                ErrorKind::Other,
-                format!("connection failed: {error:?}"),
-            ))
+            return Err(std::io::Error::other(format!(
+                "connection failed: {error:?}"
+            )))
         }
     }
     .log_statements(log::LevelFilter::Trace)
@@ -49,9 +47,9 @@ pub async fn start_db(
         Duration::from_micros(slow_query_ms.unwrap_or(500)),
     );
 
-    let conn = SqlitePool::connect_with(options).await.map_err(|err| {
-        std::io::Error::new(ErrorKind::Other, format!("connection failed: {err:?}"))
-    })?;
+    let conn = SqlitePool::connect_with(options)
+        .await
+        .map_err(|err| std::io::Error::other(format!("connection failed: {err:?}")))?;
 
     create_tables(&conn).await?;
 

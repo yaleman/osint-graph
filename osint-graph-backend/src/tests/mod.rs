@@ -11,10 +11,9 @@ use uuid::Uuid;
 
 async fn setup_test_server() -> TestServer {
     tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from("debug")
-                .unwrap_or_else(|_| "osint_graph_backend=debug,tower_http=debug".into()),
-        )
+        .with(tracing_subscriber::EnvFilter::new(
+            "osint_graph_backend=debug,tower_http=debug",
+        ))
         .with(tracing_subscriber::fmt::layer())
         .init();
 
@@ -67,9 +66,7 @@ async fn test_api_project_node_save_load() {
     let res = server.post("/api/v1/project").json(&project).await;
     res.assert_status_ok();
 
-    let res = server
-        .get(&format!("/api/v1/project/{}", project_id.to_string()))
-        .await;
+    let res = server.get(&format!("/api/v1/project/{}", project_id)).await;
     res.assert_status_ok();
 
     let res = server
@@ -85,20 +82,20 @@ async fn test_api_project_node_save_load() {
     assert_eq!(res.status_code(), 200);
 
     let res = server
-        .get(&format!("/api/v1/node/{}", id.to_string()))
+        .get(&format!("/api/v1/node/{}", id))
         .expect_success()
         .await;
     assert_eq!(res.status_code(), 200);
 
     let res = server
-        .get(&format!("/api/v1/node/{}", Uuid::new_v4().to_string()))
+        .get(&format!("/api/v1/node/{}", Uuid::new_v4()))
         .expect_failure()
         .await;
     assert_eq!(res.status_code(), 404);
 
     // looking for something that shouldn't exist
     let res = server
-        .get(&format!("/api/v1/project/{}", id.to_string()))
+        .get(&format!("/api/v1/project/{}", id))
         .expect_failure()
         .await;
     assert_eq!(res.status_code(), 404);
@@ -110,7 +107,7 @@ async fn test_api_project_node_save_load() {
 
     // looking for something that shouldn't exist
     let res = server
-        .get(&format!("/api/v1/project/{}", id.to_string()))
+        .get(&format!("/api/v1/project/{}", id))
         .expect_failure()
         .await;
     assert_eq!(res.status_code(), 404);

@@ -14,5 +14,10 @@ fmt:
 frontend-lint:
     cd osint-graph-frontend && npm run lint
 
+# Build frontend and run the application
+run:
+    cd osint-graph-frontend && vite build --emptyOutDir
+    cargo run
+
 # Run all checks (clippy, test, fmt, frontend-lint)
 check: clippy test fmt frontend-lint

@@ -57,6 +57,9 @@ Key directories:
 ### Just Tasks
 
 ```bash
+# Build frontend and run the application
+just run
+
 # Run all quality checks (clippy, tests, fmt, frontend linting)
 just check
 

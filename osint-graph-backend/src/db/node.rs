@@ -19,6 +19,8 @@ impl DBEntity for Node {
             CREATE TABLE IF NOT EXISTS {} (
                 id TEXT PRIMARY KEY,
                 project_id TEXT NOT NULL,
+                node_type TEXT NOT NULL,
+                display TEXT NOT NULL,
                 value TEXT NOT NULL,
                 updated TEXT NOT NULL,
                 notes TEXT,
@@ -37,21 +39,29 @@ impl DBEntity for Node {
 
     async fn save(&self, _pool: &SqlitePool) -> Result<(), DBError> {
         let querystring = format!(
-            "INSERT INTO {} (id, project_id, value, updated, notes) VALUES (?, ?, ?, ?, ?)
+            "INSERT INTO {} (id, project_id, node_type, display, value, updated, notes, pos_x, pos_y) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO
-                UPDATE SET project_id = ?, value = ?, updated = ?, notes = ?;",
+                UPDATE SET project_id = ?, node_type = ?, display = ?, value = ?, updated = ?, notes = ?, pos_x = ?, pos_y = ?;",
             Self::table()
         );
         sqlx::query(&querystring)
             .bind(self.id)
             .bind(self.project_id)
+            .bind(self.node_type.clone())
+            .bind(self.display.clone())
             .bind(self.value.clone())
             .bind(self.updated)
             .bind(self.notes.clone())
+            .bind(self.pos_x)
+            .bind(self.pos_y)
             .bind(self.project_id)
+            .bind(self.node_type.clone())
+            .bind(self.display.clone())
             .bind(self.value.clone())
             .bind(self.updated)
             .bind(self.notes.clone())
+            .bind(self.pos_x)
+            .bind(self.pos_y)
             .execute(_pool)
             .await?;
         Ok(())
@@ -133,6 +143,8 @@ mod tests {
         let mut node = Node {
             project_id,
             id,
+            node_type: "person".to_string(),
+            display: "Test Person".to_string(),
             value,
             updated: DateTime::from(std::time::SystemTime::now()),
             ..Default::default()

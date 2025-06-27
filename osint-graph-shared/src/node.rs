@@ -17,6 +17,8 @@ pub struct Node {
     pub project_id: Uuid,
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
+    pub node_type: String,
+    pub display: String,
     pub value: String,
     pub updated: DateTime<Utc>,
     pub notes: Option<String>,

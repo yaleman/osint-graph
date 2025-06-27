@@ -85,9 +85,13 @@ export default function App() {
             setNodes(reactFlowNodes);
           } catch (error) {
             console.error('Failed to load existing nodes:', error);
-            // If loading nodes fails, we'll continue with an empty project
+            // If loading nodes fails, create a new project instead
+            localStorage.removeItem(PROJECT_ID_KEY);
+            projectId = null;
           }
-        } else {
+        }
+        
+        if (!projectId) {
           // Create a new project
           project = await createProject();
           projectId = project.id;

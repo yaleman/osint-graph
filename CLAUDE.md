@@ -180,3 +180,7 @@ Backend serves:
 - Mention key features, improvements, or fixes
 - Do not mention that Claude generated the code
 - Always commit when a user's task is marked as complete
+
+## Development Best Practices
+
+- When making changes, always validate that a change to the front end is reflected in the backend too, and vice versa

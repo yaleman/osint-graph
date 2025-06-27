@@ -150,8 +150,16 @@ async fn test_api_get_nodes_by_project() {
     };
 
     // Create both projects
-    server.post("/api/v1/project").json(&project1).await.assert_status_ok();
-    server.post("/api/v1/project").json(&project2).await.assert_status_ok();
+    server
+        .post("/api/v1/project")
+        .json(&project1)
+        .await
+        .assert_status_ok();
+    server
+        .post("/api/v1/project")
+        .json(&project2)
+        .await
+        .assert_status_ok();
 
     // Test getting nodes from empty project
     let res = server
@@ -200,9 +208,21 @@ async fn test_api_get_nodes_by_project() {
     };
 
     // Add all nodes
-    server.post("/api/v1/node").json(&node1).await.assert_status_ok();
-    server.post("/api/v1/node").json(&node2).await.assert_status_ok();
-    server.post("/api/v1/node").json(&other_node).await.assert_status_ok();
+    server
+        .post("/api/v1/node")
+        .json(&node1)
+        .await
+        .assert_status_ok();
+    server
+        .post("/api/v1/node")
+        .json(&node2)
+        .await
+        .assert_status_ok();
+    server
+        .post("/api/v1/node")
+        .json(&other_node)
+        .await
+        .assert_status_ok();
 
     // Test getting nodes for first project
     let res = server
@@ -211,7 +231,7 @@ async fn test_api_get_nodes_by_project() {
     res.assert_status_ok();
     let nodes: Vec<Node> = res.json();
     assert_eq!(nodes.len(), 2);
-    
+
     // Verify we got the right nodes
     let node_ids: Vec<Uuid> = nodes.iter().map(|n| n.id).collect();
     assert!(node_ids.contains(&node_id1));
@@ -298,7 +318,11 @@ async fn test_api_nodes_crud() {
         last_updated: None,
         nodes: Default::default(),
     };
-    server.post("/api/v1/project").json(&project).await.assert_status_ok();
+    server
+        .post("/api/v1/project")
+        .json(&project)
+        .await
+        .assert_status_ok();
 
     // Test node creation
     let node_id = Uuid::new_v4();
@@ -352,7 +376,10 @@ async fn test_api_nodes_crud() {
     let retrieved_node: Node = res.json();
     assert_eq!(retrieved_node.display, "updated@example.com");
     assert_eq!(retrieved_node.value, "updated@example.com");
-    assert_eq!(retrieved_node.notes, Some("Updated test email node".to_string()));
+    assert_eq!(
+        retrieved_node.notes,
+        Some("Updated test email node".to_string())
+    );
     assert_eq!(retrieved_node.pos_x, Some(300));
     assert_eq!(retrieved_node.pos_y, Some(400));
 

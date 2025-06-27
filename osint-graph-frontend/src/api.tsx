@@ -56,7 +56,7 @@ export const createProject = async (projectName: string = "My OSINT Project"): P
 		name: projectName,
 		id: uuidv4(),
 		user: uuidv4(),
-		creationdate: new Date().toISOString(),
+		creationdate: Date.now(), // Send timestamp in milliseconds
 	});
 	return response.data;
 };

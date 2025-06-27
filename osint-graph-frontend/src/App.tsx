@@ -61,7 +61,8 @@ export default function App() {
         let projectId = localStorage.getItem(PROJECT_ID_KEY);
         let project: Project;
 
-        if (projectId) {
+        // Check for valid project ID (not null, not "undefined", not empty)
+        if (projectId && projectId !== "undefined" && projectId.trim() !== "") {
           // Try to load existing nodes for this project
           try {
             const existingNodes = await fetchNodesByProject(projectId);
@@ -121,8 +122,8 @@ export default function App() {
 
   const createOSINTNode = useCallback(async (nodeType: string) => {
     const projectId = localStorage.getItem(PROJECT_ID_KEY);
-    if (!projectId) {
-      console.error('No project ID found in localStorage');
+    if (!projectId || projectId === "undefined" || projectId.trim() === "") {
+      console.error('No valid project ID found in localStorage');
       return;
     }
 

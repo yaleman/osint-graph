@@ -104,6 +104,10 @@ export default function App() {
     setNodes((nds) => nds.concat(newReactFlowNode));
     setShowMenu(false);
 
+    // Automatically open edit UI for the new node
+    setEditingNode(nodeId);
+    setEditDisplay(osintNode.display);
+
     // Save to backend
     try {
       await createNode(osintNode);

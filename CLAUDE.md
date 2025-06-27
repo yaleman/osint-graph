@@ -132,6 +132,7 @@ Backend serves:
 
 - **Background Click**: Click anywhere on canvas to open node creation menu
 - **Node Creation**: Select from 10 OSINT node types with color coding
+- **Auto-Edit**: New nodes automatically open edit dialog for immediate naming
 - **Node Editing**: Double-click any node to edit its display name
 - **Drag & Drop**: Move nodes around, positions auto-save to backend
 - **Connections**: Drag between nodes to create relationships

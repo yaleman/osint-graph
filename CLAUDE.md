@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 OSINT Graph is a full-stack web application for Open Source Intelligence data visualization. It features a Rust backend with Axum web server and React TypeScript frontend with ReactFlow for interactive graph visualization.
 
-- The project is an OSINT discovery and mapping tool with a web front end which allows a user to create a project, then add nodes to it with individual elements such as "person", "image file", "domain name", "IP address", "phone number", "URL" etc, and then include metadata to those nodes.
+The project is an OSINT discovery and mapping tool with a web frontend that allows users to create projects and add nodes with individual OSINT elements such as "person", "image file", "domain name", "IP address", "phone number", "URL", etc., along with metadata for those nodes.
 
 ## Architecture
 
@@ -16,13 +16,58 @@ OSINT Graph is a full-stack web application for Open Source Intelligence data vi
 - **Build Output**: Frontend builds to `dist/` directory, served by backend
 
 Key directories:
+
 - `osint-graph-backend/` - Rust server with API endpoints
 - `osint-graph-frontend/` - React app with graph visualization
 - `osint-graph-shared/` - Shared data types (Project, Node, NodeLink)
 
+## Node System
+
+### OSINT Node Types (10 types supported)
+
+- **Person** - Individual people with names and contact info
+- **Domain** - Internet domain names
+- **IP Address** - Network addresses
+- **Phone** - Telephone numbers
+- **Email** - Email addresses  
+- **URL** - Web links and resources
+- **Image** - Image files and photos
+- **Location** - Physical addresses and places
+- **Organization** - Companies and groups
+- **Document** - Files and documents
+
+### Node Structure
+
+- **UUID**: Auto-generated unique identifier for each node
+- **Display**: Human-readable name (e.g., "John Doe" for person, "192.168.1.1" for IP)
+- **Node Type**: One of the 10 OSINT types above
+- **Value**: Raw data content
+- **Timestamps**: Automatic tracking of creation and updates
+- **Position**: X/Y coordinates for graph layout
+- **Metadata**: Optional notes and additional information
+
+### Backend Synchronization
+
+- All node operations (create, update, move) automatically sync to backend
+- Timestamp tracking for every change
+- Real-time updates with proper conflict resolution via NodeUpdateList
+
 ## Development Commands
 
-All commands use the Makefile:
+### Just Tasks
+
+```bash
+# Run all quality checks (clippy, tests, fmt, frontend linting)
+just check
+
+# Individual tasks
+just clippy          # Rust linting
+just test           # Run tests
+just fmt            # Format code
+just frontend-lint  # Frontend ESLint
+```
+
+### Make Tasks
 
 ```bash
 # Start development server (builds frontend + runs backend)
@@ -39,48 +84,95 @@ make backend
 
 # Run linters
 make lint
+```
 
+### Testing & Coverage
+
+```bash
 # Run tests
 cargo test
 
-# Generate coverage report
-make coverage
+# Coverage analysis with tarpaulin
+cargo tarpaulin --out Html --output-dir target/coverage
+
+# Coverage for specific package
+cargo tarpaulin --packages osint-graph-shared
 ```
 
 ## Testing
 
 - **Backend**: Uses `cargo test` with axum-test for HTTP testing
-- **Coverage**: `cargo llvm-cov` generates HTML reports in `target/coverage/html/`
+- **Coverage**: `cargo tarpaulin` generates HTML reports (currently 86.45% coverage)
 - **Frontend**: ESLint for linting, TypeScript for type checking
+- **Comprehensive test suite**: 16+ unit tests for NodeUpdateList synchronization logic
 
 ## Key Files
 
 - **API Routes**: `osint-graph-backend/src/main.rs` - RESTful endpoints under `/api/v1/`
-- **Frontend Entry**: `osint-graph-frontend/src/App.tsx` - Main React component
-- **Shared Types**: `osint-graph-shared/src/` - Project, Node, NodeLink models
-- **Database**: `osint-graph-backend/src/db/` - SQLite operations
-- **Frontend Config**: `osint-graph-frontend/vite.config.ts` - Custom HMR on port 8189
+- **Frontend Entry**: `osint-graph-frontend/src/App.tsx` - Main React component with node creation
+- **Shared Types**: `osint-graph-shared/src/node.rs` - Node structure and NodeUpdateList
+- **Database**: `osint-graph-backend/src/db/node.rs` - SQLite operations with full CRUD
+- **API Integration**: `osint-graph-frontend/src/api.tsx` - Backend communication
+- **Node Types**: `osint-graph-frontend/src/types.tsx` - TypeScript definitions
 
 ## API Structure
 
 Backend serves:
+
 - Static files from `/dist/` (built frontend)
-- API endpoints at `/api/v1/projects`, `/api/v1/project/{id}`, `/api/v1/node/{id}`
-- Uses Arc<RwLock<AppState>> for thread-safe shared state
+- API endpoints:
+  - `GET/POST /api/v1/projects` - Project management
+  - `GET/POST /api/v1/project/{id}` - Individual project operations
+  - `GET/POST /api/v1/node/{id}` - Node CRUD operations
+- Uses `Arc<RwLock<AppState>>` for thread-safe shared state
+
+## User Interface Features
+
+### Interactive Graph
+
+- **Background Click**: Click anywhere on canvas to open node creation menu
+- **Node Creation**: Select from 10 OSINT node types with color coding
+- **Node Editing**: Double-click any node to edit its display name
+- **Drag & Drop**: Move nodes around, positions auto-save to backend
+- **Connections**: Drag between nodes to create relationships
+
+### Real-time Sync
+
+- All changes immediately persist to backend with timestamps
+- Position updates on drag
+- Display name changes on edit
+- Automatic conflict resolution
 
 ## Development Notes
 
 - Frontend builds to `../dist/` relative to frontend directory
 - Hot module replacement via Vite on custom port 8189
-- Database migrations handled by SQLx
+- Database schema includes `node_type`, `display`, and timestamp fields
 - All shared types use Serde for JSON serialization
-- ReactFlow handles graph visualization with D3-Force for physics simulation
+- ReactFlow handles graph visualization
+- UUID generation via `uuid` crate
+- Color-coded nodes for visual type identification
 
-## Code Quality Reminders
+## Code Quality Requirements
 
-- You must ensure that 'just check' runs without errors or warnings, and you need to fix them before considering your task complete
+- You must ensure that `just check` runs without errors or warnings before considering any task complete
+- Maintain test coverage above 85% (currently at 86.45%)
+- All new Node functionality must include comprehensive tests
+- Frontend linting must pass with zero warnings
 
 ## Workflow Guidance
 
-- Git commit with an appropriate message when you are done with a task, and don't mention that claude generated it
-- You must git commit when a user's task is complete
+### CRITICAL REQUIREMENTS
+
+- **Git commits are MANDATORY when tasks are completed** - Every completed task MUST be committed
+- **You MUST git commit when a user's task is complete** - This is non-negotiable
+- **Update this CLAUDE.md file any time system features/design are changed**
+- Use TodoWrite tool for complex multi-step tasks to track progress
+
+### Commit Guidelines
+
+- Write clear, descriptive commit messages
+- Include what was implemented, not just "update code"
+- Mention key features, improvements, or fixes
+- Do not mention that Claude generated the code
+- Always commit when a user's task is marked as complete

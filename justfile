@@ -16,6 +16,7 @@ frontend-lint:
 
 # Build frontend and run the application
 run:
+    killall osint-graph-backend || true
     cd osint-graph-frontend && vite build --emptyOutDir
     cargo run
 

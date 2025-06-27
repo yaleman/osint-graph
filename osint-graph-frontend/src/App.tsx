@@ -121,10 +121,18 @@ export default function App() {
   }, []);
 
   const createOSINTNode = useCallback(async (nodeType: string) => {
-    const projectId = localStorage.getItem(PROJECT_ID_KEY);
+    let projectId = localStorage.getItem(PROJECT_ID_KEY);
     if (!projectId || projectId === "undefined" || projectId.trim() === "") {
-      console.error('No valid project ID found in localStorage');
-      return;
+      console.log('No valid project ID found, creating new project...');
+      try {
+        const project = await createProject();
+        projectId = project.id;
+        localStorage.setItem(PROJECT_ID_KEY, projectId);
+        setCurrentProject(project);
+      } catch (error) {
+        console.error('Failed to create new project:', error);
+        return;
+      }
     }
 
     const reactFlowBounds = document.querySelector('.react-flow')?.getBoundingClientRect();

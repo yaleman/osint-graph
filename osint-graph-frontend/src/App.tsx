@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -13,15 +13,14 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { v4 as uuidv4 } from 'uuid';
-import { createNode, updateNode } from './api';
-import type { OSINTNode } from './types';
+import { createNode, updateNode, createProject, fetchNodesByProject } from './api';
+import type { OSINTNode, Project } from './types';
 import { NodeTypeInfo } from './types';
 
 const initialNodes: Node[] = [];
 const initialEdges: Edge[] = [];
 
-// Default project ID for demo
-const DEFAULT_PROJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
+const PROJECT_ID_KEY = 'osint-graph-project-id';
 
 export default function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -30,22 +29,13 @@ export default function App() {
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [editingNode, setEditingNode] = useState<string | null>(null);
   const [editDisplay, setEditDisplay] = useState('');
+  const [, setCurrentProject] = useState<Project | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const onConnect: OnConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
-
-  const nodeTypes = Object.keys(NodeTypeInfo);
-
-  const onPaneClick = useCallback((event: React.MouseEvent) => {
-    setMenuPosition({
-      x: event.clientX,
-      y: event.clientY,
-    });
-    setShowMenu(true);
-    setEditingNode(null);
-  }, []);
 
   const getNodeColor = useCallback((nodeType: string): string => {
     const colors: Record<string, string> = {
@@ -63,7 +53,75 @@ export default function App() {
     return colors[nodeType] || '#6b7280';
   }, []);
 
+  // Initialize project on component mount
+  useEffect(() => {
+    const initializeProject = async () => {
+      try {
+        setIsLoading(true);
+        let projectId = localStorage.getItem(PROJECT_ID_KEY);
+        let project: Project;
+
+        if (projectId) {
+          // Try to load existing nodes for this project
+          try {
+            const existingNodes = await fetchNodesByProject(projectId);
+            const reactFlowNodes: Node[] = existingNodes.map(osintNode => ({
+              id: osintNode.id,
+              type: 'default',
+              position: { x: osintNode.pos_x || 100, y: osintNode.pos_y || 100 },
+              data: { 
+                label: osintNode.display,
+                nodeType: osintNode.node_type,
+                osintNode: osintNode
+              },
+              style: {
+                background: getNodeColor(osintNode.node_type),
+                color: 'white',
+                border: '1px solid #222',
+                width: 180,
+                cursor: 'pointer',
+              },
+            }));
+            setNodes(reactFlowNodes);
+          } catch (error) {
+            console.error('Failed to load existing nodes:', error);
+            // If loading nodes fails, we'll continue with an empty project
+          }
+        } else {
+          // Create a new project
+          project = await createProject();
+          projectId = project.id;
+          localStorage.setItem(PROJECT_ID_KEY, projectId);
+          setCurrentProject(project);
+        }
+      } catch (error) {
+        console.error('Failed to initialize project:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeProject();
+  }, [setNodes, getNodeColor]);
+
+  const nodeTypes = Object.keys(NodeTypeInfo);
+
+  const onPaneClick = useCallback((event: React.MouseEvent) => {
+    setMenuPosition({
+      x: event.clientX,
+      y: event.clientY,
+    });
+    setShowMenu(true);
+    setEditingNode(null);
+  }, []);
+
   const createOSINTNode = useCallback(async (nodeType: string) => {
+    const projectId = localStorage.getItem(PROJECT_ID_KEY);
+    if (!projectId) {
+      console.error('No project ID found in localStorage');
+      return;
+    }
+
     const reactFlowBounds = document.querySelector('.react-flow')?.getBoundingClientRect();
     const x = reactFlowBounds ? menuPosition.x - reactFlowBounds.left - 90 : 100;
     const y = reactFlowBounds ? menuPosition.y - reactFlowBounds.top - 40 : 100;
@@ -72,7 +130,7 @@ export default function App() {
     
     const osintNode: OSINTNode = {
       id: nodeId,
-      project_id: DEFAULT_PROJECT_ID,
+      project_id: projectId,
       node_type: nodeType,
       display: `New ${NodeTypeInfo[nodeType]?.label || nodeType}`,
       value: '',
@@ -179,6 +237,21 @@ export default function App() {
       }
     });
   }, [onNodesChange, nodes]);
+
+  if (isLoading) {
+    return (
+      <div style={{ 
+        width: '100vw', 
+        height: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        fontSize: '18px'
+      }}>
+        Initializing OSINT Graph...
+      </div>
+    );
+  }
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>

@@ -19,7 +19,7 @@ use axum::{
     Router,
 };
 // use dev_websocket::ws_handler;
-use project::{get_node, get_project, get_projects, post_node, post_project};
+use project::{get_node, get_nodes_by_project, get_project, get_projects, post_node, post_project};
 use sqlx::SqlitePool;
 use std::{borrow::Cow, sync::Arc, time::Duration};
 use tokio::sync::RwLock;
@@ -57,6 +57,7 @@ pub fn build_app<T>(shared_state: &SharedState) -> Router<T> {
         .route("/api/v1/node/:id", get(get_node))
         .route("/api/v1/project", post(post_project))
         .route("/api/v1/project/:id", get(get_project))
+        .route("/api/v1/project/:id/nodes", get(get_nodes_by_project))
         .route("/api/v1/projects", get(get_projects));
 
     // #[cfg(debug_assertions)]

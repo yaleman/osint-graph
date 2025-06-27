@@ -7,6 +7,7 @@ use osint_graph_shared::project::Project;
 use tracing::debug;
 use uuid::Uuid;
 
+use crate::db::node::NodeExt;
 use crate::db::project::DBProjectExt;
 use crate::storage::DBEntity;
 use crate::SharedState;
@@ -81,6 +82,22 @@ pub async fn get_node(Path(id): Path<Uuid>, State(state): State<SharedState>) ->
             ),
             None => (StatusCode::NOT_FOUND, "".to_string()),
         },
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Error: {:?}", err),
+        ),
+    }
+}
+
+pub async fn get_nodes_by_project(
+    Path(project_id): Path<Uuid>,
+    State(state): State<SharedState>,
+) -> impl IntoResponse {
+    match Node::get_by_project_id(&state.read().await.conn, project_id).await {
+        Ok(nodes) => (
+            StatusCode::OK,
+            serde_json::to_string_pretty(&nodes).expect("Failed to serialize nodes list response"),
+        ),
         Err(err) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Error: {:?}", err),

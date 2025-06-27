@@ -46,6 +46,21 @@ export const updateNode = async (node: OSINTNode): Promise<AxiosResponse<OSINTNo
 	return response;
 };
 
+export const fetchNodesByProject = async (projectId: string): Promise<OSINTNode[]> => {
+	const response = await axios.get<OSINTNode[]>(`${PROJECT_URL}/${projectId}/nodes`);
+	return response.data;
+};
+
+export const createProject = async (projectName: string = "My OSINT Project"): Promise<Project> => {
+	const response = await axios.post<Project>(PROJECT_URL, {
+		name: projectName,
+		id: uuidv4(),
+		user: uuidv4(),
+		creationdate: new Date().toISOString(),
+	});
+	return response.data;
+};
+
 /** Takes the project list and sends back a list */
 export function projectLis(projects: Project[]) {
 	return (

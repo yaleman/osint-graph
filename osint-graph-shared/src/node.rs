@@ -109,7 +109,7 @@ mod tests {
         let project_id = Uuid::new_v4();
         let node_id = Uuid::new_v4();
         let now = Utc::now();
-        
+
         let node = Node {
             project_id,
             id: node_id,
@@ -121,7 +121,7 @@ mod tests {
             pos_x: Some(100),
             pos_y: Some(200),
         };
-        
+
         assert_eq!(node.project_id, project_id);
         assert_eq!(node.id, node_id);
         assert_eq!(node.node_type, "person");
@@ -164,13 +164,13 @@ mod tests {
         let mut list = NodeUpdateList::new();
         let id = Uuid::new_v4();
         let time = Utc::now();
-        
+
         list.insert(id, time);
-        
+
         assert_eq!(list.len(), 1);
         assert!(!list.is_empty());
         assert_eq!(list.get(&id), Some(&time));
-        
+
         let non_existent_id = Uuid::new_v4();
         assert_eq!(list.get(&non_existent_id), None);
     }
@@ -182,10 +182,10 @@ mod tests {
         let id2 = Uuid::new_v4();
         let time1 = Utc.with_ymd_and_hms(2023, 1, 1, 12, 0, 0).unwrap();
         let time2 = Utc.with_ymd_and_hms(2023, 1, 2, 12, 0, 0).unwrap();
-        
+
         list.insert(id1, time1);
         list.insert(id2, time2);
-        
+
         let items: Vec<_> = list.iter().collect();
         assert_eq!(items.len(), 2);
         assert!(items.contains(&(&id1, &time1)));
@@ -196,7 +196,7 @@ mod tests {
     fn test_get_newer_from_empty_lists() {
         let list1 = NodeUpdateList::new();
         let list2 = NodeUpdateList::new();
-        
+
         let result = list1.get_newer_from(&list2);
         assert!(result.is_empty());
     }
@@ -205,16 +205,16 @@ mod tests {
     fn test_get_newer_from_with_new_items() {
         let mut list1 = NodeUpdateList::new();
         let mut list2 = NodeUpdateList::new();
-        
+
         let id1 = Uuid::new_v4();
         let id2 = Uuid::new_v4();
         let time1 = Utc.with_ymd_and_hms(2023, 1, 1, 12, 0, 0).unwrap();
         let time2 = Utc.with_ymd_and_hms(2023, 1, 2, 12, 0, 0).unwrap();
-        
+
         list1.insert(id1, time1);
         list2.insert(id1, time1);
         list2.insert(id2, time2); // This is new in list2
-        
+
         let result = list1.get_newer_from(&list2);
         assert_eq!(result.len(), 1);
         assert_eq!(result.get(&id2), Some(&time2));
@@ -224,14 +224,14 @@ mod tests {
     fn test_get_newer_from_with_updated_items() {
         let mut list1 = NodeUpdateList::new();
         let mut list2 = NodeUpdateList::new();
-        
+
         let id = Uuid::new_v4();
         let old_time = Utc.with_ymd_and_hms(2023, 1, 1, 12, 0, 0).unwrap();
         let new_time = Utc.with_ymd_and_hms(2023, 1, 2, 12, 0, 0).unwrap();
-        
+
         list1.insert(id, old_time);
         list2.insert(id, new_time); // This is newer in list2
-        
+
         let result = list1.get_newer_from(&list2);
         assert_eq!(result.len(), 1);
         assert_eq!(result.get(&id), Some(&new_time));
@@ -241,14 +241,14 @@ mod tests {
     fn test_get_newer_from_with_older_items() {
         let mut list1 = NodeUpdateList::new();
         let mut list2 = NodeUpdateList::new();
-        
+
         let id = Uuid::new_v4();
         let old_time = Utc.with_ymd_and_hms(2023, 1, 1, 12, 0, 0).unwrap();
         let new_time = Utc.with_ymd_and_hms(2023, 1, 2, 12, 0, 0).unwrap();
-        
+
         list1.insert(id, new_time);
         list2.insert(id, old_time); // This is older in list2
-        
+
         let result = list1.get_newer_from(&list2);
         assert!(result.is_empty());
     }
@@ -257,7 +257,7 @@ mod tests {
     fn test_get_newer_than_empty_lists() {
         let list1 = NodeUpdateList::new();
         let list2 = NodeUpdateList::new();
-        
+
         let result = list1.get_newer_than(&list2);
         assert!(result.is_empty());
     }
@@ -266,16 +266,16 @@ mod tests {
     fn test_get_newer_than_with_new_items() {
         let mut list1 = NodeUpdateList::new();
         let mut list2 = NodeUpdateList::new();
-        
+
         let id1 = Uuid::new_v4();
         let id2 = Uuid::new_v4();
         let time1 = Utc.with_ymd_and_hms(2023, 1, 1, 12, 0, 0).unwrap();
         let time2 = Utc.with_ymd_and_hms(2023, 1, 2, 12, 0, 0).unwrap();
-        
+
         list1.insert(id1, time1);
         list1.insert(id2, time2); // This is new in list1
         list2.insert(id1, time1);
-        
+
         let result = list1.get_newer_than(&list2);
         assert_eq!(result.len(), 1);
         assert_eq!(result.get(&id2), Some(&time2));
@@ -285,14 +285,14 @@ mod tests {
     fn test_get_newer_than_with_updated_items() {
         let mut list1 = NodeUpdateList::new();
         let mut list2 = NodeUpdateList::new();
-        
+
         let id = Uuid::new_v4();
         let old_time = Utc.with_ymd_and_hms(2023, 1, 1, 12, 0, 0).unwrap();
         let new_time = Utc.with_ymd_and_hms(2023, 1, 2, 12, 0, 0).unwrap();
-        
+
         list1.insert(id, new_time); // This is newer in list1
         list2.insert(id, old_time);
-        
+
         let result = list1.get_newer_than(&list2);
         assert_eq!(result.len(), 1);
         assert_eq!(result.get(&id), Some(&new_time));
@@ -302,14 +302,14 @@ mod tests {
     fn test_get_newer_than_with_older_items() {
         let mut list1 = NodeUpdateList::new();
         let mut list2 = NodeUpdateList::new();
-        
+
         let id = Uuid::new_v4();
         let old_time = Utc.with_ymd_and_hms(2023, 1, 1, 12, 0, 0).unwrap();
         let new_time = Utc.with_ymd_and_hms(2023, 1, 2, 12, 0, 0).unwrap();
-        
+
         list1.insert(id, old_time); // This is older in list1
         list2.insert(id, new_time);
-        
+
         let result = list1.get_newer_than(&list2);
         assert!(result.is_empty());
     }
@@ -318,32 +318,32 @@ mod tests {
     fn test_complex_scenario() {
         let mut list1 = NodeUpdateList::new();
         let mut list2 = NodeUpdateList::new();
-        
+
         let id1 = Uuid::new_v4();
         let id2 = Uuid::new_v4();
         let id3 = Uuid::new_v4();
         let id4 = Uuid::new_v4();
-        
+
         let time1 = Utc.with_ymd_and_hms(2023, 1, 1, 12, 0, 0).unwrap();
         let time2 = Utc.with_ymd_and_hms(2023, 1, 2, 12, 0, 0).unwrap();
         let time3 = Utc.with_ymd_and_hms(2023, 1, 3, 12, 0, 0).unwrap();
         let time4 = Utc.with_ymd_and_hms(2023, 1, 4, 12, 0, 0).unwrap();
-        
+
         // list1 has: id1(old), id2(new), id3(only in list1)
         list1.insert(id1, time1);
         list1.insert(id2, time3);
         list1.insert(id3, time2);
-        
+
         // list2 has: id1(new), id2(old), id4(only in list2)
         list2.insert(id1, time2);
         list2.insert(id2, time1);
         list2.insert(id4, time4);
-        
+
         let newer_from_list2 = list1.get_newer_from(&list2);
         assert_eq!(newer_from_list2.len(), 2); // id1 (updated) and id4 (new)
         assert_eq!(newer_from_list2.get(&id1), Some(&time2));
         assert_eq!(newer_from_list2.get(&id4), Some(&time4));
-        
+
         let newer_than_list2 = list1.get_newer_than(&list2);
         assert_eq!(newer_than_list2.len(), 2); // id2 (updated) and id3 (new)
         assert_eq!(newer_than_list2.get(&id2), Some(&time3));

@@ -2,7 +2,7 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use axum::async_trait;
-use osint_graph_shared::node::Node;
+use osint_graph_shared::node::{Node, NodeUpdateList};
 use osint_graph_shared::nodelink::NodeLink;
 use osint_graph_shared::project::Project;
 use sqlx::sqlite::SqliteConnectOptions;
@@ -67,6 +67,40 @@ pub async fn create_tables(conn: &SqlitePool) -> Result<(), std::io::Error> {
         .await
         .expect("Failed to create NodeLink table");
 
+    // Create default project if it doesn't exist
+    create_default_project(conn).await?;
+
+    Ok(())
+}
+
+async fn create_default_project(conn: &SqlitePool) -> Result<(), std::io::Error> {
+    use crate::storage::DBEntity;
+    use osint_graph_shared::project::Project;
+
+    let default_project_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000")
+        .map_err(|e| std::io::Error::other(format!("Invalid UUID: {}", e)))?;
+
+    // Check if default project already exists
+    if let Ok(Some(_)) = Project::get(conn, &default_project_id).await {
+        debug!("Default project already exists");
+        return Ok(());
+    }
+
+    let default_project = Project {
+        id: default_project_id,
+        name: "Default Project".to_string(),
+        user: Uuid::new_v4(), // Generate a random user ID for demo
+        creationdate: std::time::SystemTime::now().into(),
+        last_updated: None,
+        nodes: NodeUpdateList::new(),
+    };
+
+    default_project
+        .save(conn)
+        .await
+        .map_err(|e| std::io::Error::other(format!("Failed to create default project: {:?}", e)))?;
+
+    debug!("Created default project with ID: {}", default_project_id);
     Ok(())
 }
 

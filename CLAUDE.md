@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 OSINT Graph is a full-stack web application for Open Source Intelligence data visualization. It features a Rust backend with Axum web server and React TypeScript frontend with ReactFlow for interactive graph visualization.
 
+- The project is an OSINT discovery and mapping tool with a web front end which allows a user to create a project, then add nodes to it with individual elements such as "person", "image file", "domain name", "IP address", "phone number", "URL" etc, and then include metadata to those nodes.
+
 ## Architecture
 
 - **Backend**: Rust workspace with Axum web server, SQLite + REDB storage

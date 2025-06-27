@@ -2,8 +2,6 @@ import {
 	useCallback,
 	useEffect,
 	useState,
-
-
 } from "react";
 
 import type { MouseEvent as ReactMouseEvent } from "react";
@@ -26,7 +24,8 @@ import { type CustomNode, initialNodes, nodeTypes } from "./nodes";
 import { type CustomEdge, initialEdges, edgeTypes } from "./edges";
 import { fetchProjects, projectLis, newProject } from "./api";
 import type { Project } from "./types";
-import { newNode } from "./ui";
+import { NodeTypeMenu } from "./components/NodeTypeMenu";
+import { v4 as uuidv4 } from "uuid";
 import {
 	forceCenter,
 	forceCollide,
@@ -81,6 +80,8 @@ const NODE_STRENGTH = -50;
 
 export default function App() {
 	const [projectNodes, setProjectNodes] = useState<Project[]>([]);
+	const [showNodeMenu, setShowNodeMenu] = useState(false);
+	const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
 
 	const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
 	const [edges, setEdges, onEdgesChange] = useEdgesState(
@@ -163,34 +164,76 @@ export default function App() {
 		updateProjects(setProjectNodes);
 	}, []); // Empty array means this effect runs once on component mount
 
-	return (
-		<ReactFlow
-			nodes={nodes}
-			nodeTypes={nodeTypes}
-			onNodeDragStop={(event: ReactMouseEvent, eventNode: CustomNode, eventNodes: CustomNode[]) => {
+	// Handle background click to show node menu
+	const onPaneClick = useCallback((event: ReactMouseEvent) => {
+		console.debug('Pane clicked at:', event.clientX, event.clientY);
+		setMenuPosition({
+			x: event.clientX,
+			y: event.clientY,
+		});
+		setShowNodeMenu(true);
+	}, []);
 
-				console.debug("onNodeDragStop", event, eventNode, eventNodes);
-				setNodes(nodes);
-			}}
-			onNodesChange={onNodesChange}
-			edges={edges}
-			edgeTypes={edgeTypes}
-			onEdgesChange={onEdgesChange}
-			onConnect={onConnect}
-			fitView
-		>
+	// Create new node of specified type at menu position
+	const createNode = useCallback((nodeType: string) => {
+		// Convert screen coordinates to ReactFlow coordinates
+		const reactFlowBounds = document.querySelector('.react-flow')?.getBoundingClientRect();
+		const x = reactFlowBounds ? menuPosition.x - reactFlowBounds.left - 60 : menuPosition.x - 60;
+		const y = reactFlowBounds ? menuPosition.y - reactFlowBounds.top - 30 : menuPosition.y - 30;
+		
+		const newNode: CustomNode = {
+			id: uuidv4(),
+			type: nodeType,
+			position: { x, y },
+			data: {
+				label: `New ${nodeType}`,
+				content: "",
+			},
+		};
+		setNodes((nodes) => [...nodes, newNode]);
+		setShowNodeMenu(false);
+	}, [menuPosition, setNodes]);
+
+	// Close node menu
+	const closeNodeMenu = useCallback(() => {
+		setShowNodeMenu(false);
+	}, []);
+
+	// Close menu when clicking outside
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (showNodeMenu && !(event.target as HTMLElement).closest('.node-type-menu')) {
+				setShowNodeMenu(false);
+			}
+		};
+
+		document.addEventListener('mousedown', handleClickOutside);
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+		};
+	}, [showNodeMenu]);
+
+	return (
+		<div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
+			<ReactFlow
+				nodes={nodes}
+				nodeTypes={nodeTypes}
+				onNodeDragStop={(event: ReactMouseEvent, eventNode: CustomNode, eventNodes: CustomNode[]) => {
+					console.debug("onNodeDragStop", event, eventNode, eventNodes);
+					setNodes(nodes);
+				}}
+				onNodesChange={onNodesChange}
+				edges={edges}
+				edgeTypes={edgeTypes}
+				onEdgesChange={onEdgesChange}
+				onConnect={onConnect}
+				onPaneClick={onPaneClick}
+				fitView
+			>
 			<Background />
 			<MiniMap />
 			<Controls />
 			<Panel position="top-right">
-				<button
-					type="button"
-					onClick={() => {
-						newNode(nodes, setNodes);
-					}}
-				>
-					New Node
-				</button>
 				<button
 					type="button"
 					onClick={() => {
@@ -211,6 +254,15 @@ export default function App() {
 				</button>
 				{projectLis(projectNodes)}
 			</Panel>
-		</ReactFlow>
+			</ReactFlow>
+			{showNodeMenu && (
+				<NodeTypeMenu
+					x={menuPosition.x}
+					y={menuPosition.y}
+					onSelect={createNode}
+					onClose={closeNodeMenu}
+				/>
+			)}
+		</div>
 	);
 }

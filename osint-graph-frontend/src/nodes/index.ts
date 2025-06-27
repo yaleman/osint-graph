@@ -1,5 +1,17 @@
 import type { Node, NodeTypes } from "reactflow";
 import { PositionLoggerNode } from "./PositionLoggerNode";
+import {
+  PersonNode,
+  ImageNode,
+  DomainNode,
+  IPNode,
+  PhoneNode,
+  URLNode,
+  EmailNode,
+  LocationNode,
+  OrganizationNode,
+  DocumentNode,
+} from "./OSINTNodes";
 import type { SimulationNodeDatum } from "d3-force";
 
 export interface CustomNode extends Node, SimulationNodeDatum {
@@ -31,5 +43,14 @@ export const initialNodes = [
 
 export const nodeTypes = {
   "position-logger": PositionLoggerNode,
-  // Add any of your custom nodes here!
+  "person": PersonNode,
+  "image": ImageNode,
+  "domain": DomainNode,
+  "ip": IPNode,
+  "phone": PhoneNode,
+  "url": URLNode,
+  "email": EmailNode,
+  "location": LocationNode,
+  "organization": OrganizationNode,
+  "document": DocumentNode,
 } satisfies NodeTypes;

@@ -85,6 +85,10 @@ export const fetchNodeLinksByProject = async (projectId: string): Promise<NodeLi
 	return response.data;
 };
 
+export const deleteNodeLink = async (nodelinkId: string): Promise<void> => {
+	await axios.delete(`${NODELINK_URL}/${nodelinkId}`);
+};
+
 /** Takes the project list and sends back a list */
 export function projectLis(projects: Project[]) {
 	return (

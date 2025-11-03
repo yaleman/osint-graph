@@ -211,3 +211,24 @@ pub async fn get_nodelinks_by_project(
         ),
     }
 }
+
+pub async fn delete_nodelink(
+    Path(id): Path<Uuid>,
+    State(state): State<SharedState>,
+) -> impl IntoResponse {
+    let conn = &state.read().await.conn;
+
+    match NodeLink::delete_by_id(conn, id).await {
+        Ok(()) => {
+            debug!("Deleted nodelink: {}", id);
+            (StatusCode::OK, "NodeLink deleted successfully".to_string())
+        }
+        Err(err) => {
+            debug!("Error deleting nodelink {}: {:?}", id, err);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Error deleting nodelink: {:?}", err),
+            )
+        }
+    }
+}

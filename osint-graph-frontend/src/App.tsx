@@ -15,7 +15,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { v4 as uuidv4 } from 'uuid';
 import toast, { Toaster } from 'react-hot-toast';
-import { createNode, updateNode, createProject, fetchNodesByProject, getProject, fetchProjects, createNodeLink, fetchNodeLinksByProject } from './api';
+import { createNode, updateNode, createProject, fetchNodesByProject, getProject, fetchProjects, createNodeLink, fetchNodeLinksByProject, deleteNodeLink } from './api';
 import type { OSINTNode, Project } from './types';
 import { NodeTypeInfo } from './types';
 import { ProjectMismatchDialog } from './components/ProjectMismatchDialog';
@@ -610,6 +610,16 @@ export default function App() {
 
     if (hasRemove) {
       saveHistory();
+
+      // Delete nodelinks from backend
+      changes.forEach(change => {
+        if (change.type === 'remove') {
+          deleteNodeLink(change.id).catch(error => {
+            console.error('Failed to delete nodelink:', error);
+            toast.error('Failed to delete connection from backend');
+          });
+        }
+      });
     }
 
     onEdgesChange(changes);

@@ -1,3 +1,6 @@
+default:
+    just --list
+
 # Run cargo clippy on all targets
 clippy:
     cargo clippy --all-targets

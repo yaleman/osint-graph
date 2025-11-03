@@ -148,7 +148,6 @@ export default function App() {
       display: `New ${NodeTypeInfo[nodeType]?.label || nodeType}`,
       value: '',
       updated: new Date().toISOString(),
-      notes: undefined,
       pos_x: Math.round(x),
       pos_y: Math.round(y),
     };
@@ -231,19 +230,26 @@ export default function App() {
 
   const handleNodesChange: OnNodesChange = useCallback((changes) => {
     onNodesChange(changes);
-    
+
     // Update position changes in backend
     changes.forEach(change => {
       if (change.type === 'position' && change.position) {
         const node = nodes.find(n => n.id === change.id);
         if (node?.data.osintNode) {
-          const updatedNode = {
+          const projectId = localStorage.getItem(PROJECT_ID_KEY);
+          if (!projectId || projectId === "undefined" || projectId.trim() === "") {
+            console.error('No valid project ID found when updating node position');
+            return;
+          }
+
+          const updatedNode: OSINTNode = {
             ...node.data.osintNode,
+            project_id: projectId,
             pos_x: Math.round(change.position.x),
             pos_y: Math.round(change.position.y),
             updated: new Date().toISOString(),
           };
-          updateNode(updatedNode).catch(error => 
+          updateNode(updatedNode).catch(error =>
             console.error('Failed to update node position:', error)
           );
         }

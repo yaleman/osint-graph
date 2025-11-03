@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -24,6 +24,7 @@ const initialNodes: Node[] = [];
 const initialEdges: Edge[] = [];
 
 const PROJECT_ID_KEY = 'osint-graph-project-id';
+const DEBOUNCE_DELAY = 100; // ms
 
 export default function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -36,6 +37,69 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [showMismatchDialog, setShowMismatchDialog] = useState(false);
   const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
+
+  // Refs for debouncing node updates
+  const pendingUpdatesRef = useRef<Map<string, number>>(new Map());
+  const latestNodeDataRef = useRef<Map<string, OSINTNode>>(new Map());
+
+  // Flush all pending updates immediately
+  const flushPendingUpdates = useCallback(() => {
+    const updates = Array.from(latestNodeDataRef.current.entries());
+
+    updates.forEach(([nodeId, nodeData]) => {
+      // Clear the timeout
+      const timeout = pendingUpdatesRef.current.get(nodeId);
+      if (timeout) {
+        clearTimeout(timeout);
+        pendingUpdatesRef.current.delete(nodeId);
+      }
+
+      // Execute the update
+      updateNode(nodeData).catch(error => {
+        console.error('Failed to update node:', error);
+        toast.error('Failed to update node');
+      });
+    });
+
+    // Clear the latest data map
+    latestNodeDataRef.current.clear();
+  }, []);
+
+  // Debounced update function
+  const debouncedUpdateNode = useCallback((nodeData: OSINTNode) => {
+    const nodeId = nodeData.id;
+
+    // Store the latest data for this node
+    latestNodeDataRef.current.set(nodeId, nodeData);
+
+    // Clear existing timeout for this node
+    const existingTimeout = pendingUpdatesRef.current.get(nodeId);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+    }
+
+    // Set new timeout
+    const timeout = setTimeout(() => {
+      const latestData = latestNodeDataRef.current.get(nodeId);
+      if (latestData) {
+        updateNode(latestData).catch(error => {
+          console.error('Failed to update node:', error);
+          toast.error('Failed to update node');
+        });
+        latestNodeDataRef.current.delete(nodeId);
+      }
+      pendingUpdatesRef.current.delete(nodeId);
+    }, DEBOUNCE_DELAY);
+
+    pendingUpdatesRef.current.set(nodeId, timeout);
+  }, []);
+
+  // Cleanup: flush pending updates on unmount
+  useEffect(() => {
+    return () => {
+      flushPendingUpdates();
+    };
+  }, [flushPendingUpdates]);
 
   const onConnect: OnConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -274,12 +338,9 @@ export default function App() {
             display: editDisplay,
             updated: new Date().toISOString(),
           };
-          
-          // Update backend
-          updateNode(updatedOSINTNode).catch(error => {
-            console.error('Failed to update node in backend:', error);
-            toast.error('Failed to update node');
-          });
+
+          // Use debounced update for display name changes
+          debouncedUpdateNode(updatedOSINTNode);
 
           return {
             ...node,
@@ -296,7 +357,7 @@ export default function App() {
     
     setEditingNode(null);
     setEditDisplay('');
-  }, [editingNode, editDisplay, setNodes]);
+  }, [editingNode, editDisplay, setNodes, debouncedUpdateNode]);
 
   const handleNodesChange: OnNodesChange = useCallback((changes) => {
     onNodesChange(changes);
@@ -319,14 +380,12 @@ export default function App() {
             pos_y: Math.round(change.position.y),
             updated: new Date().toISOString(),
           };
-          updateNode(updatedNode).catch(error => {
-            console.error('Failed to update node position:', error);
-            toast.error('Failed to update node position');
-          });
+          // Use debounced update for position changes (happens frequently during drag)
+          debouncedUpdateNode(updatedNode);
         }
       }
     });
-  }, [onNodesChange, nodes]);
+  }, [onNodesChange, nodes, debouncedUpdateNode]);
 
   if (isLoading) {
     return (

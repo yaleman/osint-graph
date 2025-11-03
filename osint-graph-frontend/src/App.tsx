@@ -29,8 +29,7 @@ const DEBOUNCE_DELAY = 100; // ms
 export default function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const [showMenu, setShowMenu] = useState(false);
-  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
   const [editingNode, setEditingNode] = useState<string | null>(null);
   const [editDisplay, setEditDisplay] = useState('');
   const [editValue, setEditValue] = useState('');
@@ -283,15 +282,6 @@ export default function App() {
     }
   }, [loadProjectData]);
 
-  const onPaneClick = useCallback((event: React.MouseEvent) => {
-    setMenuPosition({
-      x: event.clientX,
-      y: event.clientY,
-    });
-    setShowMenu(true);
-    setEditingNode(null);
-  }, []);
-
   const createOSINTNode = useCallback(async (nodeType: string) => {
     let projectId = localStorage.getItem(PROJECT_ID_KEY);
     if (!projectId || projectId === "undefined" || projectId.trim() === "") {
@@ -307,9 +297,13 @@ export default function App() {
       }
     }
 
+    // Create nodes in center of viewport with small random offset
     const reactFlowBounds = document.querySelector('.react-flow')?.getBoundingClientRect();
-    const x = reactFlowBounds ? menuPosition.x - reactFlowBounds.left - 90 : 100;
-    const y = reactFlowBounds ? menuPosition.y - reactFlowBounds.top - 40 : 100;
+    const centerX = reactFlowBounds ? reactFlowBounds.width / 2 : 400;
+    const centerY = reactFlowBounds ? reactFlowBounds.height / 2 : 300;
+    const randomOffset = () => Math.random() * 100 - 50; // -50 to +50
+    const x = centerX + randomOffset();
+    const y = centerY + randomOffset();
 
     const nodeId = uuidv4();
     
@@ -344,11 +338,11 @@ export default function App() {
 
     // Update local state immediately
     setNodes((nds) => nds.concat(newReactFlowNode));
-    setShowMenu(false);
 
     // Automatically open edit UI for the new node
     setEditingNode(nodeId);
     setEditDisplay(osintNode.display);
+    setEditValue('');
 
     // Save to backend
     try {
@@ -358,7 +352,7 @@ export default function App() {
       console.error('Failed to save node to backend:', error);
       toast.error('Failed to save node to backend');
     }
-  }, [menuPosition, setNodes, getNodeColor]);
+  }, [setNodes, getNodeColor]);
 
   const handleNodeDoubleClick = useCallback((event: React.MouseEvent, node: Node) => {
     event.stopPropagation();
@@ -471,7 +465,6 @@ export default function App() {
         onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        onPaneClick={onPaneClick}
         onNodeDoubleClick={handleNodeDoubleClick}
         fitView
       >
@@ -480,23 +473,54 @@ export default function App() {
         <Background />
       </ReactFlow>
 
-      {showMenu && (
-        <div
+      {/* Right-side collapsible panel for adding nodes */}
+      <div
+        style={{
+          position: 'fixed',
+          top: '60px',
+          right: isPanelCollapsed ? '-220px' : '10px',
+          width: '220px',
+          background: 'white',
+          border: '1px solid #ccc',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          zIndex: 1000,
+          transition: 'right 0.3s ease',
+          maxHeight: 'calc(100vh - 80px)',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {/* Collapse/Expand button */}
+        <button
+          onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
           style={{
-            position: 'fixed',
-            left: menuPosition.x,
-            top: menuPosition.y,
+            position: 'absolute',
+            left: '-32px',
+            top: '10px',
+            width: '32px',
+            height: '40px',
             background: 'white',
             border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '8px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            zIndex: 1000,
-            maxHeight: '400px',
-            overflowY: 'auto',
+            borderRight: 'none',
+            borderRadius: '8px 0 0 8px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '18px',
+            boxShadow: '-2px 2px 8px rgba(0, 0, 0, 0.1)',
           }}
+          title={isPanelCollapsed ? 'Expand panel' : 'Collapse panel'}
         >
-          <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>Add Node:</div>
+          {isPanelCollapsed ? '◀' : '▶'}
+        </button>
+
+        {/* Panel content */}
+        <div style={{ padding: '16px', overflowY: 'auto', flex: 1 }}>
+          <div style={{ marginBottom: '12px', fontWeight: 'bold', fontSize: '16px' }}>
+            Add Node
+          </div>
           {nodeTypes.map((type) => (
             <button
               key={type}
@@ -504,36 +528,32 @@ export default function App() {
               style={{
                 display: 'block',
                 width: '100%',
-                padding: '8px 12px',
-                margin: '2px 0',
+                padding: '10px 12px',
+                margin: '4px 0',
                 border: 'none',
-                borderRadius: '4px',
+                borderRadius: '6px',
                 background: getNodeColor(type),
                 color: 'white',
                 cursor: 'pointer',
                 textAlign: 'left',
+                fontSize: '14px',
+                fontWeight: '500',
+                transition: 'transform 0.1s ease, box-shadow 0.1s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
               }}
             >
               {NodeTypeInfo[type]?.label || type}
             </button>
           ))}
-          <button
-            onClick={() => setShowMenu(false)}
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '4px',
-              margin: '4px 0 0 0',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              background: 'white',
-              cursor: 'pointer',
-            }}
-          >
-            Cancel
-          </button>
         </div>
-      )}
+      </div>
 
       {editingNode && (
         <div

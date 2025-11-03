@@ -10,6 +10,7 @@ import ReactFlow, {
   useEdgesState,
   OnConnect,
   OnNodesChange,
+  OnEdgesChange,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { v4 as uuidv4 } from 'uuid';
@@ -42,6 +43,13 @@ export default function App() {
   // Refs for debouncing node updates
   const pendingUpdatesRef = useRef<Map<string, number>>(new Map());
   const latestNodeDataRef = useRef<Map<string, OSINTNode>>(new Map());
+
+  // History state for undo/redo (max 10 levels)
+  const [history, setHistory] = useState<{ past: Array<{ nodes: Node[]; edges: Edge[] }>; future: Array<{ nodes: Node[]; edges: Edge[] }> }>({
+    past: [],
+    future: [],
+  });
+  const isUndoingRef = useRef(false);
 
   // Flush all pending updates immediately
   const flushPendingUpdates = useCallback(() => {
@@ -95,6 +103,114 @@ export default function App() {
     pendingUpdatesRef.current.set(nodeId, timeout);
   }, []);
 
+  // Save current state to history (max 10 levels)
+  const saveHistory = useCallback(() => {
+    if (isUndoingRef.current) return;
+
+    setHistory(prev => {
+      const newPast = [...prev.past, { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }];
+      // Keep only last 10 states
+      if (newPast.length > 10) {
+        newPast.shift();
+      }
+      return {
+        past: newPast,
+        future: [], // Clear future when new action is performed
+      };
+    });
+  }, [nodes, edges]);
+
+  // Undo function
+  const undo = useCallback(() => {
+    if (history.past.length === 0) {
+      toast.error('Nothing to undo');
+      return;
+    }
+
+    flushPendingUpdates();
+    isUndoingRef.current = true;
+
+    setHistory(prev => {
+      const newPast = [...prev.past];
+      const previousState = newPast.pop();
+
+      if (!previousState) return prev;
+
+      const currentState = { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) };
+
+      return {
+        past: newPast,
+        future: [currentState, ...prev.future],
+      };
+    });
+
+    const previousState = history.past[history.past.length - 1];
+    if (previousState) {
+      setNodes(JSON.parse(JSON.stringify(previousState.nodes)));
+      setEdges(JSON.parse(JSON.stringify(previousState.edges)));
+      toast.success('Undo');
+    }
+
+    setTimeout(() => {
+      isUndoingRef.current = false;
+    }, 100);
+  }, [history, nodes, edges, setNodes, setEdges, flushPendingUpdates]);
+
+  // Redo function
+  const redo = useCallback(() => {
+    if (history.future.length === 0) {
+      toast.error('Nothing to redo');
+      return;
+    }
+
+    flushPendingUpdates();
+    isUndoingRef.current = true;
+
+    setHistory(prev => {
+      const newFuture = [...prev.future];
+      const nextState = newFuture.shift();
+
+      if (!nextState) return prev;
+
+      const currentState = { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) };
+
+      return {
+        past: [...prev.past, currentState],
+        future: newFuture,
+      };
+    });
+
+    const nextState = history.future[0];
+    if (nextState) {
+      setNodes(JSON.parse(JSON.stringify(nextState.nodes)));
+      setEdges(JSON.parse(JSON.stringify(nextState.edges)));
+      toast.success('Redo');
+    }
+
+    setTimeout(() => {
+      isUndoingRef.current = false;
+    }, 100);
+  }, [history, nodes, edges, setNodes, setEdges, flushPendingUpdates]);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const modifier = isMac ? e.metaKey : e.ctrlKey;
+
+      if (modifier && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if (modifier && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        redo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
+
   // Cleanup: flush pending updates on unmount
   useEffect(() => {
     return () => {
@@ -104,6 +220,9 @@ export default function App() {
 
   const onConnect: OnConnect = useCallback(
     async (params) => {
+      // Save history before making changes
+      saveHistory();
+
       // Add edge locally
       setEdges((eds) => addEdge(params, eds));
 
@@ -137,7 +256,7 @@ export default function App() {
         toast.error('Failed to save connection to backend');
       }
     },
-    [setEdges]
+    [setEdges, saveHistory]
   );
 
   const getNodeColor = useCallback((nodeType: string): string => {
@@ -382,6 +501,9 @@ export default function App() {
       },
     };
 
+    // Save history before making changes
+    saveHistory();
+
     // Update local state immediately
     setNodes((nds) => nds.concat(newReactFlowNode));
 
@@ -398,7 +520,7 @@ export default function App() {
       console.error('Failed to save node to backend:', error);
       toast.error('Failed to save node to backend');
     }
-  }, [nodes, findNonOverlappingPosition, setNodes, getNodeColor]);
+  }, [nodes, findNonOverlappingPosition, setNodes, getNodeColor, saveHistory]);
 
   const handleNodeDoubleClick = useCallback((event: React.MouseEvent, node: Node) => {
     event.stopPropagation();
@@ -410,6 +532,9 @@ export default function App() {
 
   const saveNodeEdit = useCallback(async () => {
     if (!editingNode) return;
+
+    // Save history before making changes
+    saveHistory();
 
     setNodes((nds) =>
       nds.map((node) => {
@@ -442,9 +567,16 @@ export default function App() {
     setEditDisplay('');
     setEditValue('');
     setEditNotes('');
-  }, [editingNode, editDisplay, editValue, editNotes, setNodes, debouncedUpdateNode]);
+  }, [editingNode, editDisplay, editValue, editNotes, setNodes, debouncedUpdateNode, saveHistory]);
 
   const handleNodesChange: OnNodesChange = useCallback((changes) => {
+    // Check if any changes are removals, save history before applying
+    const hasRemove = changes.some(change => change.type === 'remove');
+
+    if (hasRemove) {
+      saveHistory();
+    }
+
     onNodesChange(changes);
 
     // Update position changes in backend
@@ -470,7 +602,23 @@ export default function App() {
         }
       }
     });
-  }, [onNodesChange, nodes, debouncedUpdateNode]);
+  }, [onNodesChange, nodes, debouncedUpdateNode, saveHistory]);
+
+  // Handle edge changes (including deletions)
+  const handleEdgesChange: OnEdgesChange = useCallback((changes) => {
+    const hasRemove = changes.some(change => change.type === 'remove');
+
+    if (hasRemove) {
+      saveHistory();
+    }
+
+    onEdgesChange(changes);
+  }, [onEdgesChange, saveHistory]);
+
+  // Save history when node drag starts (for position undo)
+  const onNodeDragStart = useCallback(() => {
+    saveHistory();
+  }, [saveHistory]);
 
   if (isLoading) {
     return (
@@ -509,8 +657,9 @@ export default function App() {
         nodes={nodes}
         edges={edges}
         onNodesChange={handleNodesChange}
-        onEdgesChange={onEdgesChange}
+        onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
+        onNodeDragStart={onNodeDragStart}
         onNodeDoubleClick={handleNodeDoubleClick}
         fitView
       >

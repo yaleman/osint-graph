@@ -1,11 +1,12 @@
 // api.ts
 import axios, { type AxiosResponse } from "axios";
 import { v4 as uuidv4 } from "uuid";
-import type { Project, OSINTNode } from "./types";
+import type { Project, OSINTNode, NodeLink } from "./types";
 
 const PROJECTS_URL = "/api/v1/projects";
 const PROJECT_URL = "/api/v1/project";
 const NODE_URL = "/api/v1/node";
+const NODELINK_URL = "/api/v1/nodelink";
 
 export const fetchProjects = async (): Promise<Project[]> => {
 	const response = await axios.get<Project[]>(PROJECTS_URL);
@@ -72,6 +73,16 @@ export const getProject = async (projectId: string): Promise<Project | null> => 
 		}
 		throw error;
 	}
+};
+
+export const createNodeLink = async (nodelink: NodeLink): Promise<AxiosResponse<NodeLink>> => {
+	const response = await axios.post<NodeLink>(NODELINK_URL, nodelink);
+	return response;
+};
+
+export const fetchNodeLinksByProject = async (projectId: string): Promise<NodeLink[]> => {
+	const response = await axios.get<NodeLink[]>(`${PROJECT_URL}/${projectId}/nodelinks`);
+	return response.data;
 };
 
 /** Takes the project list and sends back a list */

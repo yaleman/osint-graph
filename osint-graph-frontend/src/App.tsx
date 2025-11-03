@@ -14,7 +14,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { v4 as uuidv4 } from 'uuid';
 import toast, { Toaster } from 'react-hot-toast';
-import { createNode, updateNode, createProject, fetchNodesByProject, getProject, fetchProjects } from './api';
+import { createNode, updateNode, createProject, fetchNodesByProject, getProject, fetchProjects, createNodeLink, fetchNodeLinksByProject } from './api';
 import type { OSINTNode, Project } from './types';
 import { NodeTypeInfo } from './types';
 import { ProjectMismatchDialog } from './components/ProjectMismatchDialog';
@@ -33,6 +33,8 @@ export default function App() {
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [editingNode, setEditingNode] = useState<string | null>(null);
   const [editDisplay, setEditDisplay] = useState('');
+  const [editValue, setEditValue] = useState('');
+  const [editNotes, setEditNotes] = useState('');
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showMismatchDialog, setShowMismatchDialog] = useState(false);
@@ -102,14 +104,47 @@ export default function App() {
   }, [flushPendingUpdates]);
 
   const onConnect: OnConnect = useCallback(
-    (params) => setEdges((eds) => addEdge(params, eds)),
+    async (params) => {
+      // Add edge locally
+      setEdges((eds) => addEdge(params, eds));
+
+      // Validate source and target
+      if (!params.source || !params.target) {
+        console.error('Invalid connection: missing source or target');
+        return;
+      }
+
+      // Save to backend
+      const projectId = localStorage.getItem(PROJECT_ID_KEY);
+      if (!projectId || projectId === "undefined" || projectId.trim() === "") {
+        console.error('No valid project ID found when creating node link');
+        toast.error('Cannot create link: no project selected');
+        return;
+      }
+
+      try {
+        const nodeLink = {
+          id: uuidv4(),
+          left: params.source,
+          right: params.target,
+          project_id: projectId,
+          linktype: 'Directional' as const,
+        };
+
+        await createNodeLink(nodeLink);
+        toast.success('Connection saved');
+      } catch (error) {
+        console.error('Failed to save connection:', error);
+        toast.error('Failed to save connection to backend');
+      }
+    },
     [setEdges]
   );
 
   const getNodeColor = useCallback((nodeType: string): string => {
     const colors: Record<string, string> = {
       person: '#3b82f6',
-      domain: '#f59e0b', 
+      domain: '#f59e0b',
       ip: '#ef4444',
       phone: '#8b5cf6',
       email: '#ec4899',
@@ -121,6 +156,45 @@ export default function App() {
     };
     return colors[nodeType] || '#6b7280';
   }, []);
+
+  // Helper function to load nodes and edges for a project
+  const loadProjectData = useCallback(async (projectId: string) => {
+    try {
+      // Load nodes
+      const existingNodes = await fetchNodesByProject(projectId);
+      const reactFlowNodes: Node[] = existingNodes.map(osintNode => ({
+        id: osintNode.id,
+        type: 'default',
+        position: { x: osintNode.pos_x || 100, y: osintNode.pos_y || 100 },
+        data: {
+          label: osintNode.display,
+          nodeType: osintNode.node_type,
+          osintNode: osintNode
+        },
+        style: {
+          background: getNodeColor(osintNode.node_type),
+          color: 'white',
+          border: '1px solid #222',
+          width: 180,
+          cursor: 'pointer',
+        },
+      }));
+      setNodes(reactFlowNodes);
+
+      // Load node links
+      const existingLinks = await fetchNodeLinksByProject(projectId);
+      const reactFlowEdges: Edge[] = existingLinks.map(nodeLink => ({
+        id: nodeLink.id,
+        source: nodeLink.left,
+        target: nodeLink.right,
+        type: nodeLink.linktype === 'Directional' ? 'default' : 'straight',
+      }));
+      setEdges(reactFlowEdges);
+    } catch (error) {
+      console.error('Failed to load project data:', error);
+      throw error;
+    }
+  }, [setNodes, setEdges, getNodeColor]);
 
   // Initialize project on component mount
   useEffect(() => {
@@ -138,29 +212,11 @@ export default function App() {
             // Project exists, load its data
             setCurrentProject(project);
             try {
-              const existingNodes = await fetchNodesByProject(projectId);
-              const reactFlowNodes: Node[] = existingNodes.map(osintNode => ({
-                id: osintNode.id,
-                type: 'default',
-                position: { x: osintNode.pos_x || 100, y: osintNode.pos_y || 100 },
-                data: {
-                  label: osintNode.display,
-                  nodeType: osintNode.node_type,
-                  osintNode: osintNode
-                },
-                style: {
-                  background: getNodeColor(osintNode.node_type),
-                  color: 'white',
-                  border: '1px solid #222',
-                  width: 180,
-                  cursor: 'pointer',
-                },
-              }));
-              setNodes(reactFlowNodes);
+              await loadProjectData(projectId);
               setIsLoading(false);
             } catch (error) {
-              console.error('Failed to load nodes:', error);
-              toast.error('Failed to load nodes for this project');
+              console.error('Failed to load project data:', error);
+              toast.error('Failed to load project data');
               setIsLoading(false);
             }
           } else {
@@ -185,7 +241,7 @@ export default function App() {
     };
 
     initializeProject();
-  }, [setNodes, getNodeColor]);
+  }, [loadProjectData]);
 
   const nodeTypes = Object.keys(NodeTypeInfo);
 
@@ -196,12 +252,13 @@ export default function App() {
       setCurrentProject(project);
       setShowMismatchDialog(false);
       setNodes([]);
+      setEdges([]);
       toast.success(`Created new project: ${project.name}`);
     } catch (error) {
       console.error('Failed to create project:', error);
       toast.error('Failed to create new project');
     }
-  }, [setNodes]);
+  }, [setNodes, setEdges]);
 
   const handleSelectExisting = useCallback(() => {
     setShowMismatchDialog(false);
@@ -216,33 +273,15 @@ export default function App() {
         localStorage.setItem(PROJECT_ID_KEY, projectId);
         setCurrentProject(project);
 
-        // Load nodes for this project
-        const existingNodes = await fetchNodesByProject(projectId);
-        const reactFlowNodes: Node[] = existingNodes.map(osintNode => ({
-          id: osintNode.id,
-          type: 'default',
-          position: { x: osintNode.pos_x || 100, y: osintNode.pos_y || 100 },
-          data: {
-            label: osintNode.display,
-            nodeType: osintNode.node_type,
-            osintNode: osintNode
-          },
-          style: {
-            background: getNodeColor(osintNode.node_type),
-            color: 'white',
-            border: '1px solid #222',
-            width: 180,
-            cursor: 'pointer',
-          },
-        }));
-        setNodes(reactFlowNodes);
+        // Load nodes and links for this project
+        await loadProjectData(projectId);
         toast.success(`Switched to project: ${project.name}`);
       }
     } catch (error) {
       console.error('Failed to switch project:', error);
       toast.error('Failed to switch project');
     }
-  }, [setNodes, getNodeColor]);
+  }, [loadProjectData]);
 
   const onPaneClick = useCallback((event: React.MouseEvent) => {
     setMenuPosition({
@@ -325,21 +364,25 @@ export default function App() {
     event.stopPropagation();
     setEditingNode(node.id);
     setEditDisplay(node.data.osintNode?.display || node.data.label || '');
+    setEditValue(node.data.osintNode?.value || '');
+    setEditNotes(node.data.osintNode?.notes || '');
   }, []);
 
   const saveNodeEdit = useCallback(async () => {
     if (!editingNode) return;
 
-    setNodes((nds) => 
+    setNodes((nds) =>
       nds.map((node) => {
         if (node.id === editingNode) {
-          const updatedOSINTNode = {
+          const updatedOSINTNode: OSINTNode = {
             ...node.data.osintNode,
             display: editDisplay,
+            value: editValue,
+            notes: editNotes || undefined,
             updated: new Date().toISOString(),
           };
 
-          // Use debounced update for display name changes
+          // Use debounced update for node edits
           debouncedUpdateNode(updatedOSINTNode);
 
           return {
@@ -354,10 +397,12 @@ export default function App() {
         return node;
       })
     );
-    
+
     setEditingNode(null);
     setEditDisplay('');
-  }, [editingNode, editDisplay, setNodes, debouncedUpdateNode]);
+    setEditValue('');
+    setEditNotes('');
+  }, [editingNode, editDisplay, editValue, editNotes, setNodes, debouncedUpdateNode]);
 
   const handleNodesChange: OnNodesChange = useCallback((changes) => {
     onNodesChange(changes);
@@ -507,27 +552,74 @@ export default function App() {
           }}
         >
           <h3>Edit Node</h3>
-          <input
-            type="text"
-            value={editDisplay}
-            onChange={(e) => setEditDisplay(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              marginBottom: '10px',
-            }}
-            placeholder="Enter display name"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') saveNodeEdit();
-              if (e.key === 'Escape') {
-                setEditingNode(null);
-                setEditDisplay('');
-              }
-            }}
-          />
+          <div style={{ marginBottom: '10px' }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500', fontSize: '14px' }}>
+              Display Name
+            </label>
+            <input
+              type="text"
+              value={editDisplay}
+              onChange={(e) => setEditDisplay(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                boxSizing: 'border-box',
+              }}
+              placeholder="Name shown on graph"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setEditingNode(null);
+                  setEditDisplay('');
+                  setEditValue('');
+                  setEditNotes('');
+                }
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '10px' }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500', fontSize: '14px' }}>
+              Value
+            </label>
+            <input
+              type="text"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                boxSizing: 'border-box',
+              }}
+              placeholder="Actual value (e.g., email, phone number)"
+            />
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500', fontSize: '14px' }}>
+              Notes
+            </label>
+            <textarea
+              value={editNotes}
+              onChange={(e) => setEditNotes(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                boxSizing: 'border-box',
+                minHeight: '80px',
+                resize: 'vertical',
+                fontFamily: 'inherit',
+              }}
+              placeholder="Additional information..."
+            />
+          </div>
+
           <div style={{ display: 'flex', gap: '10px' }}>
             <button
               onClick={saveNodeEdit}
@@ -546,6 +638,8 @@ export default function App() {
               onClick={() => {
                 setEditingNode(null);
                 setEditDisplay('');
+                setEditValue('');
+                setEditNotes('');
               }}
               style={{
                 padding: '8px 16px',

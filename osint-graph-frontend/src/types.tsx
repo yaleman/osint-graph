@@ -19,6 +19,14 @@ export interface OSINTNode {
 	pos_y?: number;
 }
 
+export interface NodeLink {
+	id: string;
+	left: string;
+	right: string;
+	project_id: string;
+	linktype: 'Omni' | 'Directional';
+}
+
 export const NodeTypeInfo: Record<string, { label: string; defaultDisplay: string }> = {
 	person: { label: 'Person', defaultDisplay: 'Name' },
 	domain: { label: 'Domain', defaultDisplay: 'Domain' },

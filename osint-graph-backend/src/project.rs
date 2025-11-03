@@ -3,11 +3,13 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
 use osint_graph_shared::node::Node;
+use osint_graph_shared::nodelink::NodeLink;
 use osint_graph_shared::project::Project;
 use tracing::debug;
 use uuid::Uuid;
 
 use crate::db::node::NodeExt;
+use crate::db::nodelink::NodeExt as NodeLinkNodeExt;
 use crate::db::project::DBProjectExt;
 use crate::storage::DBEntity;
 use crate::SharedState;
@@ -144,5 +146,68 @@ pub async fn post_node(
                 format!("Error checking project: {:?}", err),
             )
         }
+    }
+}
+
+pub async fn post_nodelink(
+    State(state): State<SharedState>,
+    Json(nodelink): Json<NodeLink>,
+) -> impl IntoResponse {
+    let conn = &state.read().await.conn;
+
+    // Validate that the project exists before saving the nodelink
+    match Project::get(conn, &nodelink.project_id).await {
+        Ok(Some(_)) => {
+            // Project exists, proceed with saving the nodelink
+            let res = nodelink.save(conn).await;
+            debug!("Saved nodelink: {:?}", res);
+            match res {
+                Ok(()) => (
+                    StatusCode::OK,
+                    serde_json::to_string_pretty(&nodelink)
+                        .expect("Failed to serialize nodelink response"),
+                ),
+                Err(err) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Error saving nodelink: {:?}", err),
+                ),
+            }
+        }
+        Ok(None) => {
+            // Project doesn't exist
+            debug!(
+                "Cannot save nodelink: project {} not found",
+                nodelink.project_id
+            );
+            (
+                StatusCode::NOT_FOUND,
+                format!("Project {} not found", nodelink.project_id),
+            )
+        }
+        Err(err) => {
+            // Error checking project
+            debug!("Error checking project existence: {:?}", err);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Error checking project: {:?}", err),
+            )
+        }
+    }
+}
+
+pub async fn get_nodelinks_by_project(
+    Path(project_id): Path<Uuid>,
+    State(state): State<SharedState>,
+) -> impl IntoResponse {
+    match NodeLink::get_by_project_id(&state.read().await.conn, project_id).await {
+        Ok(nodelinks) => (
+            StatusCode::OK,
+            serde_json::to_string_pretty(&nodelinks)
+                .expect("Failed to serialize nodelinks list response"),
+        ),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Error: {:?}", err),
+        ),
     }
 }

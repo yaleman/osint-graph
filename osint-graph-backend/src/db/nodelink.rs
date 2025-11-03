@@ -71,7 +71,7 @@ impl DBEntity for NodeLink {
 
 #[allow(dead_code)] // TODO: remove this
 #[async_trait]
-trait NodeExt {
+pub trait NodeExt {
     async fn get_by_project_id(pool: &SqlitePool, project_id: Uuid) -> Result<Vec<Self>, DBError>
     where
         Self: Sized;

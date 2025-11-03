@@ -109,16 +109,40 @@ pub async fn post_node(
     State(state): State<SharedState>,
     Json(node): Json<Node>,
 ) -> impl IntoResponse {
-    let res = node.save(&state.read().await.conn).await;
-    debug!("Saved node: {:?}", res);
-    match res {
-        Ok(val) => (
-            StatusCode::OK,
-            serde_json::to_string_pretty(&val).expect("Failed to serialize project list response"),
-        ),
-        Err(err) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Error: {:?}", err),
-        ),
+    let conn = &state.read().await.conn;
+
+    // Validate that the project exists before saving the node
+    match Project::get(conn, &node.project_id).await {
+        Ok(Some(_)) => {
+            // Project exists, proceed with saving the node
+            let res = node.save(conn).await;
+            debug!("Saved node: {:?}", res);
+            match res {
+                Ok(val) => (
+                    StatusCode::OK,
+                    serde_json::to_string_pretty(&val).expect("Failed to serialize node response"),
+                ),
+                Err(err) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Error saving node: {:?}", err),
+                ),
+            }
+        }
+        Ok(None) => {
+            // Project doesn't exist
+            debug!("Cannot save node: project {} not found", node.project_id);
+            (
+                StatusCode::NOT_FOUND,
+                format!("Project {} not found", node.project_id),
+            )
+        }
+        Err(err) => {
+            // Error checking project
+            debug!("Error checking project existence: {:?}", err);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Error checking project: {:?}", err),
+            )
+        }
     }
 }

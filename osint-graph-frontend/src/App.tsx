@@ -13,9 +13,12 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { v4 as uuidv4 } from 'uuid';
-import { createNode, updateNode, createProject, fetchNodesByProject } from './api';
+import toast, { Toaster } from 'react-hot-toast';
+import { createNode, updateNode, createProject, fetchNodesByProject, getProject, fetchProjects } from './api';
 import type { OSINTNode, Project } from './types';
 import { NodeTypeInfo } from './types';
+import { ProjectMismatchDialog } from './components/ProjectMismatchDialog';
+import { ProjectSelector } from './components/ProjectSelector';
 
 const initialNodes: Node[] = [];
 const initialEdges: Edge[] = [];
@@ -29,8 +32,10 @@ export default function App() {
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [editingNode, setEditingNode] = useState<string | null>(null);
   const [editDisplay, setEditDisplay] = useState('');
-  const [, setCurrentProject] = useState<Project | null>(null);
+  const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showMismatchDialog, setShowMismatchDialog] = useState(false);
+  const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
 
   const onConnect: OnConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -58,50 +63,59 @@ export default function App() {
     const initializeProject = async () => {
       try {
         setIsLoading(true);
-        let projectId = localStorage.getItem(PROJECT_ID_KEY);
-        let project: Project;
+        const projectId = localStorage.getItem(PROJECT_ID_KEY);
 
         // Check for valid project ID (not null, not "undefined", not empty)
         if (projectId && projectId !== "undefined" && projectId.trim() !== "") {
-          // Try to load existing nodes for this project
-          try {
-            const existingNodes = await fetchNodesByProject(projectId);
-            const reactFlowNodes: Node[] = existingNodes.map(osintNode => ({
-              id: osintNode.id,
-              type: 'default',
-              position: { x: osintNode.pos_x || 100, y: osintNode.pos_y || 100 },
-              data: { 
-                label: osintNode.display,
-                nodeType: osintNode.node_type,
-                osintNode: osintNode
-              },
-              style: {
-                background: getNodeColor(osintNode.node_type),
-                color: 'white',
-                border: '1px solid #222',
-                width: 180,
-                cursor: 'pointer',
-              },
-            }));
-            setNodes(reactFlowNodes);
-          } catch (error) {
-            console.error('Failed to load existing nodes:', error);
-            // If loading nodes fails, create a new project instead
-            localStorage.removeItem(PROJECT_ID_KEY);
-            projectId = null;
+          // Validate project exists in backend
+          const project = await getProject(projectId);
+
+          if (project) {
+            // Project exists, load its data
+            setCurrentProject(project);
+            try {
+              const existingNodes = await fetchNodesByProject(projectId);
+              const reactFlowNodes: Node[] = existingNodes.map(osintNode => ({
+                id: osintNode.id,
+                type: 'default',
+                position: { x: osintNode.pos_x || 100, y: osintNode.pos_y || 100 },
+                data: {
+                  label: osintNode.display,
+                  nodeType: osintNode.node_type,
+                  osintNode: osintNode
+                },
+                style: {
+                  background: getNodeColor(osintNode.node_type),
+                  color: 'white',
+                  border: '1px solid #222',
+                  width: 180,
+                  cursor: 'pointer',
+                },
+              }));
+              setNodes(reactFlowNodes);
+              setIsLoading(false);
+            } catch (error) {
+              console.error('Failed to load nodes:', error);
+              toast.error('Failed to load nodes for this project');
+              setIsLoading(false);
+            }
+          } else {
+            // Project doesn't exist in backend, show mismatch dialog
+            const projects = await fetchProjects();
+            setAvailableProjects(projects);
+            setShowMismatchDialog(true);
+            setIsLoading(false);
           }
-        }
-        
-        if (!projectId) {
-          // Create a new project
-          project = await createProject();
-          projectId = project.id;
-          localStorage.setItem(PROJECT_ID_KEY, projectId);
+        } else {
+          // No project ID in localStorage, create new project
+          const project = await createProject();
+          localStorage.setItem(PROJECT_ID_KEY, project.id);
           setCurrentProject(project);
+          setIsLoading(false);
         }
       } catch (error) {
         console.error('Failed to initialize project:', error);
-      } finally {
+        toast.error('Failed to initialize project');
         setIsLoading(false);
       }
     };
@@ -110,6 +124,61 @@ export default function App() {
   }, [setNodes, getNodeColor]);
 
   const nodeTypes = Object.keys(NodeTypeInfo);
+
+  const handleCreateNewProject = useCallback(async () => {
+    try {
+      const project = await createProject();
+      localStorage.setItem(PROJECT_ID_KEY, project.id);
+      setCurrentProject(project);
+      setShowMismatchDialog(false);
+      setNodes([]);
+      toast.success(`Created new project: ${project.name}`);
+    } catch (error) {
+      console.error('Failed to create project:', error);
+      toast.error('Failed to create new project');
+    }
+  }, [setNodes]);
+
+  const handleSelectExisting = useCallback(() => {
+    setShowMismatchDialog(false);
+    // The user can use the project selector to choose a project
+    toast('Please select a project from the dropdown');
+  }, []);
+
+  const handleProjectChange = useCallback(async (projectId: string) => {
+    try {
+      const project = await getProject(projectId);
+      if (project) {
+        localStorage.setItem(PROJECT_ID_KEY, projectId);
+        setCurrentProject(project);
+
+        // Load nodes for this project
+        const existingNodes = await fetchNodesByProject(projectId);
+        const reactFlowNodes: Node[] = existingNodes.map(osintNode => ({
+          id: osintNode.id,
+          type: 'default',
+          position: { x: osintNode.pos_x || 100, y: osintNode.pos_y || 100 },
+          data: {
+            label: osintNode.display,
+            nodeType: osintNode.node_type,
+            osintNode: osintNode
+          },
+          style: {
+            background: getNodeColor(osintNode.node_type),
+            color: 'white',
+            border: '1px solid #222',
+            width: 180,
+            cursor: 'pointer',
+          },
+        }));
+        setNodes(reactFlowNodes);
+        toast.success(`Switched to project: ${project.name}`);
+      }
+    } catch (error) {
+      console.error('Failed to switch project:', error);
+      toast.error('Failed to switch project');
+    }
+  }, [setNodes, getNodeColor]);
 
   const onPaneClick = useCallback((event: React.MouseEvent) => {
     setMenuPosition({
@@ -181,10 +250,10 @@ export default function App() {
     // Save to backend
     try {
       await createNode(osintNode);
-      console.log('Node saved to backend');
+      toast.success('Node created successfully');
     } catch (error) {
       console.error('Failed to save node to backend:', error);
-      // Optionally show user notification
+      toast.error('Failed to save node to backend');
     }
   }, [menuPosition, setNodes, getNodeColor]);
 
@@ -207,9 +276,10 @@ export default function App() {
           };
           
           // Update backend
-          updateNode(updatedOSINTNode).catch(error => 
-            console.error('Failed to update node in backend:', error)
-          );
+          updateNode(updatedOSINTNode).catch(error => {
+            console.error('Failed to update node in backend:', error);
+            toast.error('Failed to update node');
+          });
 
           return {
             ...node,
@@ -249,9 +319,10 @@ export default function App() {
             pos_y: Math.round(change.position.y),
             updated: new Date().toISOString(),
           };
-          updateNode(updatedNode).catch(error =>
-            console.error('Failed to update node position:', error)
-          );
+          updateNode(updatedNode).catch(error => {
+            console.error('Failed to update node position:', error);
+            toast.error('Failed to update node position');
+          });
         }
       }
     });
@@ -274,6 +345,22 @@ export default function App() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
+      <Toaster position="top-right" />
+
+      <ProjectSelector
+        currentProject={currentProject}
+        onProjectChange={handleProjectChange}
+        onCreateNew={handleCreateNewProject}
+      />
+
+      {showMismatchDialog && (
+        <ProjectMismatchDialog
+          onCreateNew={handleCreateNewProject}
+          onSelectExisting={handleSelectExisting}
+          projects={availableProjects}
+        />
+      )}
+
       <ReactFlow
         nodes={nodes}
         edges={edges}

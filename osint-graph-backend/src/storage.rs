@@ -51,6 +51,12 @@ pub async fn start_db(
         .await
         .map_err(|err| std::io::Error::other(format!("connection failed: {err:?}")))?;
 
+    // Enable foreign key constraints
+    sqlx::query("PRAGMA foreign_keys = ON")
+        .execute(&conn)
+        .await
+        .map_err(|err| std::io::Error::other(format!("Failed to enable foreign keys: {err:?}")))?;
+
     create_tables(&conn).await?;
 
     Ok(conn)

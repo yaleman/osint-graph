@@ -410,11 +410,11 @@ async fn test_api_node_foreign_key_constraint() {
         pos_y: None,
     };
 
-    // This should fail due to foreign key constraint
+    // This should fail due to project validation (project doesn't exist)
     let res = server
         .post("/api/v1/node")
         .json(&node)
         .expect_failure()
         .await;
-    assert_eq!(res.status_code(), 500); // Internal server error due to foreign key constraint
+    assert_eq!(res.status_code(), 404); // Project not found
 }

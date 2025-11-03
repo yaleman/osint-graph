@@ -112,11 +112,15 @@ cargo tarpaulin --packages osint-graph-shared
 ## Key Files
 
 - **API Routes**: `osint-graph-backend/src/main.rs` - RESTful endpoints under `/api/v1/`
-- **Frontend Entry**: `osint-graph-frontend/src/App.tsx` - Main React component with node creation
+- **Frontend Entry**: `osint-graph-frontend/src/App.tsx` - Main React component with project management
 - **Shared Types**: `osint-graph-shared/src/node.rs` - Node structure and NodeUpdateList
 - **Database**: `osint-graph-backend/src/db/node.rs` - SQLite operations with full CRUD
-- **API Integration**: `osint-graph-frontend/src/api.tsx` - Backend communication
+- **Storage**: `osint-graph-backend/src/storage.rs` - Database initialization with FK constraints
+- **API Integration**: `osint-graph-frontend/src/api.tsx` - Backend communication with validation
 - **Node Types**: `osint-graph-frontend/src/types.tsx` - TypeScript definitions
+- **Project Components**:
+  - `osint-graph-frontend/src/components/ProjectSelector.tsx` - Project switching UI
+  - `osint-graph-frontend/src/components/ProjectMismatchDialog.tsx` - Validation error handling
 
 ## API Structure
 
@@ -146,6 +150,20 @@ Backend serves:
 - Position updates on drag
 - Display name changes on edit
 - Automatic conflict resolution
+
+### Project Management
+
+- **Project Validation**: On startup, frontend validates that localStorage project ID exists in backend
+- **Mismatch Handling**: If project doesn't exist, user is prompted with options:
+  - Create new project
+  - Select existing project from list
+- **Project Selector**: Dropdown UI in top-left to:
+  - View current project name
+  - Switch between projects
+  - Create new projects
+- **Toast Notifications**: User-friendly error and success messages via react-hot-toast
+- **Data Integrity**: SQLite foreign key constraints prevent orphaned nodes
+- **Backend Validation**: Node operations validate project exists before saving
 
 ## Development Notes
 

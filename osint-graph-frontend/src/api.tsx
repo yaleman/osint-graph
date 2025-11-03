@@ -62,6 +62,18 @@ export const createProject = async (projectName: string = "My OSINT Project"): P
 	return response.data;
 };
 
+export const getProject = async (projectId: string): Promise<Project | null> => {
+	try {
+		const response = await axios.get<Project>(`${PROJECT_URL}/${projectId}`);
+		return response.data;
+	} catch (error) {
+		if (axios.isAxiosError(error) && error.response?.status === 404) {
+			return null;
+		}
+		throw error;
+	}
+};
+
 /** Takes the project list and sends back a list */
 export function projectLis(projects: Project[]) {
 	return (

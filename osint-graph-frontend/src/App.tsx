@@ -576,11 +576,11 @@ function AppContent() {
     event.stopPropagation();
     setEditingNode(node.id);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    setEditDisplay(node.data.osintNode?.display || node.data.label || '');
+    setEditDisplay(node.data.osintNode?.display ?? node.data.label ?? '');
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    setEditValue(node.data.osintNode?.value || '');
+    setEditValue(node.data.osintNode?.value ?? '');
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    setEditNotes(node.data.osintNode?.notes || '');
+    setEditNotes(node.data.osintNode?.notes ?? '');
   }, []);
 
   const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {

@@ -604,8 +604,10 @@ function AppContent() {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const url = contextMenu.node.data.osintNode?.value as string;
     if (url) {
+      // Trim and clean the URL to remove any invisible characters
+      const cleanUrl = url.trim().replace(/[\u200B-\u200D\uFEFF\u2069]/g, '');
       // Add https:// if no protocol specified
-      const fullUrl = url.match(/^https?:\/\//) ? url : `https://${url}`;
+      const fullUrl = cleanUrl.match(/^https?:\/\//) ? cleanUrl : `https://${cleanUrl}`;
       window.open(fullUrl, '_blank', 'noopener,noreferrer');
     }
 

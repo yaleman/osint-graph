@@ -49,16 +49,16 @@ impl AddrInfo {
 
     pub fn test() -> Self {
         // select a random port
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
-        let mut port: u16 = rng.gen_range(32768..65535);
+        let mut port: u16 = rng.random_range(32768..65535);
         loop {
             // check if we can connect to it
             println!("checking {}", port);
             if TcpListener::bind(format!("127.0.0.1:{}", port)).is_ok() {
                 break;
             }
-            port = rng.gen_range(32768..65535);
+            port = rng.random_range(32768..65535);
         }
 
         Self {

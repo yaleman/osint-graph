@@ -16,6 +16,24 @@ use uuid::Uuid;
 use crate::entity::{node, nodelink, project};
 use crate::SharedState;
 
+/// Clean URL values by removing invisible Unicode characters
+/// Removes zero-width spaces, directional isolates, and other invisible formatting characters
+fn clean_url_value(value: &str) -> String {
+    value
+        .trim()
+        .chars()
+        .filter(|c| {
+            // Remove invisible Unicode characters that can break URLs
+            !matches!(
+                *c,
+                '\u{200B}'..='\u{200D}' | // Zero-width spaces
+                '\u{FEFF}' |               // Zero-width no-break space
+                '\u{2069}'                 // Pop directional isolate
+            )
+        })
+        .collect()
+}
+
 /// POST handler for project things
 pub async fn post_project(
     State(state): State<SharedState>,
@@ -156,9 +174,14 @@ pub async fn get_nodes_by_project(
 
 pub async fn post_node(
     State(state): State<SharedState>,
-    Json(node): Json<node::Model>,
+    Json(mut node): Json<node::Model>,
 ) -> Result<Json<node::Model>, WebError> {
     let conn = &state.read().await.conn;
+
+    // Clean URL values before saving
+    if node.node_type == "url" {
+        node.value = clean_url_value(&node.value);
+    }
 
     // Validate that the project exists before saving the node
     match project::Entity::find()
@@ -256,9 +279,15 @@ pub async fn delete_node(
 pub async fn update_node(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
-    Json(node): Json<node::Model>,
+    Json(mut node): Json<node::Model>,
 ) -> Result<Json<node::Model>, WebError> {
     let conn = &state.read().await.conn;
+
+    // Clean URL values before updating
+    if node.node_type == "url" {
+        node.value = clean_url_value(&node.value);
+    }
+
     // Verify node exists first
     match node::Entity::find()
         .filter(node::Column::Id.eq(id))

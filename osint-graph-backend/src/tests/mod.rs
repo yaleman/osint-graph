@@ -28,13 +28,17 @@ async fn setup_test_server() -> TestServer {
     let shared_state = Arc::new(RwLock::new(AppState::test().await));
     let app = build_app(&shared_state);
 
-    let config = TestServerConfig::builder()
+    let config = TestServerConfig {
         // Preserve cookies across requests
         // for the session cookie to work.
-        .save_cookies()
-        .expect_success_by_default()
-        .mock_transport()
-        .build();
+        save_cookies: true,
+
+        expect_success_by_default: true,
+        restrict_requests_with_http_schema: false,
+        default_content_type: None,
+        default_scheme: Some("http".into()),
+        ..Default::default()
+    };
 
     TestServer::new_with_config(app, config).unwrap()
 }

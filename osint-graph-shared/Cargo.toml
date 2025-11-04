@@ -15,4 +15,4 @@ sea-orm = { workspace = true }
 sea-query = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { workspace = true }
-rand = "0.8.5"
+rand = "0.9.2"

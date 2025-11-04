@@ -62,30 +62,24 @@ pub fn build_app<T>(shared_state: &SharedState) -> Router<T> {
     // Build our application by composing routes
     let router = Router::new()
         .route("/api/v1/node", post(post_node))
-        .route("/api/v1/node/:id", get(get_node))
-        .route("/api/v1/node/:id", delete(delete_node))
-        .route("/api/v1/node/:id", put(update_node))
+        .route("/api/v1/node/{id}", get(get_node))
+        .route("/api/v1/node/{id}", delete(delete_node))
+        .route("/api/v1/node/{id}", put(update_node))
         .route("/api/v1/nodelink", post(post_nodelink))
-        .route("/api/v1/nodelink/:id", delete(delete_nodelink))
+        .route("/api/v1/nodelink/{id}", delete(delete_nodelink))
         .route(
-            "/api/v1/project/:id/nodelinks",
+            "/api/v1/project/{id}/nodelinks",
             get(get_nodelinks_by_project),
         )
         .route("/api/v1/project", post(post_project))
-        .route("/api/v1/project/:id", get(get_project))
-        .route("/api/v1/project/:id", put(update_project))
-        .route("/api/v1/project/:id", delete(delete_project))
-        .route("/api/v1/project/:id/nodes", get(get_nodes_by_project))
+        .route("/api/v1/project/{id}", get(get_project))
+        .route("/api/v1/project/{id}", put(update_project))
+        .route("/api/v1/project/{id}", delete(delete_project))
+        .route("/api/v1/project/{id}/nodes", get(get_nodes_by_project))
         .route("/api/v1/projects", get(get_projects))
-        .route("/api/v1/project/:id/export", get(export_project));
-
-    // #[cfg(debug_assertions)]
-    // let router = router.route("/dev-websocket/", get(ws_handler));
-
-    let router = router
-        // .route("/api/v1/nodes", get(async { "" }))
-        .nest_service("/", static_service.clone())
-        .nest_service("/static", static_service);
+        .route("/api/v1/project/{id}/export", get(export_project))
+        .nest_service("/static", static_service.clone())
+        .fallback_service(static_service);
 
     router
         // Add middleware to all routes

@@ -222,3 +222,4 @@ Backend serves:
 ## Development Best Practices
 
 - When making changes, always validate that a change to the front end is reflected in the backend too, and vice versa
+- never ever use inline styles, use css classes for all styling

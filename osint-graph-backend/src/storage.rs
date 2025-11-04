@@ -1,7 +1,6 @@
 use sea_orm::{Database, DatabaseConnection, DbErr};
 use sea_orm_migration::MigratorTrait;
 use tracing::debug;
-use uuid::Uuid;
 
 use crate::migration::Migrator;
 
@@ -105,38 +104,4 @@ impl From<serde_json::Error> for DBError {
     fn from(value: serde_json::Error) -> Self {
         DBError::Serde(value)
     }
-}
-
-// Legacy DBEntity trait for backward compatibility during migration
-// This will be removed once all code is migrated to use SeaORM entities directly
-#[axum::async_trait]
-pub trait DBEntity {
-    fn table() -> &'static str;
-
-    async fn create_table(conn: &DatabaseConnection) -> Result<(), DBError>;
-
-    async fn save(&self, conn: &DatabaseConnection) -> Result<(), DBError>
-    where
-        Self: Sized;
-
-    async fn delete_by_id(
-        conn: &DatabaseConnection,
-        id: Uuid,
-    ) -> Result<(), crate::storage::DBError> {
-        use sea_orm::ConnectionTrait;
-        let querystring = format!("DELETE from {} where id = ?", Self::table());
-
-        let _ = conn
-            .execute(sea_orm::Statement::from_sql_and_values(
-                sea_orm::DatabaseBackend::Sqlite,
-                querystring,
-                vec![id.to_string().into()],
-            ))
-            .await?;
-        Ok(())
-    }
-
-    async fn get(conn: &DatabaseConnection, id: &Uuid) -> Result<Option<Self>, DBError>
-    where
-        Self: Sized;
 }

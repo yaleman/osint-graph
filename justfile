@@ -25,3 +25,18 @@ run:
 
 # Run all checks (clippy, test, fmt, frontend-lint)
 check: clippy test fmt frontend-lint
+
+
+set positional-arguments
+
+@coverage_inner *args='':
+    cargo tarpaulin --workspace --exclude-files=src/main.rs $@
+
+# run coverage checks
+coverage:
+    just coverage_inner --out=Html
+    @echo "Coverage report should be at file://$(pwd)/tarpaulin-report.html"
+
+coveralls:
+    just coverage_inner --out=Html --coveralls $COVERALLS_REPO_TOKEN
+    @echo "Coverage report should be at https://coveralls.io/github/yaleman/osint-graph?branch=$(git branch --show-current)"

@@ -3,17 +3,20 @@
 ## Phase 0: Database Migration to SeaORM ✅
 
 ### 0.1 SeaORM Setup
+
 - [x] Update sqlx dependency to 0.8.4 for compatibility
 - [x] Add SeaORM and sea-orm-migration dependencies to backend
 - [x] Add chrono dependency with serde features
 
 ### 0.2 Migration Infrastructure
+
 - [x] Create migration module in `osint-graph-backend/src/migration/`
 - [x] Create initial migration for all existing tables (project, node, nodelink, attachment)
 - [x] Set up foreign key constraints in migrations
 - [x] Configure automatic migration execution on startup
 
 ### 0.3 Entity Definitions
+
 - [x] Create SeaORM entity for Project in `src/entity/project.rs`
 - [x] Create SeaORM entity for Node in `src/entity/node.rs`
 - [x] Create SeaORM entity for NodeLink in `src/entity/nodelink.rs`
@@ -21,6 +24,7 @@
 - [x] Define entity relationships (belongs_to, has_many)
 
 ### 0.4 Database Layer Refactoring
+
 - [x] Replace SqlitePool with DatabaseConnection in AppState
 - [x] Update storage.rs to use SeaORM Database::connect
 - [x] Refactor DBEntity trait to use ConnectionTrait
@@ -31,6 +35,7 @@
 - [x] Update attachment database operations for SeaORM
 
 ### 0.5 Testing & Documentation
+
 - [x] Update all test functions to use new start_db signature
 - [x] Verify all tests pass with SeaORM
 - [x] Update CLAUDE.md with SeaORM architecture details
@@ -40,14 +45,15 @@
 ## Phase 1: Backend Schema & Database
 
 ### 1.2 File Attachment Schema ✅
+
 - [x] Create `Attachment` struct in new file `osint-graph-shared/src/attachment.rs`:
   - id: Uuid
   - node_id: Uuid
   - filename: String
   - content_type: String
   - size: i64
-  - data: Vec<u8> (will be zstd compressed)
-  - created: DateTime<Utc>
+  - data: `Vec<u8>` (will be zstd compressed)
+  - created: `DateTime<Utc>`
 - [x] Add `attachments: Vec<Uuid>` field to Node struct (just IDs, not full data)
 - [x] Create attachments table in `osint-graph-backend/src/db/attachment.rs`:
   - Table schema with FOREIGN KEY to node(id)
@@ -59,17 +65,7 @@
 - [x] Write tests for cascade deletion (deleting node deletes attachments)
 
 ### 1.3 Backend API Endpoints - Export/Import
-- [ ] Add `GET /api/v1/project/:id/export` endpoint
-- [ ] Implement `export_project` handler that returns JSON with structure:
-  ```json
-  {
-    "project": { Project },
-    "nodes": [ OSINTNode array ],
-    "links": [ NodeLink array ],
-    "attachments": { node_id: [ { id, filename, content_type, data_base64 } ] }
-  }
-  ```
-- [ ] Write test for export endpoint with full project data
+
 - [ ] Add `POST /api/v1/project/import` endpoint with query param `mode` (new/overwrite/merge)
 - [ ] Implement `import_project` handler:
   - mode=new: Generate new UUIDs for everything, preserve relationships
@@ -80,6 +76,7 @@
 - [ ] Write test for import mode=merge
 
 ### 1.4 Backend API Endpoints - File Attachments
+
 - [ ] Add `POST /api/v1/node/:id/attachment` endpoint (multipart/form-data)
 - [ ] Implement `upload_attachment` handler with zstd compression
 - [ ] Write test for file upload with various file types
@@ -97,6 +94,7 @@
 ## Phase 2: Frontend Types & API
 
 ### 2.1 Update Frontend Types
+
 - [ ] Update `Project` interface in `osint-graph-frontend/src/types.tsx`:
   - Add `description?: string`
   - Add `tags?: string[]`
@@ -109,6 +107,7 @@
   - created: string
 - [ ] Update `OSINTNode` interface to add `attachments?: string[]` (array of attachment IDs)
 - [ ] Create `ProjectExport` interface:
+
   ```typescript
   {
     project: Project,
@@ -117,9 +116,11 @@
     attachments: Record<string, Attachment[]>
   }
   ```
+
 - [ ] Create `ImportMode` type: 'new' | 'overwrite' | 'merge'
 
 ### 2.2 Frontend API Client
+
 - [ ] Add `updateProject(id: string, data: Partial<Project>): Promise<void>` in `api.tsx`
 - [ ] Add `deleteProject(id: string): Promise<void>` in `api.tsx`
 - [ ] Add `exportProject(id: string): Promise<ProjectExport>` in `api.tsx`
@@ -132,18 +133,21 @@
 ## Phase 3: UI Components
 
 ### 3.1 Project Selector Updates
+
 - [ ] Add gear/settings icon button in `ProjectSelector.tsx` next to "+ New" button
 - [ ] Add state for settings dialog open/closed
 - [ ] Add click handler to open ProjectManagementDialog
 - [ ] Style gear button to match existing design
 
 ### 3.2 Project Management Dialog Component
+
 - [ ] Create new file `osint-graph-frontend/src/components/ProjectManagementDialog.tsx`
 - [ ] Create dialog component with close button and backdrop
 - [ ] Add tabbed interface with 4 tabs: General, Export, Import, Delete
 - [ ] Add dialog state management (current tab, loading states)
 
 #### Tab 1: General Settings
+
 - [ ] Create form with fields:
   - Project name (text input, required)
   - Description (textarea, optional)
@@ -156,6 +160,7 @@
 - [ ] Update parent component state on successful save
 
 #### Tab 2: Export
+
 - [ ] Add "Export Project" button
 - [ ] Implement export handler:
   - Call `exportProject` API
@@ -166,6 +171,7 @@
 - [ ] Display export metadata (node count, link count, attachment count, file size)
 
 #### Tab 3: Import
+
 - [ ] Create file upload dropzone (drag & drop + click to browse)
 - [ ] Accept only `.json` files
 - [ ] On file selected, parse and validate JSON structure
@@ -181,6 +187,7 @@
 - [ ] Handle errors (invalid JSON, missing fields, server errors)
 
 #### Tab 4: Delete
+
 - [ ] Add warning text explaining cascade deletion
 - [ ] Add confirmation input: "Type project name to confirm"
 - [ ] Add "Delete Project" button (red, disabled until name matches)
@@ -193,6 +200,7 @@
 - [ ] Show success message after deletion
 
 ### 3.3 File Attachments UI in Node Editor
+
 - [ ] Update node edit dialog in `App.tsx` to add attachments section
 - [ ] Add "Attachments" section header with paperclip icon
 - [ ] Display list of current attachments:
@@ -209,6 +217,7 @@
 - [ ] Handle errors for all operations
 
 ### 3.4 Import Mode Dialog Component
+
 - [ ] Create `ImportModeDialog.tsx` component
 - [ ] Add three radio options with clear descriptions
 - [ ] Add warning icon and text for overwrite mode
@@ -218,6 +227,7 @@
 ## Phase 4: Integration & Testing
 
 ### 4.1 Backend Integration Tests
+
 - [ ] Test complete export/import cycle (export then import with mode=new)
 - [ ] Test export includes all attachments with correct compression
 - [ ] Test import with attachments creates files correctly
@@ -227,6 +237,7 @@
 - [ ] Run `just check` and ensure all tests pass
 
 ### 4.2 Frontend Integration
+
 - [ ] Test settings dialog opens and closes correctly
 - [ ] Test project update from UI updates backend and state
 - [ ] Test export downloads valid JSON file
@@ -234,9 +245,10 @@
 - [ ] Test import with invalid JSON shows error
 - [ ] Test delete project flow completes successfully
 - [ ] Test file upload/download in node editor
-- [ ] Run `npm run lint` and fix any issues
+- [ ] Run `pnpm run lint` and fix any issues
 
 ### 4.3 Documentation
+
 - [ ] Update `CLAUDE.md` with new Project schema fields
 - [ ] Document export JSON structure in `CLAUDE.md`
 - [ ] Document import modes (new/overwrite/merge) in `CLAUDE.md`
@@ -245,73 +257,22 @@
 - [ ] Add example export JSON to documentation
 
 ## Phase 5: Cleanup & Commit
+
 - [ ] Run `just check` final validation
 - [ ] Commit backend changes
 - [ ] Commit frontend changes
 - [ ] Commit documentation updates
-- [ ] Delete this TODO.md file (all items complete!)
-
----
+- [ ] Clear out the completed taks this TODO.md file (all items complete!)
 
 ## Notes
 
 ### Backend Dependencies to Add
+
 - `zstd` crate for compression (add to `osint-graph-backend/Cargo.toml`)
 - `base64` crate if not already present
 - `multipart` or `axum-multipart` for file uploads
 
 ### Frontend Dependencies to Add
+
 - Consider `react-dropzone` for file upload UI
 - Consider `@mui/material` Chip component for tags input (or build custom)
-
-### Export JSON Schema
-```json
-{
-  "version": "1.0",
-  "exported_at": "2025-11-04T00:00:00Z",
-  "project": {
-    "id": "uuid",
-    "name": "string",
-    "description": "string",
-    "tags": ["string"],
-    "user": "uuid",
-    "creationdate": "datetime",
-    "last_updated": "datetime"
-  },
-  "nodes": [
-    {
-      "id": "uuid",
-      "project_id": "uuid",
-      "node_type": "string",
-      "display": "string",
-      "value": "string",
-      "notes": "string",
-      "pos_x": 123,
-      "pos_y": 456,
-      "updated": "datetime",
-      "attachments": ["uuid"]
-    }
-  ],
-  "links": [
-    {
-      "id": "uuid",
-      "left": "uuid",
-      "right": "uuid",
-      "project_id": "uuid",
-      "linktype": "Omni"
-    }
-  ],
-  "attachments": {
-    "node_uuid": [
-      {
-        "id": "uuid",
-        "filename": "example.pdf",
-        "content_type": "application/pdf",
-        "size": 12345,
-        "data": "base64_zstd_compressed_string",
-        "created": "datetime"
-      }
-    ]
-  }
-}
-```

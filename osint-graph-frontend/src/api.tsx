@@ -1,7 +1,7 @@
 // api.ts
 import axios, { type AxiosResponse } from "axios";
 import { v4 as uuidv4 } from "uuid";
-import type { Project, OSINTNode, NodeLink } from "./types";
+import type { Project, OSINTNode, NodeLink, ProjectExport } from "./types";
 
 const PROJECTS_URL = "/api/v1/projects";
 const PROJECT_URL = "/api/v1/project";
@@ -94,6 +94,20 @@ export const deleteNode = async (nodeId: string): Promise<void> => {
 
 export const deleteNodeLink = async (nodelinkId: string): Promise<void> => {
 	await axios.delete(`${NODELINK_URL}/${nodelinkId}`);
+};
+
+export const updateProject = async (projectId: string, project: Partial<Project>): Promise<Project> => {
+	const response = await axios.put<Project>(`${PROJECT_URL}/${projectId}`, project);
+	return response.data;
+};
+
+export const deleteProject = async (projectId: string): Promise<void> => {
+	await axios.delete(`${PROJECT_URL}/${projectId}`);
+};
+
+export const exportProject = async (projectId: string): Promise<ProjectExport> => {
+	const response = await axios.get<ProjectExport>(`${PROJECT_URL}/${projectId}/export`);
+	return response.data;
 };
 
 /** Takes the project list and sends back a list */

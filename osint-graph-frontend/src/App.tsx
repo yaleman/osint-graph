@@ -22,6 +22,7 @@ import type { OSINTNode, Project } from './types';
 import { NodeTypeInfo } from './types';
 import { ProjectMismatchDialog } from './components/ProjectMismatchDialog';
 import { ProjectSelector } from './components/ProjectSelector';
+import { ProjectManagementDialog } from './components/ProjectManagementDialog';
 
 const initialNodes: Node[] = [];
 const initialEdges: Edge[] = [];
@@ -42,6 +43,7 @@ function AppContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [showMismatchDialog, setShowMismatchDialog] = useState(false);
   const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
+  const [showProjectManagement, setShowProjectManagement] = useState(false);
 
   // Refs for debouncing node updates
   const pendingUpdatesRef = useRef<Map<string, number>>(new Map());
@@ -430,6 +432,27 @@ function AppContent() {
     }
   }, [setNodes, setEdges]);
 
+  const handleProjectUpdate = useCallback((updatedProject: Project) => {
+    setCurrentProject(updatedProject);
+  }, []);
+
+  const handleProjectDelete = useCallback(async () => {
+    // Clear localStorage
+    localStorage.removeItem(PROJECT_ID_KEY);
+    // Create a new project
+    try {
+      const project = await createProject();
+      localStorage.setItem(PROJECT_ID_KEY, project.id);
+      setCurrentProject(project);
+      setNodes([]);
+      setEdges([]);
+      setShowProjectManagement(false);
+    } catch (error) {
+      console.error('Failed to create new project after deletion:', error);
+      toast.error('Failed to create new project');
+    }
+  }, [setNodes, setEdges]);
+
   const handleSelectExisting = useCallback(() => {
     setShowMismatchDialog(false);
     // The user can use the project selector to choose a project
@@ -686,17 +709,49 @@ function AppContent() {
     <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
       <Toaster position="top-right" />
 
-      <ProjectSelector
-        currentProject={currentProject}
-        onProjectChange={handleProjectChange}
-        onCreateNew={handleCreateNewProject}
-      />
+      <div style={{ position: 'fixed', top: '10px', left: '10px', zIndex: 1000, display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <ProjectSelector
+          currentProject={currentProject}
+          onProjectChange={handleProjectChange}
+          onCreateNew={handleCreateNewProject}
+        />
+
+        <button
+          onClick={() => setShowProjectManagement(true)}
+          style={{
+            padding: '8px 12px',
+            backgroundColor: '#3b82f6',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+          title="Project Settings"
+        >
+          ⚙️ Settings
+        </button>
+      </div>
 
       {showMismatchDialog && (
         <ProjectMismatchDialog
           onCreateNew={handleCreateNewProject}
           onSelectExisting={handleSelectExisting}
           projects={availableProjects}
+        />
+      )}
+
+      {showProjectManagement && (
+        <ProjectManagementDialog
+          isOpen={showProjectManagement}
+          onClose={() => setShowProjectManagement(false)}
+          currentProject={currentProject}
+          onProjectUpdate={handleProjectUpdate}
+          onProjectDelete={handleProjectDelete}
         />
       )}
 

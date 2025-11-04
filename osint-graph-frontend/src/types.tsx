@@ -31,6 +31,13 @@ export interface NodeLink {
 	linktype: 'Omni' | 'Directional';
 }
 
+export interface ProjectExport {
+	project: Project;
+	nodes: OSINTNode[];
+	links: NodeLink[];
+	attachments?: Record<string, unknown>;
+}
+
 export const NodeTypeInfo: Record<string, { label: string; defaultDisplay: string }> = {
 	person: { label: 'Person', defaultDisplay: 'Name' },
 	domain: { label: 'Domain', defaultDisplay: 'Domain' },

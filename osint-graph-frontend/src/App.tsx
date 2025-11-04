@@ -12,6 +12,7 @@ import ReactFlow, {
   OnNodesChange,
   OnEdgesChange,
   useReactFlow,
+  ReactFlowProvider,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { v4 as uuidv4 } from 'uuid';
@@ -28,7 +29,7 @@ const initialEdges: Edge[] = [];
 const PROJECT_ID_KEY = 'osint-graph-project-id';
 const DEBOUNCE_DELAY = 100; // ms
 
-export default function App() {
+function AppContent() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const { project } = useReactFlow();
@@ -903,5 +904,13 @@ export default function App() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ReactFlowProvider>
+      <AppContent />
+    </ReactFlowProvider>
   );
 }

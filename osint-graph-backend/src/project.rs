@@ -26,9 +26,10 @@ fn clean_url_value(value: &str) -> String {
             // Remove invisible Unicode characters that can break URLs
             !matches!(
                 *c,
-                '\u{200B}'..='\u{200D}' | // Zero-width spaces
+                '\u{200B}'
+                    ..='\u{200D}' | // Zero-width spaces
                 '\u{FEFF}' |               // Zero-width no-break space
-                '\u{2069}'                 // Pop directional isolate
+                '\u{2069}' // Pop directional isolate
             )
         })
         .collect()

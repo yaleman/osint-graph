@@ -773,52 +773,30 @@ function AppContent() {
 
   if (isLoading) {
     return (
-      <div style={{
-        width: '100vw',
-        height: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '18px'
-      }}>
+      <div className="loadingScreen">
         Initializing OSINT Graph...
       </div>
     );
   }
 
   return (
-    <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
+    <div className="app-container">
       <Toaster position="top-right" />
 
       <ProjectSelector
         currentProject={currentProject}
         onProjectChange={handleProjectChange}
         onCreateNew={handleCreateNewProject}
+        setShowProjectManagement={setShowProjectManagement}
       />
 
-      <button
+      {/* <button
         onClick={() => setShowProjectManagement(true)}
-        style={{
-          position: 'fixed',
-          top: '10px',
-          left: '360px',
-          zIndex: 1000,
-          padding: '8px 12px',
-          backgroundColor: '#3b82f6',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer',
-          fontSize: '14px',
-          fontWeight: '500',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-        }}
+        className="btn btn-primary project-settings-button"
         title="Project Settings"
       >
         ⚙️ Settings
-      </button>
+      </button> */}
 
       {showMismatchDialog && (
         <ProjectMismatchDialog
@@ -856,42 +834,13 @@ function AppContent() {
 
       {/* Right-side collapsible panel for adding nodes */}
       <div
-        style={{
-          position: 'fixed',
-          top: '60px',
-          right: isPanelCollapsed ? '-220px' : '10px',
-          width: '220px',
-          background: 'white',
-          border: '1px solid #ccc',
-          borderRadius: '8px',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-          zIndex: 1000,
-          transition: 'right 0.3s ease',
-          maxHeight: 'calc(100vh - 80px)',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
+
+        className={`node-panel ${isPanelCollapsed ? 'node-panel-collapsed' : 'node-panel-expanded'}`}
       >
         {/* Collapse/Expand button */}
         <button
           onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
-          style={{
-            position: 'absolute',
-            left: '-32px',
-            top: '10px',
-            width: '32px',
-            height: '40px',
-            background: 'white',
-            border: '1px solid #ccc',
-            borderRight: 'none',
-            borderRadius: '8px 0 0 8px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '18px',
-            boxShadow: '-2px 2px 8px rgba(0, 0, 0, 0.1)',
-          }}
+          className="node-panel-collapse-button"
           title={isPanelCollapsed ? 'Expand panel' : 'Collapse panel'}
         >
           {isPanelCollapsed ? '◀' : '▶'}
@@ -953,7 +902,7 @@ function AppContent() {
           }}
         >
           <h3>Edit Node</h3>
-          <div style={{ marginBottom: '10px' }}>
+          <div className="modal-field">
             <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500', fontSize: '14px' }}>
               Display Name
             </label>
@@ -978,7 +927,7 @@ function AppContent() {
             />
           </div>
 
-          <div style={{ marginBottom: '10px' }}>
+          <div className="modal-field">
             <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500', fontSize: '14px' }}>
               Value
             </label>
@@ -997,7 +946,7 @@ function AppContent() {
             />
           </div>
 
-          <div style={{ marginBottom: '16px' }}>
+          <div className="modal-field">
             <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500', fontSize: '14px' }}>
               Notes
             </label>

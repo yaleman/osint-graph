@@ -1,3 +1,10 @@
+:root {
+	--nodel-panel-width: 15rem;
+	--white: #ffffff;
+	--node-collapse-button-width: 32px;
+	--default-font-weight: var(--default-font-weight);
+}
+
 /* Project Management Dialog Styles */
 
 .dialog-backdrop {
@@ -16,10 +23,10 @@
 .dialog-container {
 	background-color: white;
 	border-radius: 8px;
-	width: 600px;
-	max-width: 90vw;
-	max-height: 80vh;
-	overflow: hidden;
+	padding: 1.0rem;
+	max-width: 95vw;
+	min-width: 60vw;
+	max-height: 99vh;
 	display: flex;
 	flex-direction: column;
 	box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -74,7 +81,8 @@
 .dialog-content {
 	padding: 20px;
 	overflow-y: auto;
-	flex: 1;
+	max-width: 95%;
+	/* flex: 1; */
 }
 
 /* Form Elements */
@@ -86,7 +94,7 @@
 .form-label {
 	display: block;
 	margin-bottom: 5px;
-	font-weight: 500;
+	font-weight: var(--default-font-weight);
 	color: #374151;
 }
 
@@ -153,18 +161,28 @@
 
 /* Buttons */
 
+.project-selector {
+	background: white;
+	gap: 8px;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	font-weight: var(--default-font-weight);
+}
+
 .btn {
-	padding: 10px 20px;
-	border: none;
+	padding: 0.5rem 1.0rem;
 	border-radius: 4px;
 	cursor: pointer;
 	font-size: 14px;
-	font-weight: 500;
-	width: 100%;
+	font-weight: var(--default-font-weight);
 }
 
 .btn-primary {
 	background-color: #3b82f6;
+	border: none;
 	color: white;
 }
 
@@ -191,7 +209,7 @@
 	border-radius: 4px;
 	cursor: pointer;
 	font-size: 14px;
-	font-weight: 500;
+	font-weight: var(--default-font-weight);
 }
 
 /* Export Tab */
@@ -232,7 +250,7 @@
 
 .import-dropzone-title {
 	margin-bottom: 10px;
-	font-weight: 500;
+	font-weight: var(--default-font-weight);
 }
 
 .import-dropzone-text {
@@ -251,7 +269,7 @@
 
 .delete-warning-title {
 	color: #991b1b;
-	font-weight: 500;
+	font-weight: var(--default-font-weight);
 	margin: 0 0 10px 0;
 }
 
@@ -289,4 +307,72 @@
 
 .context-menu-item:hover {
 	background-color: #f3f4f6;
+}
+
+
+.loading-screen {
+	width: 100vw;
+	height: 100vh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 18px;
+}
+
+.modal-field {
+	margin-bottom: 10px;
+}
+
+
+
+.app-container {
+	width: 100vw;
+	height: 100vh;
+	position: relative;
+}
+
+
+.node-panel {
+	position: fixed;
+	top: 4rem;
+	width: var(--nodel-panel-width);
+	background: white;
+	border: 1px solid #ccc;
+	border-radius: 0.75rem;
+	box-shadow: 0 4px 0.5rem rgba(0, 0, 0, 0.15);
+	z-index: 1000;
+	transition: right 0.2s ease;
+	max-height: calc(100vh - 80px);
+	display: flex;
+	flex-direction: column;
+}
+
+.node-panel-expanded {
+	right: 0.5rem;
+}
+
+.node-panel-collapsed {
+	right: calc(-1* var(--nodel-panel-width));
+}
+
+.node-panel-collapse-button {
+	position: absolute;
+	left: calc(-1* var(--node-collapse-button-width));
+	top: 10px;
+	width: var(--node-collapse-button-width);
+	height: calc(1.25* var(--node-collapse-button-width));
+	background: var(--white);
+	border: 1px solid #ccc;
+	border-right: none;
+	border-radius: 8px 0 0 8px;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 18px;
+	box-shadow: -2px 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.smol {
+	font-size: 0.75rem;
 }

@@ -6,9 +6,10 @@ interface ProjectSelectorProps {
   currentProject: Project | null;
   onProjectChange: (projectId: string) => void;
   onCreateNew: () => void;
+  setShowProjectManagement: (show: boolean) => void;
 }
 
-export function ProjectSelector({ currentProject, onProjectChange, onCreateNew }: ProjectSelectorProps) {
+export function ProjectSelector({ currentProject, onProjectChange, onCreateNew, setShowProjectManagement }: ProjectSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
@@ -37,37 +38,26 @@ export function ProjectSelector({ currentProject, onProjectChange, onCreateNew }
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <button
           onClick={() => setIsOpen(!isOpen)}
-          style={{
-            padding: '8px 12px',
-            background: 'white',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontWeight: '500',
-          }}
+          className="project-selector btn"
         >
           <span>📁</span>
           <span>{currentProject?.name ?? 'No Project'}</span>
-          <span style={{ fontSize: '10px' }}>{isOpen ? '▲' : '▼'}</span>
+          <span className="smol">{isOpen ? '▲' : '▼'}</span>
         </button>
 
         <button
           onClick={onCreateNew}
-          style={{
-            padding: '8px 12px',
-            background: '#3b82f6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: '500',
-          }}
+          className="btn btn-primary"
           title="Create New Project"
         >
           + New
+        </button>
+        <button
+          onClick={() => setShowProjectManagement(true)}
+          className="btn btn-primary"
+          title="Project Settings"
+        >
+          ⚙️ Settings
         </button>
       </div>
 
@@ -119,7 +109,7 @@ export function ProjectSelector({ currentProject, onProjectChange, onCreateNew }
                     }
                   }}
                 >
-                  <div style={{ fontWeight: 'inherit' }}>{project.name}</div>
+                  <div>{project.name}</div>
                   <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>
                     {project.id}
                   </div>

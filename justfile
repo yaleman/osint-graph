@@ -15,7 +15,7 @@ fmt:
 
 # Run frontend linting/checks
 frontend-lint:
-    cd osint-graph-frontend && npm run lint
+    cd osint-graph-frontend && pnpm run lint
 
 # Build frontend and run the application
 run:

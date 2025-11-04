@@ -1,4 +1,5 @@
-// pub mod db;
+pub mod logging;
+
 pub mod entity;
 pub mod migration;
 
@@ -30,10 +31,13 @@ use sea_orm::DatabaseConnection;
 use std::{borrow::Cow, sync::Arc, time::Duration};
 use tokio::sync::RwLock;
 use tower::{BoxError, ServiceBuilder};
-use tower_http::{services::ServeDir, set_header::SetResponseHeaderLayer, trace::TraceLayer};
+use tower_http::{services::ServeDir, set_header::SetResponseHeaderLayer};
 use tracing::error;
 
-use crate::project::{export_project, update_node};
+use crate::{
+    logging::logging_layer,
+    project::{export_project, update_node},
+};
 
 pub type SharedState = Arc<RwLock<AppState>>;
 
@@ -101,7 +105,7 @@ pub fn build_app<T>(shared_state: &SharedState) -> Router<T> {
                 .load_shed()
                 .concurrency_limit(1024)
                 .timeout(Duration::from_secs(10))
-                .layer(TraceLayer::new_for_http()),
+                .layer(logging_layer()),
         )
         .with_state(shared_state.clone())
 }

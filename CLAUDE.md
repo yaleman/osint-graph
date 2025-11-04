@@ -10,16 +10,30 @@ The project is an OSINT discovery and mapping tool with a web frontend that allo
 
 ## Architecture
 
-- **Backend**: Rust workspace with Axum web server, SQLite + REDB storage
+- **Backend**: Rust workspace with Axum web server, SQLite database with SeaORM
 - **Frontend**: React 18 + TypeScript + Vite, uses ReactFlow for graph rendering
 - **Shared**: Common Rust types between backend and frontend via `osint-graph-shared` crate
 - **Build Output**: Frontend builds to `dist/` directory, served by backend
+- **Database**: SeaORM with migration system for schema management
 
 Key directories:
 
 - `osint-graph-backend/` - Rust server with API endpoints
+  - `src/entity/` - SeaORM entity definitions
+  - `src/migration/` - Database migration files
+  - `src/db/` - Database operation implementations
 - `osint-graph-frontend/` - React app with graph visualization
-- `osint-graph-shared/` - Shared data types (Project, Node, NodeLink)
+- `osint-graph-shared/` - Shared data types (Node, NodeLink)
+
+### Database Layer
+
+The backend uses **SeaORM** as the ORM layer with SQLite:
+
+- **Migrations**: Schema changes managed via SeaORM migrations in `src/migration/`
+- **Entities**: Type-safe database models in `src/entity/` (project, node, nodelink, attachment)
+- **Operations**: Database operations use `ConnectionTrait` for query execution
+- **Foreign Keys**: Automatic cascade delete/update for referential integrity
+- **Connection**: `DatabaseConnection` type replaces direct sqlx usage
 
 ## Node System
 
@@ -114,8 +128,11 @@ cargo tarpaulin --packages osint-graph-shared
 - **API Routes**: `osint-graph-backend/src/main.rs` - RESTful endpoints under `/api/v1/`
 - **Frontend Entry**: `osint-graph-frontend/src/App.tsx` - Main React component with project management
 - **Shared Types**: `osint-graph-shared/src/node.rs` - Node structure and NodeUpdateList
-- **Database**: `osint-graph-backend/src/db/node.rs` - SQLite operations with full CRUD
-- **Storage**: `osint-graph-backend/src/storage.rs` - Database initialization with FK constraints
+- **Database Layer**:
+  - `osint-graph-backend/src/storage.rs` - Database initialization and migrations
+  - `osint-graph-backend/src/entity/` - SeaORM entity definitions
+  - `osint-graph-backend/src/migration/` - Migration files for schema versioning
+  - `osint-graph-backend/src/db/` - Database operations (node, project, nodelink, attachment)
 - **API Integration**: `osint-graph-frontend/src/api.tsx` - Backend communication with validation
 - **Node Types**: `osint-graph-frontend/src/types.tsx` - TypeScript definitions
 - **Project Components**:
@@ -132,6 +149,7 @@ Backend serves:
   - `GET/POST /api/v1/project/{id}` - Individual project operations
   - `GET/POST /api/v1/node/{id}` - Node CRUD operations
 - Uses `Arc<RwLock<AppState>>` for thread-safe shared state
+- AppState contains `DatabaseConnection` for SeaORM access
 
 ## User Interface Features
 
@@ -169,11 +187,13 @@ Backend serves:
 
 - Frontend builds to `../dist/` relative to frontend directory
 - Hot module replacement via Vite on custom port 8189
-- Database schema includes `node_type`, `display`, and timestamp fields
+- Database managed through SeaORM migrations
+- All database operations use `ConnectionTrait` for execution
 - All shared types use Serde for JSON serialization
 - ReactFlow handles graph visualization
 - UUID generation via `uuid` crate
 - Color-coded nodes for visual type identification
+- Database migrations run automatically on startup
 
 ## Code Quality Requirements
 

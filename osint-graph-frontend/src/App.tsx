@@ -44,6 +44,7 @@ function AppContent() {
   const [showMismatchDialog, setShowMismatchDialog] = useState(false);
   const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
   const [showProjectManagement, setShowProjectManagement] = useState(false);
+  const [pendingNodes, setPendingNodes] = useState<Set<string>>(new Set());
 
   // Refs for debouncing node updates
   const pendingUpdatesRef = useRef<Map<string, number>>(new Map());
@@ -558,19 +559,15 @@ function AppContent() {
     // Update local state immediately
     setNodes((nds) => nds.concat(newReactFlowNode));
 
+    // Mark node as pending (not yet saved to backend)
+    setPendingNodes((prev) => new Set(prev).add(nodeId));
+
     // Automatically open edit UI for the new node
     setEditingNode(nodeId);
     setEditDisplay(osintNode.display);
     setEditValue('');
 
-    // Save to backend
-    try {
-      await createNode(osintNode);
-      toast.success('Node created successfully');
-    } catch (error) {
-      console.error('Failed to save node to backend:', error);
-      toast.error('Failed to save node to backend');
-    }
+    // Don't save to backend yet - wait for user to click Save
   }, [getViewportCenterPosition, setNodes, getNodeColor, saveHistory]);
 
   const handleNodeDoubleClick = useCallback((event: React.MouseEvent, node: Node) => {
@@ -584,8 +581,31 @@ function AppContent() {
     setEditNotes(node.data.osintNode?.notes || '');
   }, []);
 
+  const cancelNodeEdit = useCallback(() => {
+    if (!editingNode) return;
+
+    const isPending = pendingNodes.has(editingNode);
+
+    if (isPending) {
+      // Remove the pending node from the UI since it was never saved
+      setNodes((nds) => nds.filter((n) => n.id !== editingNode));
+      setPendingNodes((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(editingNode);
+        return newSet;
+      });
+    }
+
+    setEditingNode(null);
+    setEditDisplay('');
+    setEditValue('');
+    setEditNotes('');
+  }, [editingNode, pendingNodes, setNodes]);
+
   const saveNodeEdit = useCallback(async () => {
     if (!editingNode) return;
+
+    const isPending = pendingNodes.has(editingNode);
 
     // Save history before making changes
     saveHistory();
@@ -602,8 +622,26 @@ function AppContent() {
             updated: new Date().toISOString(),
           };
 
-          // Use debounced update for node edits
-          debouncedUpdateNode(updatedOSINTNode);
+          if (isPending) {
+            // This is a new node - save to backend immediately
+            createNode(updatedOSINTNode)
+              .then(() => {
+                toast.success('Node created successfully');
+                // Remove from pending set
+                setPendingNodes((prev) => {
+                  const newSet = new Set(prev);
+                  newSet.delete(editingNode);
+                  return newSet;
+                });
+              })
+              .catch(error => {
+                console.error('Failed to create node:', error);
+                toast.error('Failed to create node');
+              });
+          } else {
+            // Existing node - use debounced update
+            debouncedUpdateNode(updatedOSINTNode);
+          }
 
           return {
             ...node,
@@ -622,7 +660,7 @@ function AppContent() {
     setEditDisplay('');
     setEditValue('');
     setEditNotes('');
-  }, [editingNode, editDisplay, editValue, editNotes, setNodes, debouncedUpdateNode, saveHistory]);
+  }, [editingNode, editDisplay, editValue, editNotes, setNodes, debouncedUpdateNode, saveHistory, pendingNodes]);
 
   const handleNodesChange: OnNodesChange = useCallback((changes) => {
     // Check if any changes are removals, save history before applying
@@ -890,10 +928,7 @@ function AppContent() {
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Escape') {
-                  setEditingNode(null);
-                  setEditDisplay('');
-                  setEditValue('');
-                  setEditNotes('');
+                  cancelNodeEdit();
                 }
               }}
             />
@@ -954,12 +989,7 @@ function AppContent() {
               Save
             </button>
             <button
-              onClick={() => {
-                setEditingNode(null);
-                setEditDisplay('');
-                setEditValue('');
-                setEditNotes('');
-              }}
+              onClick={cancelNodeEdit}
               style={{
                 padding: '8px 16px',
                 background: '#6b7280',

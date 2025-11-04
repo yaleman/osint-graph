@@ -23,6 +23,7 @@ import { NodeTypeInfo } from './types';
 import { ProjectMismatchDialog } from './components/ProjectMismatchDialog';
 import { ProjectSelector } from './components/ProjectSelector';
 import { ProjectManagementDialog } from './components/ProjectManagementDialog';
+import './osint-graph.css';
 
 const initialNodes: Node[] = [];
 const initialEdges: Edge[] = [];
@@ -45,6 +46,7 @@ function AppContent() {
   const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
   const [showProjectManagement, setShowProjectManagement] = useState(false);
   const [pendingNodes, setPendingNodes] = useState<Set<string>>(new Set());
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; node: Node } | null>(null);
 
   // Refs for debouncing node updates
   const pendingUpdatesRef = useRef<Map<string, number>>(new Map());
@@ -581,6 +583,45 @@ function AppContent() {
     setEditNotes(node.data.osintNode?.notes || '');
   }, []);
 
+  const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
+    event.preventDefault();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const nodeType = node.data.nodeType as string;
+
+    // Only show context menu for URL nodes
+    if (nodeType === 'url') {
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        node,
+      });
+    }
+  }, []);
+
+  const handleOpenUrl = useCallback(() => {
+    if (!contextMenu) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const url = contextMenu.node.data.osintNode?.value as string;
+    if (url) {
+      // Add https:// if no protocol specified
+      const fullUrl = url.match(/^https?:\/\//) ? url : `https://${url}`;
+      window.open(fullUrl, '_blank', 'noopener,noreferrer');
+    }
+
+    setContextMenu(null);
+  }, [contextMenu]);
+
+  // Close context menu when clicking elsewhere
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    if (contextMenu) {
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+    return undefined;
+  }, [contextMenu]);
+
   const cancelNodeEdit = useCallback(() => {
     if (!editingNode) return;
 
@@ -803,6 +844,7 @@ function AppContent() {
         onConnect={onConnect}
         onNodeDragStart={onNodeDragStart}
         onNodeDoubleClick={handleNodeDoubleClick}
+        onNodeContextMenu={handleNodeContextMenu}
         fitView
       >
         <Controls />
@@ -1002,6 +1044,20 @@ function AppContent() {
               Cancel
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Context menu for URL nodes */}
+      {contextMenu && (
+        <div
+          className="context-menu"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button onClick={handleOpenUrl} className="context-menu-item">
+            <span>🔗</span>
+            <span>Open in new tab</span>
+          </button>
         </div>
       )}
     </div>

@@ -33,7 +33,7 @@ use tower::{BoxError, ServiceBuilder};
 use tower_http::{services::ServeDir, set_header::SetResponseHeaderLayer, trace::TraceLayer};
 use tracing::error;
 
-use crate::project::update_node;
+use crate::project::{export_project, update_node};
 
 pub type SharedState = Arc<RwLock<AppState>>;
 
@@ -76,7 +76,8 @@ pub fn build_app<T>(shared_state: &SharedState) -> Router<T> {
         .route("/api/v1/project/:id", put(update_project))
         .route("/api/v1/project/:id", delete(delete_project))
         .route("/api/v1/project/:id/nodes", get(get_nodes_by_project))
-        .route("/api/v1/projects", get(get_projects));
+        .route("/api/v1/projects", get(get_projects))
+        .route("/api/v1/project/:id/export", get(export_project));
 
     // #[cfg(debug_assertions)]
     // let router = router.route("/dev-websocket/", get(ws_handler));

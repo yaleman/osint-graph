@@ -1,6 +1,7 @@
 use std::sync::{Arc, Once};
 
 use crate::entity::{node, project};
+use crate::project::ProjectExport;
 use crate::{build_app, AppState};
 use axum_test::*;
 use osint_graph_shared::StringVec;
@@ -314,6 +315,14 @@ async fn test_api_projects_crud() {
         .expect_failure()
         .await;
     assert_eq!(res.status_code(), 404);
+
+    let res = server
+        .get(&format!("/api/v1/project/{}/export", retrieved_project.id))
+        .expect_success()
+        .await;
+
+    let exported: ProjectExport = res.json();
+    assert_eq!(exported.project.id, retrieved_project.id);
 }
 
 #[tokio::test]

@@ -7,6 +7,7 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter,
     TryIntoModel,
 };
+use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::Utc;
 use tracing::{debug, error};
 use uuid::Uuid;
@@ -392,4 +393,47 @@ pub async fn delete_project(
             )
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProjectExport {
+    pub project: project::Model,
+    pub nodes: Vec<node::Model>,
+    pub nodelinks: Vec<nodelink::Model>,
+}
+
+pub async fn export_project(
+    Path(id): Path<Uuid>,
+    State(state): State<SharedState>,
+) -> Result<Json<ProjectExport>, WebError> {
+    let conn = &state.read().await.conn;
+
+    // Fetch the project
+    let project = match project::Entity::find()
+        .filter(project::Column::Id.eq(id))
+        .one(conn)
+        .await?
+    {
+        Some(project) => project,
+        None => return Err(WebError::not_found(format!("Project {} not found", id))),
+    };
+
+    // Fetch nodes
+    let nodes = node::Entity::find()
+        .filter(node::Column::ProjectId.eq(id))
+        .all(conn)
+        .await?;
+
+    // Fetch nodelinks
+    let nodelinks = nodelink::Entity::find()
+        .filter(nodelink::Column::ProjectId.eq(id))
+        .all(conn)
+        .await?;
+
+    // Construct export object
+    Ok(Json(ProjectExport {
+        project,
+        nodes,
+        nodelinks,
+    }))
 }

@@ -709,33 +709,35 @@ function AppContent() {
     <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
       <Toaster position="top-right" />
 
-      <div style={{ position: 'fixed', top: '10px', left: '10px', zIndex: 1000, display: 'flex', gap: '10px', alignItems: 'center' }}>
-        <ProjectSelector
-          currentProject={currentProject}
-          onProjectChange={handleProjectChange}
-          onCreateNew={handleCreateNewProject}
-        />
+      <ProjectSelector
+        currentProject={currentProject}
+        onProjectChange={handleProjectChange}
+        onCreateNew={handleCreateNewProject}
+      />
 
-        <button
-          onClick={() => setShowProjectManagement(true)}
-          style={{
-            padding: '8px 12px',
-            backgroundColor: '#3b82f6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '500',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
-          title="Project Settings"
-        >
-          ⚙️ Settings
-        </button>
-      </div>
+      <button
+        onClick={() => setShowProjectManagement(true)}
+        style={{
+          position: 'fixed',
+          top: '10px',
+          left: '360px',
+          zIndex: 1000,
+          padding: '8px 12px',
+          backgroundColor: '#3b82f6',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          fontSize: '14px',
+          fontWeight: '500',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+        }}
+        title="Project Settings"
+      >
+        ⚙️ Settings
+      </button>
 
       {showMismatchDialog && (
         <ProjectMismatchDialog

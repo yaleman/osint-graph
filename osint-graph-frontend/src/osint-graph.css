@@ -1,0 +1,262 @@
+/* Project Management Dialog Styles */
+
+.dialog-backdrop {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background-color: rgba(0, 0, 0, 0.5);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1000;
+}
+
+.dialog-container {
+	background-color: white;
+	border-radius: 8px;
+	width: 600px;
+	max-width: 90vw;
+	max-height: 80vh;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.dialog-header {
+	padding: 20px;
+	border-bottom: 1px solid #e5e7eb;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.dialog-title {
+	margin: 0;
+	font-size: 20px;
+	font-weight: 600;
+}
+
+.dialog-close-button {
+	background: none;
+	border: none;
+	font-size: 24px;
+	cursor: pointer;
+	color: #6b7280;
+	padding: 0;
+	width: 30px;
+	height: 30px;
+}
+
+.dialog-tabs {
+	display: flex;
+	border-bottom: 1px solid #e5e7eb;
+	background-color: #f9fafb;
+}
+
+.dialog-tab {
+	padding: 10px 20px;
+	cursor: pointer;
+	border-bottom: 2px solid transparent;
+	color: #6b7280;
+	font-weight: 400;
+	transition: all 0.2s;
+}
+
+.dialog-tab.active {
+	border-bottom-color: #3b82f6;
+	color: #3b82f6;
+	font-weight: 600;
+}
+
+.dialog-content {
+	padding: 20px;
+	overflow-y: auto;
+	flex: 1;
+}
+
+/* Form Elements */
+
+.form-group {
+	margin-bottom: 20px;
+}
+
+.form-label {
+	display: block;
+	margin-bottom: 5px;
+	font-weight: 500;
+	color: #374151;
+}
+
+.form-input {
+	width: 100%;
+	padding: 8px 12px;
+	border: 1px solid #d1d5db;
+	border-radius: 4px;
+	font-size: 14px;
+}
+
+.form-textarea {
+	width: 100%;
+	padding: 8px 12px;
+	border: 1px solid #d1d5db;
+	border-radius: 4px;
+	font-size: 14px;
+	min-height: 100px;
+	resize: vertical;
+}
+
+/* Tags */
+
+.tags-container {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 10px;
+	flex-wrap: wrap;
+}
+
+.tag {
+	background-color: #3b82f6;
+	color: white;
+	padding: 4px 12px;
+	border-radius: 16px;
+	font-size: 14px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.tag-remove-button {
+	background: none;
+	border: none;
+	color: white;
+	cursor: pointer;
+	font-size: 16px;
+	padding: 0;
+	line-height: 1;
+}
+
+.tag-input-group {
+	display: flex;
+	gap: 8px;
+}
+
+.tag-input {
+	flex: 1;
+	padding: 8px 12px;
+	border: 1px solid #d1d5db;
+	border-radius: 4px;
+	font-size: 14px;
+}
+
+/* Buttons */
+
+.btn {
+	padding: 10px 20px;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 14px;
+	font-weight: 500;
+	width: 100%;
+}
+
+.btn-primary {
+	background-color: #3b82f6;
+	color: white;
+}
+
+.btn-primary:disabled {
+	background-color: #9ca3af;
+	cursor: not-allowed;
+}
+
+.btn-danger {
+	background-color: #dc2626;
+	color: white;
+}
+
+.btn-danger:disabled {
+	background-color: #9ca3af;
+	cursor: not-allowed;
+}
+
+.btn-add-tag {
+	padding: 8px 16px;
+	background-color: #3b82f6;
+	color: white;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 14px;
+	font-weight: 500;
+}
+
+/* Export Tab */
+
+.export-info {
+	background-color: #f3f4f6;
+	padding: 15px;
+	border-radius: 4px;
+	margin-bottom: 20px;
+}
+
+.export-info-title {
+	margin: 0 0 10px 0;
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.export-info-item {
+	margin: 5px 0;
+	font-size: 14px;
+	color: #6b7280;
+}
+
+.export-description {
+	color: #6b7280;
+	margin-bottom: 20px;
+}
+
+/* Import Tab */
+
+.import-dropzone {
+	border: 2px dashed #d1d5db;
+	border-radius: 8px;
+	padding: 40px;
+	text-align: center;
+	color: #6b7280;
+}
+
+.import-dropzone-title {
+	margin-bottom: 10px;
+	font-weight: 500;
+}
+
+.import-dropzone-text {
+	font-size: 14px;
+}
+
+/* Delete Tab */
+
+.delete-warning {
+	background-color: #fef2f2;
+	border: 1px solid #fecaca;
+	border-radius: 4px;
+	padding: 15px;
+	margin-bottom: 20px;
+}
+
+.delete-warning-title {
+	color: #991b1b;
+	font-weight: 500;
+	margin: 0 0 10px 0;
+}
+
+.delete-warning-text {
+	color: #7f1d1d;
+	font-size: 14px;
+	margin: 0;
+}

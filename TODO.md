@@ -1,68 +1,6 @@
 # Project Management UI Implementation TODO
 
-## Phase 0: Database Migration to SeaORM ✅
-
-### 0.1 SeaORM Setup
-
-- [x] Update sqlx dependency to 0.8.4 for compatibility
-- [x] Add SeaORM and sea-orm-migration dependencies to backend
-- [x] Add chrono dependency with serde features
-
-### 0.2 Migration Infrastructure
-
-- [x] Create migration module in `osint-graph-backend/src/migration/`
-- [x] Create initial migration for all existing tables (project, node, nodelink, attachment)
-- [x] Set up foreign key constraints in migrations
-- [x] Configure automatic migration execution on startup
-
-### 0.3 Entity Definitions
-
-- [x] Create SeaORM entity for Project in `src/entity/project.rs`
-- [x] Create SeaORM entity for Node in `src/entity/node.rs`
-- [x] Create SeaORM entity for NodeLink in `src/entity/nodelink.rs`
-- [x] Create SeaORM entity for Attachment in `src/entity/attachment.rs`
-- [x] Define entity relationships (belongs_to, has_many)
-
-### 0.4 Database Layer Refactoring
-
-- [x] Replace SqlitePool with DatabaseConnection in AppState
-- [x] Update storage.rs to use SeaORM Database::connect
-- [x] Refactor DBEntity trait to use ConnectionTrait
-- [x] Update all database operations to use ConnectionTrait::execute and query_all
-- [x] Update project database operations for SeaORM
-- [x] Update node database operations for SeaORM
-- [x] Update nodelink database operations for SeaORM
-- [x] Update attachment database operations for SeaORM
-
-### 0.5 Testing & Documentation
-
-- [x] Update all test functions to use new start_db signature
-- [x] Verify all tests pass with SeaORM
-- [x] Update CLAUDE.md with SeaORM architecture details
-- [x] Document migration system in CLAUDE.md
-- [x] Commit SeaORM migration changes
-
 ## Phase 1: Backend Schema & Database
-
-### 1.2 File Attachment Schema ✅
-
-- [x] Create `Attachment` struct in new file `osint-graph-shared/src/attachment.rs`:
-  - id: Uuid
-  - node_id: Uuid
-  - filename: String
-  - content_type: String
-  - size: i64
-  - data: `Vec<u8>` (will be zstd compressed)
-  - created: `DateTime<Utc>`
-- [x] Add `attachments: Vec<Uuid>` field to Node struct (just IDs, not full data)
-- [x] Create attachments table in `osint-graph-backend/src/db/attachment.rs`:
-  - Table schema with FOREIGN KEY to node(id)
-  - Implement DBEntity trait
-  - Add zstd compression on save
-  - Add zstd decompression on load
-- [x] Update node database schema to add attachments column (TEXT NULL, JSON array of UUIDs)
-- [x] Write tests for Attachment CRUD with compression/decompression
-- [x] Write tests for cascade deletion (deleting node deletes attachments)
 
 ### 1.3 Backend API Endpoints - Export/Import
 
@@ -95,10 +33,6 @@
 
 ### 2.1 Update Frontend Types
 
-- [ ] Update `Project` interface in `osint-graph-frontend/src/types.tsx`:
-  - Add `description?: string`
-  - Add `tags?: string[]`
-  - Add `last_updated?: Date`
 - [ ] Create `Attachment` interface in `types.tsx`:
   - id: string
   - filename: string
@@ -106,24 +40,10 @@
   - size: number
   - created: string
 - [ ] Update `OSINTNode` interface to add `attachments?: string[]` (array of attachment IDs)
-- [ ] Create `ProjectExport` interface:
-
-  ```typescript
-  {
-    project: Project,
-    nodes: OSINTNode[],
-    links: NodeLink[],
-    attachments: Record<string, Attachment[]>
-  }
-  ```
-
 - [ ] Create `ImportMode` type: 'new' | 'overwrite' | 'merge'
 
 ### 2.2 Frontend API Client
 
-- [ ] Add `updateProject(id: string, data: Partial<Project>): Promise<void>` in `api.tsx`
-- [ ] Add `deleteProject(id: string): Promise<void>` in `api.tsx`
-- [ ] Add `exportProject(id: string): Promise<ProjectExport>` in `api.tsx`
 - [ ] Add `importProject(data: ProjectExport, mode: ImportMode): Promise<Project>` in `api.tsx`
 - [ ] Add `uploadAttachment(nodeId: string, file: File): Promise<Attachment>` in `api.tsx`
 - [ ] Add `downloadAttachment(nodeId: string, attachmentId: string): Promise<Blob>` in `api.tsx`
@@ -132,46 +52,18 @@
 
 ## Phase 3: UI Components
 
-### 3.1 Project Selector Updates
+### 3.1 Project Management Dialog ✅
 
-- [ ] Add gear/settings icon button in `ProjectSelector.tsx` next to "+ New" button
-- [ ] Add state for settings dialog open/closed
-- [ ] Add click handler to open ProjectManagementDialog
-- [ ] Style gear button to match existing design
+- [x] Create ProjectManagementDialog.tsx component with tabs
+- [x] Tab 1: General - Edit project name, description, tags
+- [x] Tab 2: Export - Export project to JSON file
+- [x] Tab 4: Delete - Delete project with confirmation
+- [x] Integrate dialog into App.tsx with Settings button
+- [x] Extract styles to osint-graph.css
 
-### 3.2 Project Management Dialog Component
+### 3.2 Import Tab Implementation
 
-- [ ] Create new file `osint-graph-frontend/src/components/ProjectManagementDialog.tsx`
-- [ ] Create dialog component with close button and backdrop
-- [ ] Add tabbed interface with 4 tabs: General, Export, Import, Delete
-- [ ] Add dialog state management (current tab, loading states)
-
-#### Tab 1: General Settings
-
-- [ ] Create form with fields:
-  - Project name (text input, required)
-  - Description (textarea, optional)
-  - Tags (chip input with add/remove, optional)
-  - User (text input or dropdown if we add user management later)
-- [ ] Add form validation (name required, non-empty)
-- [ ] Add "Save Changes" button
-- [ ] Implement save handler calling `updateProject` API
-- [ ] Show success/error toast messages
-- [ ] Update parent component state on successful save
-
-#### Tab 2: Export
-
-- [ ] Add "Export Project" button
-- [ ] Implement export handler:
-  - Call `exportProject` API
-  - Generate filename: `{project_name}_{timestamp}.json`
-  - Create download blob and trigger download
-- [ ] Add loading state during export
-- [ ] Show success message after download
-- [ ] Display export metadata (node count, link count, attachment count, file size)
-
-#### Tab 3: Import
-
+- [ ] Replace "Coming Soon" placeholder with functional import UI
 - [ ] Create file upload dropzone (drag & drop + click to browse)
 - [ ] Accept only `.json` files
 - [ ] On file selected, parse and validate JSON structure
@@ -185,19 +77,6 @@
 - [ ] On success, reload project data and close dialog
 - [ ] Show success message with import stats
 - [ ] Handle errors (invalid JSON, missing fields, server errors)
-
-#### Tab 4: Delete
-
-- [ ] Add warning text explaining cascade deletion
-- [ ] Add confirmation input: "Type project name to confirm"
-- [ ] Add "Delete Project" button (red, disabled until name matches)
-- [ ] Implement delete handler:
-  - Call `deleteProject` API
-  - Clear localStorage project ID
-  - Create new project or show project selector
-  - Close dialog
-- [ ] Show final confirmation dialog before delete
-- [ ] Show success message after deletion
 
 ### 3.3 File Attachments UI in Node Editor
 
@@ -216,13 +95,6 @@
 - [ ] Update node data after attachment changes
 - [ ] Handle errors for all operations
 
-### 3.4 Import Mode Dialog Component
-
-- [ ] Create `ImportModeDialog.tsx` component
-- [ ] Add three radio options with clear descriptions
-- [ ] Add warning icon and text for overwrite mode
-- [ ] Add confirm/cancel buttons
-- [ ] Export dialog component for use in ProjectManagementDialog
 
 ## Phase 4: Integration & Testing
 
@@ -238,41 +110,39 @@
 
 ### 4.2 Frontend Integration
 
-- [ ] Test settings dialog opens and closes correctly
-- [ ] Test project update from UI updates backend and state
-- [ ] Test export downloads valid JSON file
+- [x] Test settings dialog opens and closes correctly
+- [x] Test project update from UI updates backend and state
+- [x] Test export downloads valid JSON file
 - [ ] Test import with valid JSON file succeeds
 - [ ] Test import with invalid JSON shows error
-- [ ] Test delete project flow completes successfully
+- [x] Test delete project flow completes successfully
 - [ ] Test file upload/download in node editor
-- [ ] Run `pnpm run lint` and fix any issues
+- [x] Run `pnpm run lint` and fix any issues
 
 ### 4.3 Documentation
 
-- [ ] Update `CLAUDE.md` with new Project schema fields
+- [x] Update `CLAUDE.md` with Project Management Dialog implementation
 - [ ] Document export JSON structure in `CLAUDE.md`
 - [ ] Document import modes (new/overwrite/merge) in `CLAUDE.md`
 - [ ] Document file attachment system in `CLAUDE.md`
-- [ ] Update API endpoint list in `CLAUDE.md`
+- [x] Update API endpoint list in `CLAUDE.md`
 - [ ] Add example export JSON to documentation
 
-## Phase 5: Cleanup & Commit
+## Phase 5: Cleanup & Polish
 
 - [ ] Run `just check` final validation
-- [ ] Commit backend changes
-- [ ] Commit frontend changes
-- [ ] Commit documentation updates
-- [ ] Clear out the completed taks this TODO.md file (all items complete!)
+- [x] Commit Project Management Dialog implementation
+- [x] Commit CSS extraction
+- [x] Commit deferred node creation
+- [ ] Update CLAUDE.md with latest features
+- [ ] Clean up TODO.md (remove completed sections)
 
 ## Notes
 
-### Backend Dependencies to Add
+### Dependencies Needed for Remaining Features
 
-- `zstd` crate for compression (add to `osint-graph-backend/Cargo.toml`)
-- `base64` crate if not already present
-- `multipart` or `axum-multipart` for file uploads
+**Backend:**
+- `multipart` or `axum-multipart` for file uploads (attachments feature)
 
-### Frontend Dependencies to Add
-
-- Consider `react-dropzone` for file upload UI
-- Consider `@mui/material` Chip component for tags input (or build custom)
+**Frontend:**
+- Consider `react-dropzone` for file upload UI (import tab and attachments)

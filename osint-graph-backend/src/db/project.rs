@@ -21,7 +21,9 @@ impl DBEntity for Project {
                 user TEXT NOT NULL,
                 creationdate TEXT NOT NULL,
                 last_updated TEXT,
-                nodes TEXT
+                nodes TEXT,
+                description TEXT,
+                tags TEXT
             )
             ",
             Self::table()
@@ -34,12 +36,13 @@ impl DBEntity for Project {
 
     async fn save(&self, pool: &SqlitePool) -> Result<(), DBError> {
         let querystring = format!(
-            "INSERT INTO {} (id, name, user, creationdate, last_updated, nodes ) VALUES (?, ?, ?, ?, ?, ?)
+            "INSERT INTO {} (id, name, user, creationdate, last_updated, nodes, description, tags ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO
-            UPDATE SET name = ?, user = ?, creationdate = ?, last_updated = ? ",
+            UPDATE SET name = ?, user = ?, creationdate = ?, last_updated = ?, nodes = ?, description = ?, tags = ? ",
             Self::table()
         );
         let nodes_encoded = serde_json::to_string(&self.nodes)?;
+        let tags_encoded = serde_json::to_string(&self.tags)?;
 
         sqlx::query(&querystring)
             .bind(self.id)
@@ -48,11 +51,15 @@ impl DBEntity for Project {
             .bind(self.creationdate)
             .bind(self.last_updated)
             .bind(&nodes_encoded)
+            .bind(self.description.clone())
+            .bind(&tags_encoded)
             .bind(self.name.clone())
             .bind(self.user)
             .bind(self.creationdate)
             .bind(self.last_updated)
             .bind(&nodes_encoded)
+            .bind(self.description.clone())
+            .bind(&tags_encoded)
             .execute(pool)
             .await?;
 

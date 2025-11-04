@@ -99,6 +99,8 @@ async fn create_default_project(conn: &SqlitePool) -> Result<(), std::io::Error>
         creationdate: std::time::SystemTime::now().into(),
         last_updated: None,
         nodes: NodeUpdateList::new(),
+        description: None,
+        tags: Vec::new(),
     };
 
     default_project

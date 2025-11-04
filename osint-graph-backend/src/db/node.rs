@@ -135,6 +135,8 @@ mod tests {
             creationdate: DateTime::from(std::time::SystemTime::now()),
             last_updated: None,
             nodes: NodeUpdateList::new(),
+            description: None,
+            tags: Vec::new(),
         };
 
         project.save(&conn).await.expect("Failed to save project");

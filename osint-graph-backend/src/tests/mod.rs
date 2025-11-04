@@ -64,6 +64,8 @@ async fn test_api_project_node_save_load() {
         creationdate: chrono::Utc::now(),
         last_updated: None,
         nodes: Default::default(),
+        description: None,
+        tags: Vec::new(),
     };
 
     // create the project
@@ -137,6 +139,8 @@ async fn test_api_get_nodes_by_project() {
         creationdate: chrono::Utc::now(),
         last_updated: None,
         nodes: Default::default(),
+        description: None,
+        tags: Vec::new(),
     };
 
     // Create second project
@@ -147,6 +151,8 @@ async fn test_api_get_nodes_by_project() {
         creationdate: chrono::Utc::now(),
         last_updated: None,
         nodes: Default::default(),
+        description: None,
+        tags: Vec::new(),
     };
 
     // Create both projects
@@ -276,6 +282,8 @@ async fn test_api_projects_crud() {
         creationdate: chrono::Utc::now(),
         last_updated: None,
         nodes: Default::default(),
+        description: None,
+        tags: Vec::new(),
     };
 
     // Test project creation
@@ -317,6 +325,8 @@ async fn test_api_nodes_crud() {
         creationdate: chrono::Utc::now(),
         last_updated: None,
         nodes: Default::default(),
+        description: None,
+        tags: Vec::new(),
     };
     server
         .post("/api/v1/project")

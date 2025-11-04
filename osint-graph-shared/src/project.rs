@@ -24,6 +24,13 @@ pub struct Project {
     #[serde(default = "NodeUpdateList::new")]
     #[sqlx(json)]
     pub nodes: NodeUpdateList,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional project description
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[sqlx(json)]
+    /// Project tags for categorization
+    pub tags: Vec<String>,
 }
 
 impl Project {
@@ -59,6 +66,8 @@ impl Default for Project {
             creationdate,
             last_updated: None,
             nodes: NodeUpdateList::new(),
+            description: None,
+            tags: Vec::new(),
         }
     }
 }

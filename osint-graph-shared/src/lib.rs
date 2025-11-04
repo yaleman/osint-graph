@@ -2,6 +2,7 @@ use std::net::TcpListener;
 
 use rand::Rng;
 
+pub mod attachment;
 pub mod data;
 pub mod node;
 pub mod nodelink;

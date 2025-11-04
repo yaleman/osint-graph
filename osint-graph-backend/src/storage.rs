@@ -2,6 +2,7 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use axum::async_trait;
+use osint_graph_shared::attachment::Attachment;
 use osint_graph_shared::node::{Node, NodeUpdateList};
 use osint_graph_shared::nodelink::NodeLink;
 use osint_graph_shared::project::Project;
@@ -72,6 +73,9 @@ pub async fn create_tables(conn: &SqlitePool) -> Result<(), std::io::Error> {
     NodeLink::create_table(conn)
         .await
         .expect("Failed to create NodeLink table");
+    Attachment::create_table(conn)
+        .await
+        .expect("Failed to create Attachment table");
 
     // Create default project if it doesn't exist
     create_default_project(conn).await?;
@@ -183,6 +187,7 @@ pub enum DBError {
     SqlxError(sqlx::Error),
     IoError(std::io::Error),
     Serde(serde_json::Error),
+    Other(String),
 }
 
 impl From<sqlx::Error> for DBError {

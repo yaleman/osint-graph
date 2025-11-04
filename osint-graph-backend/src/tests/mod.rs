@@ -186,6 +186,7 @@ async fn test_api_get_nodes_by_project() {
         notes: Some("First person".to_string()),
         pos_x: Some(100),
         pos_y: Some(200),
+        attachments: Vec::new(),
     };
 
     let node2 = Node {
@@ -198,6 +199,7 @@ async fn test_api_get_nodes_by_project() {
         notes: Some("Domain node".to_string()),
         pos_x: Some(300),
         pos_y: Some(400),
+        attachments: Vec::new(),
     };
 
     // Create node for second project
@@ -211,6 +213,7 @@ async fn test_api_get_nodes_by_project() {
         notes: None,
         pos_x: Some(500),
         pos_y: Some(600),
+        attachments: Vec::new(),
     };
 
     // Add all nodes
@@ -346,6 +349,7 @@ async fn test_api_nodes_crud() {
         notes: Some("Test email node".to_string()),
         pos_x: Some(150),
         pos_y: Some(250),
+        attachments: Vec::new(),
     };
 
     let res = server.post("/api/v1/node").json(&node).await;
@@ -375,6 +379,7 @@ async fn test_api_nodes_crud() {
         notes: Some("Updated test email node".to_string()),
         pos_x: Some(300),
         pos_y: Some(400),
+        attachments: Vec::new(),
     };
 
     let res = server.post("/api/v1/node").json(&updated_node).await;
@@ -418,6 +423,7 @@ async fn test_api_node_foreign_key_constraint() {
         notes: None,
         pos_x: None,
         pos_y: None,
+        attachments: Vec::new(),
     };
 
     // This should fail due to project validation (project doesn't exist)
@@ -472,9 +478,7 @@ async fn test_api_update_project() {
     res.assert_status_ok();
 
     // Verify the update
-    let res = server
-        .get(&format!("/api/v1/project/{}", project_id))
-        .await;
+    let res = server.get(&format!("/api/v1/project/{}", project_id)).await;
     res.assert_status_ok();
     let retrieved_project: Project = res.json();
     assert_eq!(retrieved_project.id, project_id);
@@ -533,6 +537,7 @@ async fn test_api_delete_project() {
         notes: None,
         pos_x: None,
         pos_y: None,
+        attachments: Vec::new(),
     };
 
     let node_id2 = Uuid::new_v4();
@@ -546,6 +551,7 @@ async fn test_api_delete_project() {
         notes: None,
         pos_x: None,
         pos_y: None,
+        attachments: Vec::new(),
     };
 
     server

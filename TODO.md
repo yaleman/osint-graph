@@ -2,8 +2,8 @@
 
 ## Phase 1: Backend Schema & Database
 
-### 1.2 File Attachment Schema
-- [ ] Create `Attachment` struct in new file `osint-graph-shared/src/attachment.rs`:
+### 1.2 File Attachment Schema ✅
+- [x] Create `Attachment` struct in new file `osint-graph-shared/src/attachment.rs`:
   - id: Uuid
   - node_id: Uuid
   - filename: String
@@ -11,15 +11,15 @@
   - size: i64
   - data: Vec<u8> (will be zstd compressed)
   - created: DateTime<Utc>
-- [ ] Add `attachments: Vec<Uuid>` field to Node struct (just IDs, not full data)
-- [ ] Create attachments table in `osint-graph-backend/src/db/attachment.rs`:
+- [x] Add `attachments: Vec<Uuid>` field to Node struct (just IDs, not full data)
+- [x] Create attachments table in `osint-graph-backend/src/db/attachment.rs`:
   - Table schema with FOREIGN KEY to node(id)
   - Implement DBEntity trait
   - Add zstd compression on save
   - Add zstd decompression on load
-- [ ] Update node database schema to add attachments column (TEXT NULL, JSON array of UUIDs)
-- [ ] Write tests for Attachment CRUD with compression/decompression
-- [ ] Write tests for cascade deletion (deleting node deletes attachments)
+- [x] Update node database schema to add attachments column (TEXT NULL, JSON array of UUIDs)
+- [x] Write tests for Attachment CRUD with compression/decompression
+- [x] Write tests for cascade deletion (deleting node deletes attachments)
 
 ### 1.3 Backend API Endpoints - Export/Import
 - [ ] Add `GET /api/v1/project/:id/export` endpoint

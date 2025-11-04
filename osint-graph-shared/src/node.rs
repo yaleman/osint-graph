@@ -26,6 +26,10 @@ pub struct Node {
     // pub position: NodePosition,
     pub pos_x: Option<i32>,
     pub pos_y: Option<i32>,
+    /// IDs of attachments associated with this node
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[sqlx(json)]
+    pub attachments: Vec<Uuid>,
 }
 
 #[derive(Debug, Clone, sqlx::Type, FromRow, Deserialize, Serialize)]
@@ -120,6 +124,7 @@ mod tests {
             notes: Some("Test person".to_string()),
             pos_x: Some(100),
             pos_y: Some(200),
+            attachments: Vec::new(),
         };
 
         assert_eq!(node.project_id, project_id);

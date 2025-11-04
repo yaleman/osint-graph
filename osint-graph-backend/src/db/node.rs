@@ -26,6 +26,7 @@ impl DBEntity for Node {
                 notes TEXT,
                 pos_x INTEGER,
                 pos_y INTEGER,
+                attachments TEXT,
                 FOREIGN KEY (project_id) REFERENCES project(id) ON DELETE CASCADE ON UPDATE CASCADE
             )
             ",
@@ -38,10 +39,12 @@ impl DBEntity for Node {
     }
 
     async fn save(&self, _pool: &SqlitePool) -> Result<(), DBError> {
+        let attachments_encoded = serde_json::to_string(&self.attachments)?;
+
         let querystring = format!(
-            "INSERT INTO {} (id, project_id, node_type, display, value, updated, notes, pos_x, pos_y) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "INSERT INTO {} (id, project_id, node_type, display, value, updated, notes, pos_x, pos_y, attachments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO
-                UPDATE SET project_id = ?, node_type = ?, display = ?, value = ?, updated = ?, notes = ?, pos_x = ?, pos_y = ?;",
+                UPDATE SET project_id = ?, node_type = ?, display = ?, value = ?, updated = ?, notes = ?, pos_x = ?, pos_y = ?, attachments = ?;",
             Self::table()
         );
         sqlx::query(&querystring)
@@ -54,6 +57,7 @@ impl DBEntity for Node {
             .bind(self.notes.clone())
             .bind(self.pos_x)
             .bind(self.pos_y)
+            .bind(&attachments_encoded)
             .bind(self.project_id)
             .bind(self.node_type.clone())
             .bind(self.display.clone())
@@ -62,6 +66,7 @@ impl DBEntity for Node {
             .bind(self.notes.clone())
             .bind(self.pos_x)
             .bind(self.pos_y)
+            .bind(&attachments_encoded)
             .execute(_pool)
             .await?;
         Ok(())

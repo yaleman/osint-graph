@@ -20,8 +20,8 @@ use axum::{
 };
 // use dev_websocket::ws_handler;
 use project::{
-    delete_nodelink, get_node, get_nodelinks_by_project, get_nodes_by_project, get_project,
-    get_projects, post_node, post_nodelink, post_project,
+    delete_node, delete_nodelink, get_node, get_nodelinks_by_project, get_nodes_by_project,
+    get_project, get_projects, post_node, post_nodelink, post_project,
 };
 use sqlx::SqlitePool;
 use std::{borrow::Cow, sync::Arc, time::Duration};
@@ -58,6 +58,7 @@ pub fn build_app<T>(shared_state: &SharedState) -> Router<T> {
     let router = Router::new()
         .route("/api/v1/node", post(post_node))
         .route("/api/v1/node/:id", get(get_node))
+        .route("/api/v1/node/:id", delete(delete_node))
         .route("/api/v1/nodelink", post(post_nodelink))
         .route("/api/v1/nodelink/:id", delete(delete_nodelink))
         .route(

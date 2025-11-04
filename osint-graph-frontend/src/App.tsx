@@ -15,7 +15,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { v4 as uuidv4 } from 'uuid';
 import toast, { Toaster } from 'react-hot-toast';
-import { createNode, updateNode, createProject, fetchNodesByProject, getProject, fetchProjects, createNodeLink, fetchNodeLinksByProject, deleteNodeLink } from './api';
+import { createNode, updateNode, createProject, fetchNodesByProject, getProject, fetchProjects, createNodeLink, fetchNodeLinksByProject, deleteNode, deleteNodeLink } from './api';
 import type { OSINTNode, Project } from './types';
 import { NodeTypeInfo } from './types';
 import { ProjectMismatchDialog } from './components/ProjectMismatchDialog';
@@ -192,12 +192,13 @@ export default function App() {
     }, 100);
   }, [history, nodes, edges, setNodes, setEdges, flushPendingUpdates]);
 
-  // Keyboard shortcuts for undo/redo
+  // Keyboard shortcuts for undo/redo and delete
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
       const modifier = isMac ? e.metaKey : e.ctrlKey;
 
+      // Undo/Redo shortcuts
       if (modifier && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         undo();
@@ -205,11 +206,55 @@ export default function App() {
         e.preventDefault();
         redo();
       }
+      // Delete/Backspace for selected nodes and edges
+      else if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Don't delete if user is typing in an input field
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+          return;
+        }
+
+        e.preventDefault();
+
+        const selectedNodes = nodes.filter(n => n.selected);
+        const selectedEdges = edges.filter(e => e.selected);
+
+        if (selectedNodes.length === 0 && selectedEdges.length === 0) {
+          return;
+        }
+
+        // Save history before deletion
+        saveHistory();
+
+        // Delete selected nodes
+        if (selectedNodes.length > 0) {
+          selectedNodes.forEach(node => {
+            deleteNode(node.id).catch(error => {
+              console.error('Failed to delete node:', error);
+              toast.error(`Failed to delete node from backend`);
+            });
+          });
+          setNodes(nodes.filter(n => !n.selected));
+          toast.success(`Deleted ${selectedNodes.length} node${selectedNodes.length > 1 ? 's' : ''}`);
+        }
+
+        // Delete selected edges
+        if (selectedEdges.length > 0) {
+          selectedEdges.forEach(edge => {
+            deleteNodeLink(edge.id).catch(error => {
+              console.error('Failed to delete edge:', error);
+              toast.error(`Failed to delete connection from backend`);
+            });
+          });
+          setEdges(edges.filter(e => !e.selected));
+          toast.success(`Deleted ${selectedEdges.length} connection${selectedEdges.length > 1 ? 's' : ''}`);
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo]);
+  }, [undo, redo, nodes, edges, setNodes, setEdges, saveHistory]);
 
   // Cleanup: flush pending updates on unmount
   useEffect(() => {

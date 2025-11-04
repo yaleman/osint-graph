@@ -85,6 +85,10 @@ export const fetchNodeLinksByProject = async (projectId: string): Promise<NodeLi
 	return response.data;
 };
 
+export const deleteNode = async (nodeId: string): Promise<void> => {
+	await axios.delete(`${NODE_URL}/${nodeId}`);
+};
+
 export const deleteNodeLink = async (nodelinkId: string): Promise<void> => {
 	await axios.delete(`${NODELINK_URL}/${nodelinkId}`);
 };

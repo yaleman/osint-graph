@@ -4,6 +4,7 @@ export interface Project {
 	name: string;
 	user: string;
 	creationdate: Date;
+	tags: string[];
 	// Add other fields as necessary
 }
 
@@ -15,8 +16,9 @@ export interface OSINTNode {
 	value: string;
 	updated: string;
 	notes?: string;
-	pos_x?: number;
-	pos_y?: number;
+	pos_x: number;
+	pos_y: number;
+	attachments: string[];
 }
 
 export interface NodeLink {

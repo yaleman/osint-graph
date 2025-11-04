@@ -19,7 +19,8 @@ export const newProject = async (): Promise<AxiosResponse<Project, string>> => {
 		name: "New Project",
 		id: uuidv4(),
 		user: uuidv4(),
-		creationdate: new Date().valueOf(),
+		creationdate: new Date().toISOString,
+		tags: [],
 	});
 	return response;
 };
@@ -34,6 +35,7 @@ export const createNode = async (node: OSINTNode): Promise<AxiosResponse<OSINTNo
 		updated: node.updated,
 		pos_x: node.pos_x,
 		pos_y: node.pos_y,
+		attachments: node.attachments ?? [],
 		...(node.notes && { notes: node.notes })
 	};
 	const response = await axios.post<OSINTNode>(NODE_URL, nodeData);
@@ -41,7 +43,7 @@ export const createNode = async (node: OSINTNode): Promise<AxiosResponse<OSINTNo
 };
 
 export const updateNode = async (node: OSINTNode): Promise<AxiosResponse<OSINTNode>> => {
-	const response = await axios.post<OSINTNode>(NODE_URL, {
+	const response = await axios.put<OSINTNode>(`${NODE_URL}/${node.id}`, {
 		...node,
 		updated: new Date().toISOString(),
 	});
@@ -58,7 +60,8 @@ export const createProject = async (projectName: string = "My OSINT Project"): P
 		name: projectName,
 		id: uuidv4(),
 		user: uuidv4(),
-		creationdate: Date.now(), // Send timestamp in milliseconds
+		creationdate: new Date().toISOString(),
+		tags: [],
 	});
 	return response.data;
 };

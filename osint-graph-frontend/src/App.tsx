@@ -244,9 +244,13 @@ function AppContent() {
         // Delete selected edges
         if (selectedEdges.length > 0) {
           selectedEdges.forEach(edge => {
+            if (edge.id.startsWith('reactflow')) {
+              console.debug('Skipping deletion of temporary edge:', edge.id);
+              return;
+            }
             deleteNodeLink(edge.id).catch(error => {
               console.error('Failed to delete edge:', error);
-              toast.error(`Failed to delete connection from backend`);
+              // toast.error(`Failed to delete connection from backend`);
             });
           });
           setEdges(edges.filter(e => !e.selected));
@@ -320,7 +324,7 @@ function AppContent() {
       organization: '#f97316',
       document: '#6b7280'
     };
-    return colors[nodeType] || '#6b7280';
+    return colors[nodeType] ?? '#6b7280';
   }, []);
 
   // Helper function to load nodes and edges for a project
@@ -494,23 +498,24 @@ function AppContent() {
     const y = position.y;
 
     const nodeId = uuidv4();
-    
+
     const osintNode: OSINTNode = {
       id: nodeId,
       project_id: projectId,
       node_type: nodeType,
-      display: `New ${NodeTypeInfo[nodeType]?.label || nodeType}`,
+      display: `New ${NodeTypeInfo[nodeType]?.label ?? nodeType}`,
       value: '',
       updated: new Date().toISOString(),
       pos_x: Math.round(x),
       pos_y: Math.round(y),
+      attachments: [],
     };
 
     const newReactFlowNode: Node = {
       id: nodeId,
       type: 'default',
       position: { x, y },
-      data: { 
+      data: {
         label: osintNode.display,
         nodeType: nodeType,
         osintNode: osintNode
@@ -637,10 +642,13 @@ function AppContent() {
       // Delete nodelinks from backend
       changes.forEach(change => {
         if (change.type === 'remove') {
-          deleteNodeLink(change.id).catch(error => {
-            console.error('Failed to delete nodelink:', error);
-            toast.error('Failed to delete connection from backend');
-          });
+          console.debug('Deleting nodelink:', change);
+          if (!change.id.startsWith('reactflow')) {
+            deleteNodeLink(change.id).catch(error => {
+              console.error('Failed to delete nodelink:', error);
+              // toast.error('Failed to delete connection from backend');
+            });
+          }
         }
       });
     }
@@ -655,11 +663,11 @@ function AppContent() {
 
   if (isLoading) {
     return (
-      <div style={{ 
-        width: '100vw', 
-        height: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
+      <div style={{
+        width: '100vw',
+        height: '100vh',
+        display: 'flex',
+        alignItems: 'center',
         justifyContent: 'center',
         fontSize: '18px'
       }}>
@@ -777,7 +785,7 @@ function AppContent() {
                 e.currentTarget.style.boxShadow = 'none';
               }}
             >
-              {NodeTypeInfo[type]?.label || type}
+              {NodeTypeInfo[type]?.label ?? type}
             </button>
           ))}
         </div>

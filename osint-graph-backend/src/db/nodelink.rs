@@ -1,8 +1,7 @@
 use axum::async_trait;
-use futures::TryStreamExt;
 use osint_graph_shared::nodelink::NodeLink;
 
-use sqlx::{Row, SqlitePool};
+use sea_orm::{DatabaseConnection, FromQueryResult};
 use tracing::debug;
 use uuid::Uuid;
 
@@ -14,125 +13,118 @@ impl DBEntity for NodeLink {
         "nodelink"
     }
 
-    async fn create_table(pool: &SqlitePool) -> Result<(), DBError> {
-        sqlx::query(&format!(
-            "
-            CREATE TABLE IF NOT EXISTS {} (
-                id TEXT PRIMARY KEY,
-                left TEXT NOT NULL,
-                right TEXT NOT NULL,
-                project_id TEXT NOT NULL,
-                linktype TEXT NOT NULL,
-                FOREIGN KEY (project_id) REFERENCES project(id) ON DELETE CASCADE ON UPDATE CASCADE,
-                FOREIGN KEY (left) REFERENCES node(id) ON DELETE CASCADE ON UPDATE CASCADE,
-                FOREIGN KEY (right) REFERENCES node(id) ON DELETE CASCADE ON UPDATE CASCADE
-            )
-            ",
-            Self::table()
-        ))
-        .execute(pool)
-        .await?;
-        debug!("Created table {}", Self::table());
+    async fn create_table(_conn: &DatabaseConnection) -> Result<(), DBError> {
+        // Tables are now created via migrations
+        debug!("Skipping create table - using migrations");
         Ok(())
     }
 
-    async fn save(&self, _pool: &SqlitePool) -> Result<(), DBError> {
+    async fn save(&self, conn: &DatabaseConnection) -> Result<(), DBError> {
         let querystring = format!(
             "INSERT INTO {} (id, project_id, left, right, linktype) VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO
                 UPDATE SET project_id = ?, left = ?, right = ?, linktype = ?;",
             Self::table()
         );
-        sqlx::query(&querystring)
-            .bind(self.id)
-            .bind(self.project_id)
-            .bind(self.left)
-            .bind(self.right)
-            .bind(self.linktype)
-            .bind(self.project_id)
-            .bind(self.left)
-            .bind(self.right)
-            .bind(self.linktype)
-            .execute(_pool)
-            .await?;
+
+        sea_orm::Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Sqlite,
+            querystring,
+            vec![
+                self.id.to_string().into(),
+                self.project_id.to_string().into(),
+                self.left.to_string().into(),
+                self.right.to_string().into(),
+                self.linktype.clone().into(),
+                self.project_id.to_string().into(),
+                self.left.to_string().into(),
+                self.right.to_string().into(),
+                self.linktype.clone().into(),
+            ],
+        )
+        .execute(conn)
+        .await?;
         Ok(())
     }
 
-    async fn get(pool: &SqlitePool, id: &Uuid) -> Result<Option<Self>, DBError> {
+    async fn get(conn: &DatabaseConnection, id: &Uuid) -> Result<Option<Self>, DBError> {
         let querystring = format!("SELECT * FROM {} WHERE id = ?", Self::table());
 
-        sqlx::query_as(&querystring)
-            .bind(id)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| e.into())
+        let result = sea_orm::Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Sqlite,
+            querystring,
+            vec![id.to_string().into()],
+        )
+        .all(conn)
+        .await?;
+
+        if result.is_empty() {
+            return Ok(None);
+        }
+
+        let row = &result[0];
+        Ok(Some(NodeLink::from_query_result(row, "")?))
     }
 }
 
 #[allow(dead_code)] // TODO: remove this
 #[async_trait]
 pub trait NodeExt {
-    async fn get_by_project_id(pool: &SqlitePool, project_id: Uuid) -> Result<Vec<Self>, DBError>
+    async fn get_by_project_id(conn: &DatabaseConnection, project_id: Uuid) -> Result<Vec<Self>, DBError>
     where
         Self: Sized;
 }
 
 #[async_trait]
 impl NodeExt for NodeLink {
-    async fn get_by_project_id(pool: &SqlitePool, project_id: Uuid) -> Result<Vec<Self>, DBError> {
+    async fn get_by_project_id(conn: &DatabaseConnection, project_id: Uuid) -> Result<Vec<Self>, DBError> {
         let querystring = format!("SELECT * FROM {} WHERE project_id = ?", Self::table());
-        let mut rows = sqlx::query(&querystring).bind(project_id).fetch(pool);
 
-        let mut nodes = Vec::new();
+        let results = sea_orm::Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Sqlite,
+            querystring,
+            vec![project_id.to_string().into()],
+        )
+        .all(conn)
+        .await?;
 
-        while let Some(row) = rows.try_next().await? {
-            // let linktype: u8 = row.get("linktype");
-            nodes.push(Self {
-                project_id: row.get("project_id"),
-                id: row.get("id"),
-                left: row.get("left"),
-                right: row.get("right"),
-                linktype: row.get("linktype"),
-            });
-        }
-
-        Ok(nodes)
+        results
+            .iter()
+            .map(|row| NodeLink::from_query_result(row, ""))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.into())
     }
 }
 
 #[allow(dead_code)] // TODO: remove this
 #[async_trait]
 trait NodeLinkExt {
-    async fn get_by_node_id(pool: &SqlitePool, node_id: Uuid) -> Result<Vec<Self>, DBError>
+    async fn get_by_node_id(conn: &DatabaseConnection, node_id: Uuid) -> Result<Vec<Self>, DBError>
     where
         Self: Sized;
 }
 
 #[async_trait]
 impl NodeLinkExt for NodeLink {
-    async fn get_by_node_id(pool: &SqlitePool, node_id: Uuid) -> Result<Vec<Self>, DBError> {
+    async fn get_by_node_id(conn: &DatabaseConnection, node_id: Uuid) -> Result<Vec<Self>, DBError> {
         let querystring = format!(
             "SELECT id, project_id, left, right, linktype FROM {} WHERE left = ? OR right = ?",
             Self::table()
         );
-        let mut rows = sqlx::query(&querystring)
-            .bind(node_id)
-            .bind(node_id)
-            .fetch(pool);
 
-        let mut nodes = Vec::new();
+        let results = sea_orm::Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Sqlite,
+            querystring,
+            vec![node_id.to_string().into(), node_id.to_string().into()],
+        )
+        .all(conn)
+        .await?;
 
-        while let Some(row) = rows.try_next().await? {
-            nodes.push(Self {
-                project_id: row.get("project_id"),
-                id: row.get("id"),
-                left: row.get("left"),
-                right: row.get("right"),
-                linktype: row.get("linktype"),
-            });
-        }
-
-        Ok(nodes)
+        results
+            .iter()
+            .map(|row| NodeLink::from_query_result(row, ""))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.into())
     }
 }
 
@@ -150,7 +142,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_table() {
-        let conn = start_db(None, None).await.unwrap();
+        let conn = start_db(None).await.unwrap();
         NodeLink::create_table(&conn)
             .await
             .expect("Failed to create in-memory table for Node");
@@ -158,10 +150,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_crud() {
-        let conn = start_db(None, None).await.unwrap();
-        NodeLink::create_table(&conn)
-            .await
-            .expect("Failed to create in-memory table for Node");
+        let conn = start_db(None).await.unwrap();
 
         let project_id = Uuid::new_v4();
         let id = Uuid::new_v4();

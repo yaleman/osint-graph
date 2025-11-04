@@ -1,7 +1,7 @@
 use axum::async_trait;
 use osint_graph_shared::node::Node;
 
-use sqlx::SqlitePool;
+use sea_orm::{ConnectionTrait, DatabaseConnection, FromQueryResult};
 use tracing::debug;
 use uuid::Uuid;
 
@@ -13,32 +13,13 @@ impl DBEntity for Node {
         "node"
     }
 
-    async fn create_table(pool: &SqlitePool) -> Result<(), DBError> {
-        sqlx::query(&format!(
-            "
-            CREATE TABLE IF NOT EXISTS {} (
-                id TEXT PRIMARY KEY,
-                project_id TEXT NOT NULL,
-                node_type TEXT NOT NULL,
-                display TEXT NOT NULL,
-                value TEXT NOT NULL,
-                updated TEXT NOT NULL,
-                notes TEXT,
-                pos_x INTEGER,
-                pos_y INTEGER,
-                attachments TEXT,
-                FOREIGN KEY (project_id) REFERENCES project(id) ON DELETE CASCADE ON UPDATE CASCADE
-            )
-            ",
-            Self::table()
-        ))
-        .execute(pool)
-        .await?;
-        debug!("Created table {}", Self::table());
+    async fn create_table(_conn: &DatabaseConnection) -> Result<(), DBError> {
+        // Tables are now created via migrations
+        debug!("Skipping create table - using migrations");
         Ok(())
     }
 
-    async fn save(&self, _pool: &SqlitePool) -> Result<(), DBError> {
+    async fn save(&self, conn: &DatabaseConnection) -> Result<(), DBError> {
         let attachments_encoded = serde_json::to_string(&self.attachments)?;
 
         let querystring = format!(
@@ -47,57 +28,81 @@ impl DBEntity for Node {
                 UPDATE SET project_id = ?, node_type = ?, display = ?, value = ?, updated = ?, notes = ?, pos_x = ?, pos_y = ?, attachments = ?;",
             Self::table()
         );
-        sqlx::query(&querystring)
-            .bind(self.id)
-            .bind(self.project_id)
-            .bind(self.node_type.clone())
-            .bind(self.display.clone())
-            .bind(self.value.clone())
-            .bind(self.updated)
-            .bind(self.notes.clone())
-            .bind(self.pos_x)
-            .bind(self.pos_y)
-            .bind(&attachments_encoded)
-            .bind(self.project_id)
-            .bind(self.node_type.clone())
-            .bind(self.display.clone())
-            .bind(self.value.clone())
-            .bind(self.updated)
-            .bind(self.notes.clone())
-            .bind(self.pos_x)
-            .bind(self.pos_y)
-            .bind(&attachments_encoded)
-            .execute(_pool)
+
+        let _ = conn
+            .execute(sea_orm::Statement::from_sql_and_values(
+                sea_orm::DatabaseBackend::Sqlite,
+                querystring,
+                vec![
+                    self.id.to_string().into(),
+                    self.project_id.to_string().into(),
+                    self.node_type.clone().into(),
+                    self.display.clone().into(),
+                    self.value.clone().into(),
+                    self.updated.to_rfc3339().into(),
+                    self.notes.clone().into(),
+                    self.pos_x.into(),
+                    self.pos_y.into(),
+                    attachments_encoded.clone().into(),
+                    self.project_id.to_string().into(),
+                    self.node_type.clone().into(),
+                    self.display.clone().into(),
+                    self.value.clone().into(),
+                    self.updated.to_rfc3339().into(),
+                    self.notes.clone().into(),
+                    self.pos_x.into(),
+                    self.pos_y.into(),
+                    attachments_encoded.into(),
+                ],
+            ))
             .await?;
         Ok(())
     }
 
-    async fn get(pool: &SqlitePool, id: &Uuid) -> Result<Option<Self>, DBError> {
+    async fn get(conn: &DatabaseConnection, id: &Uuid) -> Result<Option<Self>, DBError> {
         let querystring = format!("SELECT * FROM {} WHERE id = ?", Self::table());
 
-        sqlx::query_as(&querystring)
-            .bind(id)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| e.into())
+        let result = conn
+            .query_all(sea_orm::Statement::from_sql_and_values(
+                sea_orm::DatabaseBackend::Sqlite,
+                querystring,
+                vec![id.to_string().into()],
+            ))
+            .await?;
+
+        if result.is_empty() {
+            return Ok(None);
+        }
+
+        let row = &result[0];
+        Ok(Some(Node::from_query_result(row, "")?))
     }
 }
 
 #[async_trait]
 pub trait NodeExt {
-    async fn get_by_project_id(pool: &SqlitePool, project_id: Uuid) -> Result<Vec<Self>, DBError>
+    async fn get_by_project_id(conn: &DatabaseConnection, project_id: Uuid) -> Result<Vec<Self>, DBError>
     where
         Self: Sized;
 }
 
 #[async_trait]
 impl NodeExt for Node {
-    async fn get_by_project_id(pool: &SqlitePool, project_id: Uuid) -> Result<Vec<Self>, DBError> {
+    async fn get_by_project_id(conn: &DatabaseConnection, project_id: Uuid) -> Result<Vec<Self>, DBError> {
         let querystring = format!("SELECT * FROM {} WHERE project_id = ?", Self::table());
-        sqlx::query_as(&querystring)
-            .bind(project_id)
-            .fetch_all(pool)
-            .await
+
+        let results = conn
+            .query_all(sea_orm::Statement::from_sql_and_values(
+                sea_orm::DatabaseBackend::Sqlite,
+                querystring,
+                vec![project_id.to_string().into()],
+            ))
+            .await?;
+
+        results
+            .iter()
+            .map(|row| Node::from_query_result(row, ""))
+            .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.into())
     }
 }
@@ -115,7 +120,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_table() {
-        let pool = start_db(None, None).await.unwrap();
+        let pool = start_db(None).await.unwrap();
         Node::create_table(&pool)
             .await
             .expect("Failed to create in-memory table for Node");
@@ -123,10 +128,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_crud() {
-        let conn = start_db(None, None).await.unwrap();
-        Node::create_table(&conn)
-            .await
-            .expect("Failed to create in-memory table for Node");
+        let conn = start_db(None).await.unwrap();
 
         let project_id = Uuid::new_v4();
         let id = Uuid::new_v4();

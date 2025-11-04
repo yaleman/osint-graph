@@ -11,5 +11,8 @@ chrono = { workspace = true, features = ["serde", "alloc"] }
 serde = { workspace = true, features = ["derive"] }
 uuid = { workspace = true, features = ["v4", "serde"] }
 
+sea-orm = { workspace = true }
+sea-query = { workspace = true }
+serde_json = { workspace = true }
 sqlx = { workspace = true }
 rand = "0.8.5"

@@ -1,6 +1,7 @@
 use axum::async_trait;
+use chrono::{DateTime, Utc};
 use osint_graph_shared::attachment::Attachment;
-use sqlx::SqlitePool;
+use sea_orm::{DatabaseConnection, FromQueryResult};
 use tracing::debug;
 use uuid::Uuid;
 
@@ -12,29 +13,13 @@ impl DBEntity for Attachment {
         "attachment"
     }
 
-    async fn create_table(pool: &SqlitePool) -> Result<(), DBError> {
-        sqlx::query(&format!(
-            "
-            CREATE TABLE IF NOT EXISTS {} (
-                id TEXT PRIMARY KEY,
-                node_id TEXT NOT NULL,
-                filename TEXT NOT NULL,
-                content_type TEXT NOT NULL,
-                size INTEGER NOT NULL,
-                data BLOB NOT NULL,
-                created TEXT NOT NULL,
-                FOREIGN KEY (node_id) REFERENCES node(id) ON DELETE CASCADE ON UPDATE CASCADE
-            )
-            ",
-            Self::table()
-        ))
-        .execute(pool)
-        .await?;
-        debug!("Created table {}", Self::table());
+    async fn create_table(_conn: &DatabaseConnection) -> Result<(), DBError> {
+        // Tables are now created via migrations
+        debug!("Skipping create table - using migrations");
         Ok(())
     }
 
-    async fn save(&self, pool: &SqlitePool) -> Result<(), DBError> {
+    async fn save(&self, conn: &DatabaseConnection) -> Result<(), DBError> {
         // Compress data with zstd before saving
         let compressed_data = zstd::encode_all(&self.data[..], 3)
             .map_err(|e| DBError::Other(format!("Failed to compress attachment data: {}", e)))?;
@@ -47,58 +32,68 @@ impl DBEntity for Attachment {
             Self::table()
         );
 
-        sqlx::query(&querystring)
-            .bind(self.id)
-            .bind(self.node_id)
-            .bind(self.filename.clone())
-            .bind(self.content_type.clone())
-            .bind(self.size)
-            .bind(&compressed_data)
-            .bind(self.created)
-            .bind(self.node_id)
-            .bind(self.filename.clone())
-            .bind(self.content_type.clone())
-            .bind(self.size)
-            .bind(&compressed_data)
-            .bind(self.created)
-            .execute(pool)
-            .await?;
+        sea_orm::Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Sqlite,
+            querystring,
+            vec![
+                self.id.to_string().into(),
+                self.node_id.to_string().into(),
+                self.filename.clone().into(),
+                self.content_type.clone().into(),
+                self.size.into(),
+                compressed_data.clone().into(),
+                self.created.to_rfc3339().into(),
+                self.node_id.to_string().into(),
+                self.filename.clone().into(),
+                self.content_type.clone().into(),
+                self.size.into(),
+                compressed_data.into(),
+                self.created.to_rfc3339().into(),
+            ],
+        )
+        .execute(conn)
+        .await?;
 
         Ok(())
     }
 
-    async fn get(pool: &SqlitePool, id: &Uuid) -> Result<Option<Self>, DBError> {
+    async fn get(conn: &DatabaseConnection, id: &Uuid) -> Result<Option<Self>, DBError> {
         let querystring = format!("SELECT * FROM {} WHERE id = ?", Self::table());
 
-        let result: Option<AttachmentRow> = sqlx::query_as(&querystring)
-            .bind(id)
-            .fetch_optional(pool)
-            .await?;
+        let result = sea_orm::Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Sqlite,
+            querystring,
+            vec![id.to_string().into()],
+        )
+        .all(conn)
+        .await?;
 
-        match result {
-            Some(row) => {
-                // Decompress data when loading
-                let decompressed_data = zstd::decode_all(&row.data[..]).map_err(|e| {
-                    DBError::Other(format!("Failed to decompress attachment data: {}", e))
-                })?;
-
-                Ok(Some(Attachment {
-                    id: row.id,
-                    node_id: row.node_id,
-                    filename: row.filename,
-                    content_type: row.content_type,
-                    size: row.size,
-                    data: decompressed_data,
-                    created: row.created,
-                }))
-            }
-            None => Ok(None),
+        if result.is_empty() {
+            return Ok(None);
         }
+
+        let row = &result[0];
+        let attachment_row = AttachmentRow::from_query_result(row, "")?;
+
+        // Decompress data when loading
+        let decompressed_data = zstd::decode_all(&attachment_row.data[..]).map_err(|e| {
+            DBError::Other(format!("Failed to decompress attachment data: {}", e))
+        })?;
+
+        Ok(Some(Attachment {
+            id: attachment_row.id,
+            node_id: attachment_row.node_id,
+            filename: attachment_row.filename,
+            content_type: attachment_row.content_type,
+            size: attachment_row.size,
+            data: decompressed_data,
+            created: attachment_row.created,
+        }))
     }
 }
 
 // Helper struct for deserializing from database (with compressed data)
-#[derive(sqlx::FromRow)]
+#[derive(FromQueryResult)]
 struct AttachmentRow {
     pub id: Uuid,
     pub node_id: Uuid,
@@ -106,43 +101,49 @@ struct AttachmentRow {
     pub content_type: String,
     pub size: i64,
     pub data: Vec<u8>,
-    pub created: sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>,
+    pub created: DateTime<Utc>,
 }
 
 /// Extension trait for attachment-specific operations
 #[async_trait]
 pub trait AttachmentExt {
     /// Get all attachments for a specific node
-    async fn get_by_node_id(pool: &SqlitePool, node_id: Uuid) -> Result<Vec<Self>, DBError>
+    async fn get_by_node_id(conn: &DatabaseConnection, node_id: Uuid) -> Result<Vec<Self>, DBError>
     where
         Self: Sized;
 }
 
 #[async_trait]
 impl AttachmentExt for Attachment {
-    async fn get_by_node_id(pool: &SqlitePool, node_id: Uuid) -> Result<Vec<Self>, DBError> {
+    async fn get_by_node_id(conn: &DatabaseConnection, node_id: Uuid) -> Result<Vec<Self>, DBError> {
         let querystring = format!("SELECT * FROM {} WHERE node_id = ?", Self::table());
 
-        let rows: Vec<AttachmentRow> = sqlx::query_as(&querystring)
-            .bind(node_id)
-            .fetch_all(pool)
-            .await?;
+        let results = sea_orm::Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Sqlite,
+            querystring,
+            vec![node_id.to_string().into()],
+        )
+        .all(conn)
+        .await?;
 
-        // Decompress all attachments
-        rows.into_iter()
+        // Convert rows and decompress all attachments
+        results
+            .iter()
             .map(|row| {
-                let decompressed_data = zstd::decode_all(&row.data[..]).map_err(|e| {
+                let attachment_row = AttachmentRow::from_query_result(row, "")?;
+
+                let decompressed_data = zstd::decode_all(&attachment_row.data[..]).map_err(|e| {
                     DBError::Other(format!("Failed to decompress attachment data: {}", e))
                 })?;
 
                 Ok(Attachment {
-                    id: row.id,
-                    node_id: row.node_id,
-                    filename: row.filename,
-                    content_type: row.content_type,
-                    size: row.size,
+                    id: attachment_row.id,
+                    node_id: attachment_row.node_id,
+                    filename: attachment_row.filename,
+                    content_type: attachment_row.content_type,
+                    size: attachment_row.size,
                     data: decompressed_data,
-                    created: row.created,
+                    created: attachment_row.created,
                 })
             })
             .collect()
@@ -158,7 +159,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_table() {
-        let conn = start_db(None, None).await.unwrap();
+        let conn = start_db(None).await.unwrap();
         Attachment::create_table(&conn)
             .await
             .expect("Failed to create attachment table");
@@ -166,10 +167,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_attachment_crud_with_compression() {
-        let conn = start_db(None, None).await.unwrap();
-        Attachment::create_table(&conn)
-            .await
-            .expect("Failed to create attachment table");
+        let conn = start_db(None).await.unwrap();
 
         // Create project and node first
         let project_id = Uuid::new_v4();
@@ -250,10 +248,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cascade_deletion() {
-        let conn = start_db(None, None).await.unwrap();
-        Attachment::create_table(&conn)
-            .await
-            .expect("Failed to create attachment table");
+        let conn = start_db(None).await.unwrap();
 
         // Create project, node, and attachment
         let project_id = Uuid::new_v4();

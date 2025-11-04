@@ -1,4 +1,6 @@
-pub mod db;
+// pub mod db;
+pub mod entity;
+pub mod migration;
 
 pub mod identifier;
 pub mod kvstore;
@@ -24,17 +26,19 @@ use project::{
     get_nodes_by_project, get_project, get_projects, post_node, post_nodelink, post_project,
     update_project,
 };
-use sqlx::SqlitePool;
+use sea_orm::DatabaseConnection;
 use std::{borrow::Cow, sync::Arc, time::Duration};
 use tokio::sync::RwLock;
 use tower::{BoxError, ServiceBuilder};
 use tower_http::{services::ServeDir, set_header::SetResponseHeaderLayer, trace::TraceLayer};
 use tracing::error;
 
+use crate::project::update_node;
+
 pub type SharedState = Arc<RwLock<AppState>>;
 
 pub struct AppState {
-    pub conn: SqlitePool,
+    pub conn: DatabaseConnection,
 }
 
 impl AppState {
@@ -45,7 +49,7 @@ impl AppState {
 
     #[cfg(test)]
     pub async fn test() -> Self {
-        let db = storage::start_db(None, None)
+        let db = storage::start_db(None)
             .await
             .expect("Failed to start test DB");
         Self { conn: db }
@@ -60,6 +64,7 @@ pub fn build_app<T>(shared_state: &SharedState) -> Router<T> {
         .route("/api/v1/node", post(post_node))
         .route("/api/v1/node/:id", get(get_node))
         .route("/api/v1/node/:id", delete(delete_node))
+        .route("/api/v1/node/:id", put(update_node))
         .route("/api/v1/nodelink", post(post_nodelink))
         .route("/api/v1/nodelink/:id", delete(delete_nodelink))
         .route(

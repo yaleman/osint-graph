@@ -1,6 +1,6 @@
 use axum::async_trait;
 use osint_graph_shared::project::Project;
-use sqlx::SqlitePool;
+use sea_orm::{ConnectionTrait, DatabaseConnection};
 use tracing::debug;
 use uuid::Uuid;
 
@@ -12,29 +12,13 @@ impl DBEntity for Project {
         "project"
     }
 
-    async fn create_table(pool: &SqlitePool) -> Result<(), DBError> {
-        sqlx::query(&format!(
-            "
-            CREATE TABLE IF NOT EXISTS {} (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                user TEXT NOT NULL,
-                creationdate TEXT NOT NULL,
-                last_updated TEXT,
-                nodes TEXT,
-                description TEXT,
-                tags TEXT
-            )
-            ",
-            Self::table()
-        ))
-        .execute(pool)
-        .await?;
-        debug!("Created table {}", Self::table());
+    async fn create_table(_conn: &DatabaseConnection) -> Result<(), DBError> {
+        // Tables are now created via migrations
+        debug!("Skipping create table - using migrations");
         Ok(())
     }
 
-    async fn save(&self, pool: &SqlitePool) -> Result<(), DBError> {
+    async fn save(&self, conn: &DatabaseConnection) -> Result<(), DBError> {
         let querystring = format!(
             "INSERT INTO {} (id, name, user, creationdate, last_updated, nodes, description, tags ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO
@@ -44,53 +28,85 @@ impl DBEntity for Project {
         let nodes_encoded = serde_json::to_string(&self.nodes)?;
         let tags_encoded = serde_json::to_string(&self.tags)?;
 
-        sqlx::query(&querystring)
-            .bind(self.id)
-            .bind(self.name.clone())
-            .bind(self.user)
-            .bind(self.creationdate)
-            .bind(self.last_updated)
-            .bind(&nodes_encoded)
-            .bind(self.description.clone())
-            .bind(&tags_encoded)
-            .bind(self.name.clone())
-            .bind(self.user)
-            .bind(self.creationdate)
-            .bind(self.last_updated)
-            .bind(&nodes_encoded)
-            .bind(self.description.clone())
-            .bind(&tags_encoded)
-            .execute(pool)
+        let _ = conn
+            .execute(sea_orm::Statement::from_sql_and_values(
+                sea_orm::DatabaseBackend::Sqlite,
+                querystring,
+                vec![
+                    self.id.to_string().into(),
+                    self.name.clone().into(),
+                    self.user.to_string().into(),
+                    self.creationdate.to_rfc3339().into(),
+                    self.last_updated.map(|d| d.to_rfc3339()).into(),
+                    nodes_encoded.clone().into(),
+                    self.description.clone().into(),
+                    tags_encoded.clone().into(),
+                    self.name.clone().into(),
+                    self.user.to_string().into(),
+                    self.creationdate.to_rfc3339().into(),
+                    self.last_updated.map(|d| d.to_rfc3339()).into(),
+                    nodes_encoded.into(),
+                    self.description.clone().into(),
+                    tags_encoded.into(),
+                ],
+            ))
             .await?;
 
         Ok(())
     }
 
-    async fn get(pool: &SqlitePool, id: &Uuid) -> Result<Option<Self>, DBError> {
-        let querystring = format!("SELECT * FROM {} WHERE id = ?", Self::table());
-
-        sqlx::query_as(&querystring)
-            .bind(id)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| e.into())
+    async fn get(conn: &DatabaseConnection, id: &Uuid) -> Result<Option<Self>, DBError> {
+        get_project_by_id(conn, id).await
     }
+}
+
+// Helper function since we can't add impl blocks to types from other crates
+async fn get_project_by_id(conn: &DatabaseConnection, id: &Uuid) -> Result<Option<Project>, DBError> {
+    use sea_orm::FromQueryResult;
+
+    let querystring = format!("SELECT * FROM {} WHERE id = ?", Project::table());
+
+    let result = conn
+        .query_all(sea_orm::Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Sqlite,
+            querystring,
+            vec![id.to_string().into()],
+        ))
+        .await?;
+
+    if result.is_empty() {
+        return Ok(None);
+    }
+
+    let row = &result[0];
+    Ok(Some(Project::from_query_result(row, "")?))
 }
 
 #[async_trait]
 pub trait DBProjectExt {
-    async fn get_all(conn: &SqlitePool) -> Result<Vec<Self>, DBError>
+    async fn get_all(conn: &DatabaseConnection) -> Result<Vec<Self>, DBError>
     where
         Self: Sized;
 }
 
 #[async_trait]
 impl DBProjectExt for Project {
-    async fn get_all(conn: &SqlitePool) -> Result<Vec<Self>, DBError> {
+    async fn get_all(conn: &DatabaseConnection) -> Result<Vec<Self>, DBError> {
+        use sea_orm::FromQueryResult;
+
         let querystring = format!("SELECT * FROM {}", Project::table());
-        sqlx::query_as(&querystring)
-            .fetch_all(conn)
-            .await
+
+        let results = conn
+            .query_all(sea_orm::Statement::from_string(
+                sea_orm::DatabaseBackend::Sqlite,
+                querystring,
+            ))
+            .await?;
+
+        results
+            .iter()
+            .map(|row| Project::from_query_result(row, ""))
+            .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.into())
     }
 }
@@ -106,7 +122,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_node_create_table() {
-        let conn = start_db(None, None).await.unwrap();
+        let conn = start_db(None).await.unwrap();
         Project::create_table(&conn)
             .await
             .expect("Failed to create in-memory table for Project");
@@ -114,10 +130,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_crud() {
-        let conn = start_db(None, None).await.unwrap();
-        Project::create_table(&conn)
-            .await
-            .expect("Failed to create in-memory table for Project");
+        let conn = start_db(None).await.unwrap();
 
         let id = Uuid::new_v4();
         let user = Uuid::new_v4();

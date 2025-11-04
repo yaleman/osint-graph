@@ -1,12 +1,13 @@
 use std::net::TcpListener;
 
 use rand::Rng;
+use sea_orm::FromJsonQueryResult;
+use serde::{Deserialize, Serialize};
 
 pub mod attachment;
 pub mod data;
 pub mod node;
 pub mod nodelink;
-pub mod project;
 pub mod storage;
 
 pub struct AddrInfo {
@@ -92,5 +93,20 @@ mod tests {
 
         let _ = AddrInfo::from_env();
         let _ = AddrInfo::test();
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult)]
+pub struct StringVec(pub Vec<String>);
+
+impl StringVec {
+    pub fn empty() -> Self {
+        Self(Vec::new())
+    }
+}
+
+impl Default for StringVec {
+    fn default() -> Self {
+        Self::empty()
     }
 }

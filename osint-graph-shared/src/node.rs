@@ -12,26 +12,6 @@ pub struct NodePosition {
     pub y: i32,
 }
 
-#[derive(Encode, Decode, FromRow, Debug, Clone, Eq, PartialEq, Default, Deserialize, Serialize)]
-pub struct Node {
-    pub project_id: Uuid,
-    #[serde(default = "Uuid::new_v4")]
-    pub id: Uuid,
-    pub node_type: String,
-    pub display: String,
-    pub value: String,
-    pub updated: DateTime<Utc>,
-    pub notes: Option<String>,
-    // TODO: ownership
-    // pub position: NodePosition,
-    pub pos_x: Option<i32>,
-    pub pos_y: Option<i32>,
-    /// IDs of attachments associated with this node
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[sqlx(json)]
-    pub attachments: Vec<Uuid>,
-}
-
 #[derive(Debug, Clone, sqlx::Type, FromRow, Deserialize, Serialize)]
 pub struct NodeUpdateList(HashMap<Uuid, DateTime<Utc>>);
 
@@ -106,48 +86,6 @@ mod tests {
         let pos = NodePosition { x: 100, y: 200 };
         assert_eq!(pos.x, 100);
         assert_eq!(pos.y, 200);
-    }
-
-    #[test]
-    fn test_node_creation() {
-        let project_id = Uuid::new_v4();
-        let node_id = Uuid::new_v4();
-        let now = Utc::now();
-
-        let node = Node {
-            project_id,
-            id: node_id,
-            node_type: "person".to_string(),
-            display: "John Doe".to_string(),
-            value: "john.doe@example.com".to_string(),
-            updated: now,
-            notes: Some("Test person".to_string()),
-            pos_x: Some(100),
-            pos_y: Some(200),
-            attachments: Vec::new(),
-        };
-
-        assert_eq!(node.project_id, project_id);
-        assert_eq!(node.id, node_id);
-        assert_eq!(node.node_type, "person");
-        assert_eq!(node.display, "John Doe");
-        assert_eq!(node.value, "john.doe@example.com");
-        assert_eq!(node.updated, now);
-        assert_eq!(node.notes, Some("Test person".to_string()));
-        assert_eq!(node.pos_x, Some(100));
-        assert_eq!(node.pos_y, Some(200));
-    }
-
-    #[test]
-    fn test_node_default() {
-        let node = Node::default();
-        assert_eq!(node.project_id, Uuid::nil());
-        assert_eq!(node.node_type, "");
-        assert_eq!(node.display, "");
-        assert_eq!(node.value, "");
-        assert_eq!(node.notes, None);
-        assert_eq!(node.pos_x, None);
-        assert_eq!(node.pos_y, None);
     }
 
     #[test]

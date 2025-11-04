@@ -56,9 +56,12 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
 		setLoading(true);
 		try {
 			const updatedProject = await updateProject(currentProject.id, {
+				id: currentProject.id,
+				user: currentProject.user,
+				creationdate: currentProject.creationdate,
 				name: projectName,
-				...(projectDescription.trim() && { description: projectDescription }),
 				tags: projectTags,
+				...(projectDescription.trim() && { description: projectDescription }),
 			});
 			onProjectUpdate(updatedProject);
 			toast.success("Project updated successfully");

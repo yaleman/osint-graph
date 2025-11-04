@@ -96,7 +96,7 @@ export const deleteNodeLink = async (nodelinkId: string): Promise<void> => {
 	await axios.delete(`${NODELINK_URL}/${nodelinkId}`);
 };
 
-export const updateProject = async (projectId: string, project: Partial<Project>): Promise<Project> => {
+export const updateProject = async (projectId: string, project: Project): Promise<Project> => {
 	const response = await axios.put<Project>(`${PROJECT_URL}/${projectId}`, project);
 	return response.data;
 };

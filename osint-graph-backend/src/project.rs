@@ -3,6 +3,7 @@ use axum::http::header::CONTENT_TYPE;
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use axum::Json;
+use sea_orm::ActiveValue::Set;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter,
     TryIntoModel,
@@ -27,17 +28,13 @@ pub async fn post_project(
     {
         Some(val) => {
             let mut target_project = val.into_active_model();
-            target_project
-                .description
-                .set_if_not_equals(project.description);
-            target_project.name.set_if_not_equals(project.name);
-            target_project.tags.set_if_not_equals(project.tags.clone());
-            target_project
-                .last_updated
-                .set_if_not_equals(Some(Utc::now()));
+            target_project.description = Set(project.description);
+            target_project.name = Set(project.name);
+            target_project.tags = Set(project.tags.clone());
+            target_project.last_updated = Set(Some(Utc::now()));
 
             target_project
-                .save(&state.read().await.conn)
+                .update(&state.read().await.conn)
                 .await
                 .inspect_err(|err| error!("Failed to update project: {:?}", err))?
                 .try_into_model()?
@@ -272,18 +269,16 @@ pub async fn update_node(
             // Update the node ID to match the path parameter
             debug!("Updating node {}: {:?}", id, node);
             let mut db_node = db_node.into_active_model();
-            db_node.node_type.set_if_not_equals(node.node_type);
-            db_node.display.set_if_not_equals(node.display);
-            db_node.value.set_if_not_equals(node.value);
-            db_node.updated.set_if_not_equals(Utc::now());
-            db_node.notes.set_if_not_equals(node.notes);
-            db_node.pos_x.set_if_not_equals(node.pos_x);
-            db_node.pos_y.set_if_not_equals(node.pos_y);
-            db_node
-                .attachments
-                .set_if_not_equals(node.attachments.clone());
+            db_node.node_type = Set(node.node_type);
+            db_node.display = Set(node.display);
+            db_node.value = Set(node.value);
+            db_node.updated = Set(Utc::now());
+            db_node.notes = Set(node.notes);
+            db_node.pos_x = Set(node.pos_x);
+            db_node.pos_y = Set(node.pos_y);
+            db_node.attachments = Set(node.attachments.clone());
 
-            let res = db_node.save(conn).await?;
+            let res = db_node.update(conn).await?;
             Ok(Json(res.try_into_model()?))
         }
         None => {
@@ -331,14 +326,12 @@ pub async fn update_project(
             // Update the project ID to match the path parameter
             debug!("Updating project {}: {:?}", id, project);
             let mut db_project = db_project.into_active_model();
-            db_project
-                .description
-                .set_if_not_equals(project.description);
-            db_project.name.set_if_not_equals(project.name);
-            db_project.tags.set_if_not_equals(project.tags.clone());
-            db_project.last_updated.set_if_not_equals(Some(Utc::now()));
-
-            let res = db_project.save(conn).await?;
+            db_project.description = Set(project.description);
+            db_project.name = Set(project.name);
+            db_project.tags = Set(project.tags.clone());
+            db_project.last_updated = Set(Some(Utc::now()));
+            debug!("db_project.is_changed(): {}", db_project.is_changed());
+            let res = db_project.update(conn).await?;
             Ok(Json(res.try_into_model()?))
         }
         None => {

@@ -57,7 +57,7 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
 		try {
 			const updatedProject = await updateProject(currentProject.id, {
 				name: projectName,
-				description: projectDescription || undefined,
+				...(projectDescription.trim() && { description: projectDescription }),
 				tags: projectTags,
 			});
 			onProjectUpdate(updatedProject);

@@ -24,9 +24,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.4
-        with:
-          version: "v0.4.2"
+        uses: mozilla-actions/sccache-action@v0.0.9
       - name: "Build the workspace (debug)"
         run: cargo build --workspace
       - name: "Run cargo test"
@@ -43,8 +41,6 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.4
-        with:
-          version: "v0.4.2"
+        uses: mozilla-actions/sccache-action@v0.0.9
       - name: "Build the workspace (release)"
         run: cargo build --workspace --release

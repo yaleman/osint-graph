@@ -15,13 +15,14 @@ use axum::{
     error_handling::HandleErrorLayer,
     http::{header, Response, StatusCode},
     response::IntoResponse,
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
     Router,
 };
 // use dev_websocket::ws_handler;
 use project::{
-    delete_node, delete_nodelink, get_node, get_nodelinks_by_project, get_nodes_by_project,
-    get_project, get_projects, post_node, post_nodelink, post_project,
+    delete_node, delete_nodelink, delete_project, get_node, get_nodelinks_by_project,
+    get_nodes_by_project, get_project, get_projects, post_node, post_nodelink, post_project,
+    update_project,
 };
 use sqlx::SqlitePool;
 use std::{borrow::Cow, sync::Arc, time::Duration};
@@ -67,6 +68,8 @@ pub fn build_app<T>(shared_state: &SharedState) -> Router<T> {
         )
         .route("/api/v1/project", post(post_project))
         .route("/api/v1/project/:id", get(get_project))
+        .route("/api/v1/project/:id", put(update_project))
+        .route("/api/v1/project/:id", delete(delete_project))
         .route("/api/v1/project/:id/nodes", get(get_nodes_by_project))
         .route("/api/v1/projects", get(get_projects));
 

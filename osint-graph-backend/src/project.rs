@@ -5,6 +5,7 @@ use axum::Json;
 use osint_graph_shared::node::Node;
 use osint_graph_shared::nodelink::NodeLink;
 use osint_graph_shared::project::Project;
+use sqlx::types::chrono::Utc;
 use tracing::debug;
 use uuid::Uuid;
 
@@ -249,6 +250,92 @@ pub async fn delete_nodelink(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Error deleting nodelink: {:?}", err),
+            )
+        }
+    }
+}
+
+/// PUT handler to update an existing project
+pub async fn update_project(
+    Path(id): Path<Uuid>,
+    State(state): State<SharedState>,
+    Json(mut project): Json<Project>,
+) -> impl IntoResponse {
+    let conn = &state.read().await.conn;
+
+    // Verify project exists first
+    match Project::get(conn, &id).await {
+        Ok(Some(_)) => {
+            // Update the project ID to match the path parameter
+            project.id = id;
+            project.last_updated = Some(Utc::now());
+
+            match project.save(conn).await {
+                Ok(()) => {
+                    debug!("Updated project: {}", id);
+                    (
+                        StatusCode::OK,
+                        serde_json::to_string_pretty(&project)
+                            .expect("Failed to serialize project response"),
+                    )
+                }
+                Err(err) => {
+                    debug!("Error updating project {}: {:?}", id, err);
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Error updating project: {:?}", err),
+                    )
+                }
+            }
+        }
+        Ok(None) => {
+            debug!("Project {} not found for update", id);
+            (StatusCode::NOT_FOUND, format!("Project {} not found", id))
+        }
+        Err(err) => {
+            debug!("Error checking project existence: {:?}", err);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Error checking project: {:?}", err),
+            )
+        }
+    }
+}
+
+/// DELETE handler to delete a project and cascade to nodes/nodelinks
+pub async fn delete_project(
+    Path(id): Path<Uuid>,
+    State(state): State<SharedState>,
+) -> impl IntoResponse {
+    let conn = &state.read().await.conn;
+
+    // Verify project exists first
+    match Project::get(conn, &id).await {
+        Ok(Some(_)) => {
+            // Delete the project - cascade should handle nodes and nodelinks automatically
+            match Project::delete_by_id(conn, id).await {
+                Ok(()) => {
+                    debug!("Deleted project: {}", id);
+                    (StatusCode::OK, "Project deleted successfully".to_string())
+                }
+                Err(err) => {
+                    debug!("Error deleting project {}: {:?}", id, err);
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Error deleting project: {:?}", err),
+                    )
+                }
+            }
+        }
+        Ok(None) => {
+            debug!("Project {} not found for deletion", id);
+            (StatusCode::NOT_FOUND, format!("Project {} not found", id))
+        }
+        Err(err) => {
+            debug!("Error checking project existence: {:?}", err);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Error checking project: {:?}", err),
             )
         }
     }

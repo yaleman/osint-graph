@@ -30,14 +30,14 @@
 - [ ] Write tests for Attachment CRUD with compression/decompression
 - [ ] Write tests for cascade deletion (deleting node deletes attachments)
 
-### 1.3 Backend API Endpoints - Project Management
-- [ ] Add `PUT /api/v1/project/:id` endpoint in `osint-graph-backend/src/lib.rs`
-- [ ] Implement `update_project` handler in `osint-graph-backend/src/project.rs`
-- [ ] Write test for PUT /api/v1/project/:id
-- [ ] Add `DELETE /api/v1/project/:id` endpoint in `osint-graph-backend/src/lib.rs`
-- [ ] Implement `delete_project` handler with cascade deletion (nodes -> attachments, nodelinks)
-- [ ] Write test for DELETE /api/v1/project/:id with cascade verification
-- [ ] Write test for DELETE returning 404 for non-existent project
+### 1.3 Backend API Endpoints - Project Management ✅
+- [x] Add `PUT /api/v1/project/:id` endpoint in `osint-graph-backend/src/lib.rs`
+- [x] Implement `update_project` handler in `osint-graph-backend/src/project.rs`
+- [x] Write test for PUT /api/v1/project/:id
+- [x] Add `DELETE /api/v1/project/:id` endpoint in `osint-graph-backend/src/lib.rs`
+- [x] Implement `delete_project` handler with cascade deletion (nodes -> attachments, nodelinks)
+- [x] Write test for DELETE /api/v1/project/:id with cascade verification
+- [x] Write test for DELETE returning 404 for non-existent project
 
 ### 1.4 Backend API Endpoints - Export/Import
 - [ ] Add `GET /api/v1/project/:id/export` endpoint

@@ -428,3 +428,182 @@ async fn test_api_node_foreign_key_constraint() {
         .await;
     assert_eq!(res.status_code(), 404); // Project not found
 }
+
+#[tokio::test]
+async fn test_api_update_project() {
+    let server = setup_test_server().await;
+
+    // Create a project first
+    let project_id = Uuid::new_v4();
+    let user_id = Uuid::new_v4();
+    let project = Project {
+        id: project_id,
+        name: "Original Name".to_string(),
+        user: user_id,
+        creationdate: chrono::Utc::now(),
+        last_updated: None,
+        nodes: Default::default(),
+        description: None,
+        tags: Vec::new(),
+    };
+
+    server
+        .post("/api/v1/project")
+        .json(&project)
+        .await
+        .assert_status_ok();
+
+    // Update the project with new data
+    let updated_project = Project {
+        id: project_id,
+        name: "Updated Name".to_string(),
+        user: user_id,
+        creationdate: chrono::Utc::now(),
+        last_updated: None,
+        nodes: Default::default(),
+        description: Some("A test description".to_string()),
+        tags: vec!["tag1".to_string(), "tag2".to_string()],
+    };
+
+    let res = server
+        .put(&format!("/api/v1/project/{}", project_id))
+        .json(&updated_project)
+        .await;
+    res.assert_status_ok();
+
+    // Verify the update
+    let res = server
+        .get(&format!("/api/v1/project/{}", project_id))
+        .await;
+    res.assert_status_ok();
+    let retrieved_project: Project = res.json();
+    assert_eq!(retrieved_project.id, project_id);
+    assert_eq!(retrieved_project.name, "Updated Name");
+    assert_eq!(
+        retrieved_project.description,
+        Some("A test description".to_string())
+    );
+    assert_eq!(
+        retrieved_project.tags,
+        vec!["tag1".to_string(), "tag2".to_string()]
+    );
+    assert!(retrieved_project.last_updated.is_some());
+
+    // Test updating non-existent project
+    let res = server
+        .put(&format!("/api/v1/project/{}", Uuid::new_v4()))
+        .json(&updated_project)
+        .expect_failure()
+        .await;
+    assert_eq!(res.status_code(), 404);
+}
+
+#[tokio::test]
+async fn test_api_delete_project() {
+    let server = setup_test_server().await;
+
+    // Create a project
+    let project_id = Uuid::new_v4();
+    let project = Project {
+        id: project_id,
+        name: "Project to Delete".to_string(),
+        user: Uuid::new_v4(),
+        creationdate: chrono::Utc::now(),
+        last_updated: None,
+        nodes: Default::default(),
+        description: Some("Will be deleted".to_string()),
+        tags: vec!["test".to_string()],
+    };
+
+    server
+        .post("/api/v1/project")
+        .json(&project)
+        .await
+        .assert_status_ok();
+
+    // Create some nodes for the project
+    let node_id1 = Uuid::new_v4();
+    let node1 = Node {
+        project_id,
+        id: node_id1,
+        node_type: "person".to_string(),
+        display: "Test Person".to_string(),
+        value: "test".to_string(),
+        updated: chrono::Utc::now(),
+        notes: None,
+        pos_x: None,
+        pos_y: None,
+    };
+
+    let node_id2 = Uuid::new_v4();
+    let node2 = Node {
+        project_id,
+        id: node_id2,
+        node_type: "email".to_string(),
+        display: "test@example.com".to_string(),
+        value: "test@example.com".to_string(),
+        updated: chrono::Utc::now(),
+        notes: None,
+        pos_x: None,
+        pos_y: None,
+    };
+
+    server
+        .post("/api/v1/node")
+        .json(&node1)
+        .await
+        .assert_status_ok();
+    server
+        .post("/api/v1/node")
+        .json(&node2)
+        .await
+        .assert_status_ok();
+
+    // Verify nodes exist
+    server
+        .get(&format!("/api/v1/node/{}", node_id1))
+        .await
+        .assert_status_ok();
+    server
+        .get(&format!("/api/v1/node/{}", node_id2))
+        .await
+        .assert_status_ok();
+
+    // Delete the project
+    let res = server
+        .delete(&format!("/api/v1/project/{}", project_id))
+        .await;
+    res.assert_status_ok();
+
+    // Verify project is deleted
+    let res = server
+        .get(&format!("/api/v1/project/{}", project_id))
+        .expect_failure()
+        .await;
+    assert_eq!(res.status_code(), 404);
+
+    // Verify cascade deletion - nodes should also be deleted
+    let res = server
+        .get(&format!("/api/v1/node/{}", node_id1))
+        .expect_failure()
+        .await;
+    assert_eq!(res.status_code(), 404);
+
+    let res = server
+        .get(&format!("/api/v1/node/{}", node_id2))
+        .expect_failure()
+        .await;
+    assert_eq!(res.status_code(), 404);
+}
+
+#[tokio::test]
+async fn test_api_delete_project_not_found() {
+    let server = setup_test_server().await;
+
+    // Try to delete non-existent project
+    let res = server
+        .delete(&format!("/api/v1/project/{}", Uuid::new_v4()))
+        .expect_failure()
+        .await;
+    assert_eq!(res.status_code(), 404);
+}

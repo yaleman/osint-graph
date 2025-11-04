@@ -1,5 +1,42 @@
 # Project Management UI Implementation TODO
 
+## Phase 0: Database Migration to SeaORM ✅
+
+### 0.1 SeaORM Setup
+- [x] Update sqlx dependency to 0.8.4 for compatibility
+- [x] Add SeaORM and sea-orm-migration dependencies to backend
+- [x] Add chrono dependency with serde features
+
+### 0.2 Migration Infrastructure
+- [x] Create migration module in `osint-graph-backend/src/migration/`
+- [x] Create initial migration for all existing tables (project, node, nodelink, attachment)
+- [x] Set up foreign key constraints in migrations
+- [x] Configure automatic migration execution on startup
+
+### 0.3 Entity Definitions
+- [x] Create SeaORM entity for Project in `src/entity/project.rs`
+- [x] Create SeaORM entity for Node in `src/entity/node.rs`
+- [x] Create SeaORM entity for NodeLink in `src/entity/nodelink.rs`
+- [x] Create SeaORM entity for Attachment in `src/entity/attachment.rs`
+- [x] Define entity relationships (belongs_to, has_many)
+
+### 0.4 Database Layer Refactoring
+- [x] Replace SqlitePool with DatabaseConnection in AppState
+- [x] Update storage.rs to use SeaORM Database::connect
+- [x] Refactor DBEntity trait to use ConnectionTrait
+- [x] Update all database operations to use ConnectionTrait::execute and query_all
+- [x] Update project database operations for SeaORM
+- [x] Update node database operations for SeaORM
+- [x] Update nodelink database operations for SeaORM
+- [x] Update attachment database operations for SeaORM
+
+### 0.5 Testing & Documentation
+- [x] Update all test functions to use new start_db signature
+- [x] Verify all tests pass with SeaORM
+- [x] Update CLAUDE.md with SeaORM architecture details
+- [x] Document migration system in CLAUDE.md
+- [x] Commit SeaORM migration changes
+
 ## Phase 1: Backend Schema & Database
 
 ### 1.2 File Attachment Schema ✅

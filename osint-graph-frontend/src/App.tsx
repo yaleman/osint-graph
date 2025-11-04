@@ -553,8 +553,11 @@ function AppContent() {
   const handleNodeDoubleClick = useCallback((event: React.MouseEvent, node: Node) => {
     event.stopPropagation();
     setEditingNode(node.id);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     setEditDisplay(node.data.osintNode?.display || node.data.label || '');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     setEditValue(node.data.osintNode?.value || '');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     setEditNotes(node.data.osintNode?.notes || '');
   }, []);
 
@@ -568,6 +571,7 @@ function AppContent() {
       nds.map((node) => {
         if (node.id === editingNode) {
           const updatedOSINTNode: OSINTNode = {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             ...node.data.osintNode,
             display: editDisplay,
             value: editValue,
@@ -611,6 +615,7 @@ function AppContent() {
     changes.forEach(change => {
       if (change.type === 'position' && change.position) {
         const node = nodes.find(n => n.id === change.id);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         if (node?.data.osintNode) {
           const projectId = localStorage.getItem(PROJECT_ID_KEY);
           if (!projectId || projectId === "undefined" || projectId.trim() === "") {
@@ -619,6 +624,7 @@ function AppContent() {
           }
 
           const updatedNode: OSINTNode = {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             ...node.data.osintNode,
             project_id: projectId,
             pos_x: Math.round(change.position.x),

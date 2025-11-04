@@ -4,7 +4,9 @@ export interface Project {
 	name: string;
 	user: string;
 	creationdate: Date;
+	last_updated?: Date;
 	tags: string[];
+	description?: string;
 	// Add other fields as necessary
 }
 

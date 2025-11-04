@@ -400,6 +400,8 @@ pub struct ProjectExport {
     pub project: project::Model,
     pub nodes: Vec<node::Model>,
     pub nodelinks: Vec<nodelink::Model>,
+    pub exported_at: chrono::DateTime<Utc>,
+    pub version: String,
 }
 
 pub async fn export_project(
@@ -435,5 +437,7 @@ pub async fn export_project(
         project,
         nodes,
         nodelinks,
+        exported_at: Utc::now(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
     }))
 }

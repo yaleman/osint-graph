@@ -50,7 +50,7 @@ export function ProjectSelector({ currentProject, onProjectChange, onCreateNew }
           }}
         >
           <span>📁</span>
-          <span>{currentProject?.name || 'No Project'}</span>
+          <span>{currentProject?.name ?? 'No Project'}</span>
           <span style={{ fontSize: '10px' }}>{isOpen ? '▲' : '▼'}</span>
         </button>
 

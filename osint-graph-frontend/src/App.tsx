@@ -11,6 +11,7 @@ import ReactFlow, {
   OnConnect,
   OnNodesChange,
   OnEdgesChange,
+  useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { v4 as uuidv4 } from 'uuid';
@@ -30,6 +31,7 @@ const DEBOUNCE_DELAY = 100; // ms
 export default function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const { project } = useReactFlow();
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
   const [editingNode, setEditingNode] = useState<string | null>(null);
   const [editDisplay, setEditDisplay] = useState('');
@@ -446,52 +448,29 @@ export default function App() {
     }
   }, [loadProjectData]);
 
-  // Helper function to check if a position overlaps with existing nodes
-  const findNonOverlappingPosition = useCallback((bounds: DOMRect, existingNodes: Node[]): { x: number; y: number } => {
-    const PANEL_WIDTH = 230; // 220px panel + 10px margin
-    const NODE_WIDTH = 180;
-    const NODE_HEIGHT = 80; // Approximate node height
-    const MIN_DISTANCE = 200; // Minimum distance from other nodes
-    const MAX_ATTEMPTS = 50;
-
-    // Calculate safe area (avoiding right panel)
-    const safeWidth = bounds.width - PANEL_WIDTH - NODE_WIDTH;
-    const safeHeight = bounds.height - NODE_HEIGHT;
-
-    // Center of safe area
-    const centerX = safeWidth / 2;
-    const centerY = safeHeight / 2;
-
-    const checkOverlap = (x: number, y: number): boolean => {
-      return existingNodes.some(node => {
-        const dx = Math.abs(node.position.x - x);
-        const dy = Math.abs(node.position.y - y);
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        return distance < MIN_DISTANCE;
-      });
-    };
-
-    // Try to find a non-overlapping position
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-      // Start near center and spiral outward
-      const angle = (attempt * 137.5) * (Math.PI / 180); // Golden angle
-      const radius = 50 + (attempt * 30); // Spiral outward
-      const x = centerX + Math.cos(angle) * radius;
-      const y = centerY + Math.sin(angle) * radius;
-
-      // Ensure position is within safe bounds
-      if (x >= 0 && x <= safeWidth && y >= 0 && y <= safeHeight) {
-        if (!checkOverlap(x, y)) {
-          return { x: Math.round(x), y: Math.round(y) };
-        }
-      }
+  // Get viewport center position for new nodes
+  const getViewportCenterPosition = useCallback((): { x: number; y: number } => {
+    const reactFlowBounds = document.querySelector('.react-flow')?.getBoundingClientRect();
+    if (!reactFlowBounds) {
+      return { x: 400, y: 300 }; // Fallback position
     }
 
-    // Fallback: return center with random offset
-    const fallbackX = centerX + (Math.random() * 100 - 50);
-    const fallbackY = centerY + (Math.random() * 100 - 50);
-    return { x: Math.round(fallbackX), y: Math.round(fallbackY) };
-  }, []);
+    // Get the center of the visible viewport
+    const centerX = reactFlowBounds.width / 2;
+    const centerY = reactFlowBounds.height / 2;
+
+    // Convert screen coordinates to flow coordinates
+    const position = project({ x: centerX, y: centerY });
+
+    // Add small random offset to prevent exact stacking
+    const offsetX = (Math.random() - 0.5) * 40; // ±20px
+    const offsetY = (Math.random() - 0.5) * 40; // ±20px
+
+    return {
+      x: Math.round(position.x + offsetX),
+      y: Math.round(position.y + offsetY)
+    };
+  }, [project]);
 
   const createOSINTNode = useCallback(async (nodeType: string) => {
     let projectId = localStorage.getItem(PROJECT_ID_KEY);
@@ -508,10 +487,8 @@ export default function App() {
       }
     }
 
-    // Find a good position that avoids the right panel and existing nodes
-    const reactFlowBounds = document.querySelector('.react-flow')?.getBoundingClientRect();
-    const bounds = reactFlowBounds || { width: 1200, height: 800 } as DOMRect;
-    const position = findNonOverlappingPosition(bounds, nodes);
+    // Place new node at viewport center with small random offset
+    const position = getViewportCenterPosition();
     const x = position.x;
     const y = position.y;
 
@@ -565,7 +542,7 @@ export default function App() {
       console.error('Failed to save node to backend:', error);
       toast.error('Failed to save node to backend');
     }
-  }, [nodes, findNonOverlappingPosition, setNodes, getNodeColor, saveHistory]);
+  }, [getViewportCenterPosition, setNodes, getNodeColor, saveHistory]);
 
   const handleNodeDoubleClick = useCallback((event: React.MouseEvent, node: Node) => {
     event.stopPropagation();

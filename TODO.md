@@ -2,15 +2,6 @@
 
 ## Phase 1: Backend Schema & Database
 
-### 1.1 Update Project Schema ✅
-- [x] Add `description: Option<String>` field to Project struct in `osint-graph-shared/src/project.rs`
-- [x] Add `tags: Vec<String>` field to Project struct in `osint-graph-shared/src/project.rs`
-- [x] Update Project database schema in `osint-graph-backend/src/db/project.rs` to add description column (TEXT NULL)
-- [x] Update Project database schema in `osint-graph-backend/src/db/project.rs` to add tags column (TEXT NULL, stored as JSON array)
-- [x] Update Project serialization/deserialization to handle new fields
-- [x] Add migration/default handling for existing projects without description/tags
-- [x] Write tests for Project CRUD with new fields (all 14 backend tests passing)
-
 ### 1.2 File Attachment Schema
 - [ ] Create `Attachment` struct in new file `osint-graph-shared/src/attachment.rs`:
   - id: Uuid
@@ -30,16 +21,7 @@
 - [ ] Write tests for Attachment CRUD with compression/decompression
 - [ ] Write tests for cascade deletion (deleting node deletes attachments)
 
-### 1.3 Backend API Endpoints - Project Management ✅
-- [x] Add `PUT /api/v1/project/:id` endpoint in `osint-graph-backend/src/lib.rs`
-- [x] Implement `update_project` handler in `osint-graph-backend/src/project.rs`
-- [x] Write test for PUT /api/v1/project/:id
-- [x] Add `DELETE /api/v1/project/:id` endpoint in `osint-graph-backend/src/lib.rs`
-- [x] Implement `delete_project` handler with cascade deletion (nodes -> attachments, nodelinks)
-- [x] Write test for DELETE /api/v1/project/:id with cascade verification
-- [x] Write test for DELETE returning 404 for non-existent project
-
-### 1.4 Backend API Endpoints - Export/Import
+### 1.3 Backend API Endpoints - Export/Import
 - [ ] Add `GET /api/v1/project/:id/export` endpoint
 - [ ] Implement `export_project` handler that returns JSON with structure:
   ```json
@@ -60,7 +42,7 @@
 - [ ] Write test for import mode=overwrite
 - [ ] Write test for import mode=merge
 
-### 1.5 Backend API Endpoints - File Attachments
+### 1.4 Backend API Endpoints - File Attachments
 - [ ] Add `POST /api/v1/node/:id/attachment` endpoint (multipart/form-data)
 - [ ] Implement `upload_attachment` handler with zstd compression
 - [ ] Write test for file upload with various file types

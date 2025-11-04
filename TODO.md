@@ -95,7 +95,6 @@
 - [ ] Update node data after attachment changes
 - [ ] Handle errors for all operations
 
-
 ## Phase 4: Integration & Testing
 
 ### 4.1 Backend Integration Tests
@@ -142,7 +141,9 @@
 ### Dependencies Needed for Remaining Features
 
 **Backend:**
+
 - `multipart` or `axum-multipart` for file uploads (attachments feature)
 
 **Frontend:**
+
 - Consider `react-dropzone` for file upload UI (import tab and attachments)

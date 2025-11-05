@@ -67,6 +67,7 @@ function AppContent() {
 	} | null>(null);
 	const [nodeAttachments, setNodeAttachments] = useState<Attachment[]>([]);
 	const [uploadingAttachment, setUploadingAttachment] = useState(false);
+	const [allAttachments, setAllAttachments] = useState<Attachment[]>([]);
 
 	// Refs for debouncing node updates
 	const pendingUpdatesRef = useRef<Map<string, number>>(new Map());
@@ -381,6 +382,9 @@ function AppContent() {
 			try {
 				// Load project data using export endpoint (single request)
 				const exportData = await exportProject(projectId, false);
+
+				// Store all attachments for later use
+				setAllAttachments(exportData.attachments || []);
 
 				// Convert nodes to ReactFlow format
 				const reactFlowNodes: Node[] = exportData.nodes.map((osintNode) => ({
@@ -809,16 +813,27 @@ function AppContent() {
 	// Load attachments when editing a node
 	useEffect(() => {
 		if (editingNode && !pendingNodes.has(editingNode)) {
-			listAttachments(editingNode)
-				.then(setNodeAttachments)
-				.catch((error) => {
-					console.error("Failed to load attachments:", error);
-					toast.error("Failed to load attachments");
-				});
+			// First, try to use cached attachments from export data
+			const cachedAttachments = allAttachments.filter(
+				(att) => att.node_id === editingNode,
+			);
+
+			if (cachedAttachments.length > 0) {
+				// Use cached attachments
+				setNodeAttachments(cachedAttachments);
+			} else {
+				// Fall back to API call if no cached attachments
+				listAttachments(editingNode)
+					.then(setNodeAttachments)
+					.catch((error) => {
+						console.error("Failed to load attachments:", error);
+						toast.error("Failed to load attachments");
+					});
+			}
 		} else {
 			setNodeAttachments([]);
 		}
-	}, [editingNode, pendingNodes]);
+	}, [editingNode, pendingNodes, allAttachments]);
 
 	const handleFileUpload = useCallback(
 		async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -834,6 +849,8 @@ function AppContent() {
 			try {
 				const attachment = await uploadAttachment(editingNode, file);
 				setNodeAttachments((prev) => [...prev, attachment]);
+				// Also update the global attachments cache
+				setAllAttachments((prev) => [...prev, attachment]);
 				toast.success(`Uploaded ${file.name}`);
 			} catch (error) {
 				console.error("Failed to upload attachment:", error);
@@ -879,6 +896,8 @@ function AppContent() {
 			try {
 				await deleteAttachment(editingNode, attachmentId);
 				setNodeAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+				// Also update the global attachments cache
+				setAllAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
 				toast.success(`Deleted ${filename}`);
 			} catch (error) {
 				console.error("Failed to delete attachment:", error);

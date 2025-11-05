@@ -1,15 +1,12 @@
-pub mod logging;
-
+pub mod cli;
 pub mod entity;
-pub mod migration;
-
 pub mod identifier;
 pub mod kvstore;
+pub mod logging;
 pub mod middleware;
+pub mod migration;
 pub mod project;
 pub mod storage;
-
-// mod dev_websocket;
 #[cfg(test)]
 mod tests;
 
@@ -21,7 +18,6 @@ use axum::{
     routing::{delete, get, post, put},
     Router,
 };
-// use dev_websocket::ws_handler;
 use project::{
     delete_node, delete_nodelink, delete_project, get_node, get_nodelinks_by_project,
     get_nodes_by_project, get_project, get_projects, post_node, post_nodelink, post_project,
@@ -35,8 +31,10 @@ use tower_http::{services::ServeDir, set_header::SetResponseHeaderLayer};
 use tracing::error;
 
 use crate::{
+    cli::{db_path_default, CliOpts},
     logging::logging_layer,
     project::{export_project, update_node},
+    storage::DBError,
 };
 
 pub type SharedState = Arc<RwLock<AppState>>;
@@ -46,9 +44,9 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub async fn new() -> Self {
-        let conn = storage::new().await.unwrap();
-        Self { conn }
+    pub async fn new(cli: &CliOpts) -> Result<Self, DBError> {
+        let conn = storage::new(&cli.db_path.clone().unwrap_or(db_path_default().into())).await?;
+        Ok(Self { conn })
     }
 
     #[cfg(test)]

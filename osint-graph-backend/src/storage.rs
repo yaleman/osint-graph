@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use sea_orm::{Database, DatabaseConnection, DbErr};
 use sea_orm_migration::MigratorTrait;
 use tracing::debug;
@@ -5,24 +7,24 @@ use tracing::debug;
 use crate::migration::Migrator;
 
 // Start the database
-pub async fn new() -> Result<DatabaseConnection, std::io::Error> {
-    let db_path = match std::env::var("OSINT_GRAPH_DB_PATH") {
-        // If the OSINT_GRAPH_DB_PATH environment variable is set, use that.
-        Ok(path) => path,
-        // Otherwise, use the default path.
-        Err(_) => shellexpand::tilde("~/.cache/osint-graph.sqlite3").to_string(),
-    };
-
+pub async fn new(db_path: &PathBuf) -> Result<DatabaseConnection, std::io::Error> {
     start_db(Some(db_path)).await
 }
 
-pub async fn start_db(db_path: Option<String>) -> Result<DatabaseConnection, std::io::Error> {
+pub async fn start_db(db_path: Option<&PathBuf>) -> Result<DatabaseConnection, std::io::Error> {
     let db_url = match db_path {
-        Some(path) => format!("sqlite://{}?mode=rwc", path),
+        Some(path) => {
+            let path = path.to_string_lossy().to_string();
+            let path = shellexpand::tilde(&path);
+
+            debug!(
+                path = path.to_string(),
+                "Database path after tilde expansion"
+            );
+            format!("sqlite://{}?mode=rwc", path)
+        }
         None => "sqlite::memory:".to_string(),
     };
-    // let db_path = db_path.unwrap_or(":memory:".to_string());
-    // let db_url = format!("sqlite://{}?mode=rwc", db_path);
     debug!("Opening Database: {db_url}");
 
     let conn = Database::connect(&db_url)
@@ -103,5 +105,11 @@ impl From<DbErr> for DBError {
 impl From<serde_json::Error> for DBError {
     fn from(value: serde_json::Error) -> Self {
         DBError::Serde(value)
+    }
+}
+
+impl From<std::io::Error> for DBError {
+    fn from(value: std::io::Error) -> Self {
+        DBError::IoError(value)
     }
 }

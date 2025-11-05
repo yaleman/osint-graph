@@ -88,19 +88,19 @@ just frontend-lint  # Frontend ESLint
 
 ```bash
 # Start development server (builds frontend + runs backend)
-make serve
+just run
 
 # Auto-reload during development
-make reload
+just reload
 
 # Build frontend only
-make frontend
+just frontend
 
 # Run backend only
-make backend
+just backend
 
 # Run linters
-make lint
+just lint
 ```
 
 ### Testing & Coverage

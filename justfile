@@ -3,7 +3,7 @@ default:
 
 # Run cargo clippy on all targets
 clippy:
-    cargo clippy --all-targets
+    cargo clippy --all-targets --all-features --workspace
 
 # Run cargo tests
 test:
@@ -13,9 +13,20 @@ test:
 fmt:
     cargo fmt
 
+# Run the backend
+backend:
+	cargo run --bin osint-graph
+
+# Build the frontend
+frontend:
+    cd osint-graph-frontend && vite build --emptyOutDir
+
+# lint all the things
+lint: clippy fmt frontend-lint
+
 # Run frontend linting/checks
 frontend-lint:
-    cd osint-graph-frontend && pnpm run lint
+    biome ci osint-graph-frontend
 
 # Build frontend and run the application
 run:
@@ -40,3 +51,6 @@ coverage:
 coveralls:
     just coverage_inner --out=Html --coveralls $COVERALLS_REPO_TOKEN
     @echo "Coverage report should be at https://coveralls.io/github/yaleman/osint-graph?branch=$(git branch --show-current)"
+
+reload:
+    cargo watch -s 'just run' --why

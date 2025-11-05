@@ -488,37 +488,41 @@ function AppContent() {
 		setCurrentProject(updatedProject);
 	}, []);
 
-	const handleProjectDelete = useCallback(async () => {
-		// Clear everything
-		localStorage.removeItem(PROJECT_ID_KEY);
-		setNodes([]);
-		setEdges([]);
-		setShowProjectManagement(false);
+	const handleProjectDelete = useCallback(
+		async (_deletedProjectId: string) => {
+			// Clear everything
+			localStorage.removeItem(PROJECT_ID_KEY);
+			setNodes([]);
+			setEdges([]);
+			setShowProjectManagement(false);
 
-		// Check if there are other projects available
-		try {
-			const projects = await fetchProjects();
-			if (projects.length > 0) {
-				// Show project selector if other projects exist
-				setAvailableProjects(projects);
-				setShowMismatchDialog(true);
-				setCurrentProject(null);
-				toast.success("Project deleted - please select a project");
-			} else {
-				// No other projects, create a new one
+			// Fetch projects AFTER deletion is confirmed complete
+			try {
+				const projects = await fetchProjects();
+
+				if (projects.length > 0) {
+					// Show project selector if other projects exist
+					setAvailableProjects(projects);
+					setShowMismatchDialog(true);
+					setCurrentProject(null);
+					toast.success("Project deleted - please select a project");
+				} else {
+					// No other projects, create a new one
+					setTimeout(() => {
+						setCurrentProject(null);
+						toast.success("Project deleted - creating new project");
+					}, 100);
+				}
+			} catch (error) {
+				console.error("Failed to fetch projects:", error);
+				// Fallback to creating new project
 				setTimeout(() => {
 					setCurrentProject(null);
-					toast.success("Project deleted - creating new project");
 				}, 100);
 			}
-		} catch (error) {
-			console.error("Failed to fetch projects:", error);
-			// Fallback to creating new project
-			setTimeout(() => {
-				setCurrentProject(null);
-			}, 100);
-		}
-	}, [setNodes, setEdges]);
+		},
+		[setNodes, setEdges],
+	);
 
 	const handleProjectChange = useCallback(
 		async (projectId: string) => {
@@ -539,10 +543,10 @@ function AppContent() {
 	);
 
 	const handleProjectSelect = useCallback(
-		(projectId: string) => {
+		async (projectId: string) => {
+			// Load project first, then close dialog to prevent race condition
+			await handleProjectChange(projectId);
 			setShowMismatchDialog(false);
-			handleProjectChange(projectId);
-			toast.success("Project selected");
 		},
 		[handleProjectChange],
 	);

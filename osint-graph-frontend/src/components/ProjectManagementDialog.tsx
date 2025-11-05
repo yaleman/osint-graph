@@ -10,7 +10,7 @@ interface ProjectManagementDialogProps {
 	onClose: () => void;
 	currentProject: Project | null;
 	onProjectUpdate: (project: Project) => void;
-	onProjectDelete: () => void;
+	onProjectDelete: (projectId: string) => void;
 }
 
 type TabType = "general" | "export" | "import" | "delete";
@@ -134,8 +134,9 @@ export const ProjectManagementDialog: React.FC<
 
 		setLoading(true);
 		try {
-			await deleteProject(currentProject.id);
-			onProjectDelete();
+			const projectId = currentProject.id;
+			await deleteProject(projectId);
+			onProjectDelete(projectId);
 			// Don't call onClose() - onProjectDelete already handles closing
 		} catch (error) {
 			console.error("Failed to delete project:", error);

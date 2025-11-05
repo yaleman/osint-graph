@@ -12,6 +12,7 @@ import type {
 const PROJECTS_URL = "/api/v1/projects";
 const PROJECT_URL = "/api/v1/project";
 const NODE_URL = "/api/v1/node";
+const ATTACHMENT_URL = "/api/v1/attachment";
 const NODELINK_URL = "/api/v1/nodelink";
 
 export const fetchProjects = async (): Promise<Project[]> => {
@@ -166,24 +167,17 @@ export const uploadAttachment = async (
 
 /** Download a file attachment */
 export const downloadAttachment = async (
-	nodeId: string,
 	attachmentId: string,
 ): Promise<Blob> => {
-	const response = await axios.get(
-		`${NODE_URL}/${nodeId}/attachment/${attachmentId}`,
-		{
-			responseType: "blob",
-		},
-	);
+	const response = await axios.get(`${ATTACHMENT_URL}/${attachmentId}`, {
+		responseType: "blob",
+	});
 	return response.data;
 };
 
 /** Delete a file attachment */
-export const deleteAttachment = async (
-	nodeId: string,
-	attachmentId: string,
-): Promise<void> => {
-	await axios.delete(`${NODE_URL}/${nodeId}/attachment/${attachmentId}`);
+export const deleteAttachment = async (attachmentId: string): Promise<void> => {
+	await axios.delete(`${ATTACHMENT_URL}/${attachmentId}`);
 };
 
 /** List all attachments for a node */

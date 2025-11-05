@@ -218,10 +218,10 @@ pub async fn download_attachment(
 }
 
 /// View a file attachment (inline display for images, PDFs, text)
-/// GET /api/v1/node/{node_id}/attachment/{attachment_id}/view
+/// GET /api/v1//attachment/{attachment_id}/view
 pub async fn view_attachment(
     State(state): State<SharedState>,
-    Path((node_id, attachment_id)): Path<(Uuid, Uuid)>,
+    Path(attachment_id): Path<Uuid>,
 ) -> Result<Response, WebError> {
     let conn = &state.read().await.conn;
 
@@ -238,17 +238,6 @@ pub async fn view_attachment(
         })?
         .ok_or_else(|| WebError::not_found(format!("Attachment {} not found", attachment_id)))?;
 
-    // Verify attachment belongs to the node
-    if attachment.node_id != node_id {
-        return Err(WebError::new(
-            StatusCode::BAD_REQUEST,
-            format!(
-                "Attachment {} does not belong to node {}",
-                attachment_id, node_id
-            ),
-        ));
-    }
-
     // Decompress data
     let mut decoder = GzDecoder::new(&attachment.data[..]);
     let mut decompressed_data = Vec::new();
@@ -259,7 +248,11 @@ pub async fn view_attachment(
         )
     })?;
 
-    debug!("Viewing attachment {} for node {}", attachment_id, node_id);
+    debug!(
+        attachment_id = attachment_id.to_string(),
+        node_id = attachment.node_id.to_string(),
+        "Viewing attachment"
+    );
 
     // Return file with inline disposition for viewing in browser
     Ok((
@@ -301,7 +294,7 @@ pub async fn delete_attachment(
     Ok("Attachment deleted successfully".to_string())
 }
 
-/// List all attachments for a node
+/// List all attachments for a node, does not include file data
 /// GET /api/v1/node/{node_id}/attachments
 pub async fn list_attachments(
     State(state): State<SharedState>,
@@ -319,7 +312,14 @@ pub async fn list_attachments(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Failed to list attachments: {:?}", e),
             )
-        })?;
+        })?
+        .into_iter()
+        .map(|mut a| {
+            // Hide the data field when listing attachments
+            a.data = Vec::new();
+            a
+        })
+        .collect::<Vec<_>>();
 
     debug!(
         "Listed {} attachments for node {}",

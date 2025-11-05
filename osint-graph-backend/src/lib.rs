@@ -20,7 +20,7 @@ use axum::{
     extract::DefaultBodyLimit,
     http::{header, Response, StatusCode},
     response::IntoResponse,
-    routing::{delete, get, post, put},
+    routing::{delete, get, post},
     Router,
 };
 use project::{
@@ -69,25 +69,22 @@ pub fn build_app<T>(shared_state: &SharedState) -> Router<T> {
     // Build our application by composing routes
     let router = Router::new()
         .route("/api/v1/node", post(post_node))
-        .route("/api/v1/node/{id}", get(get_node))
-        .route("/api/v1/node/{id}", delete(delete_node))
-        .route("/api/v1/node/{id}", put(update_node))
+        .route(
+            "/api/v1/node/{id}",
+            get(get_node).delete(delete_node).put(update_node),
+        )
         .route(
             "/api/v1/node/{id}/attachment",
             post(upload_attachment).layer(DefaultBodyLimit::max(100 * 1024 * 1024)), // 100MB limit
         )
         .route("/api/v1/node/{id}/attachments", get(list_attachments))
         .route(
-            "/api/v1/node/{node_id}/attachment/{attachment_id}",
-            get(download_attachment),
+            "/api/v1/attachment/{attachment_id}",
+            get(download_attachment).delete(delete_attachment),
         )
         .route(
-            "/api/v1/node/{node_id}/attachment/{attachment_id}/view",
+            "/api/v1/attachment/{attachment_id}/view",
             get(view_attachment),
-        )
-        .route(
-            "/api/v1/node/{node_id}/attachment/{attachment_id}",
-            delete(delete_attachment),
         )
         .route("/api/v1/nodelink", post(post_nodelink))
         .route("/api/v1/nodelink/{id}", delete(delete_nodelink))
@@ -96,9 +93,10 @@ pub fn build_app<T>(shared_state: &SharedState) -> Router<T> {
             get(get_nodelinks_by_project),
         )
         .route("/api/v1/project", post(post_project))
-        .route("/api/v1/project/{id}", get(get_project))
-        .route("/api/v1/project/{id}", put(update_project))
-        .route("/api/v1/project/{id}", delete(delete_project))
+        .route(
+            "/api/v1/project/{id}",
+            get(get_project).put(update_project).delete(delete_project),
+        )
         .route("/api/v1/project/{id}/nodes", get(get_nodes_by_project))
         .route("/api/v1/projects", get(get_projects))
         .route("/api/v1/project/{id}/export", get(export_project))

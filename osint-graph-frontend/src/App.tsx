@@ -869,7 +869,7 @@ function AppContent() {
 			if (!editingNode) return;
 
 			try {
-				const blob = await downloadAttachment(editingNode, attachment.id);
+				const blob = await downloadAttachment(attachment.id);
 				const url = window.URL.createObjectURL(blob);
 				const a = document.createElement("a");
 				a.href = url;
@@ -894,7 +894,7 @@ function AppContent() {
 			if (!window.confirm(`Delete ${filename}?`)) return;
 
 			try {
-				await deleteAttachment(editingNode, attachmentId);
+				await deleteAttachment(attachmentId);
 				setNodeAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
 				// Also update the global attachments cache
 				setAllAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
@@ -953,7 +953,7 @@ function AppContent() {
 		(attachment: Attachment) => {
 			if (!editingNode) return;
 
-			const url = `/api/v1/node/${editingNode}/attachment/${attachment.id}/view`;
+			const url = `/api/v1/attachment/${attachment.id}/view`;
 			window.open(url, "_blank");
 		},
 		[editingNode],

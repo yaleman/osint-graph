@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import type React from "react";
+import { useEffect, useId, useState } from "react";
 import toast from "react-hot-toast";
-import { updateProject, deleteProject, exportProject } from "../api";
+import { deleteProject, exportProject, updateProject } from "../api";
 import type { Project, ProjectExport } from "../types";
 import "../osint-graph.css";
 
@@ -14,13 +15,9 @@ interface ProjectManagementDialogProps {
 
 type TabType = "general" | "export" | "import" | "delete";
 
-export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = ({
-	isOpen,
-	onClose,
-	currentProject,
-	onProjectUpdate,
-	onProjectDelete,
-}) => {
+export const ProjectManagementDialog: React.FC<
+	ProjectManagementDialogProps
+> = ({ isOpen, onClose, currentProject, onProjectUpdate, onProjectDelete }) => {
 	const [activeTab, setActiveTab] = useState<TabType>("general");
 	const [loading, setLoading] = useState(false);
 
@@ -35,6 +32,11 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
 
 	// Export tab state
 	const [exportData, setExportData] = useState<ProjectExport | null>(null);
+
+	const idProjectName = useId();
+	const idProjectDescription = useId();
+	const idProjectTags = useId();
+	const idDeleteConfirmName = useId();
 
 	// Initialize form with current project data
 	useEffect(() => {
@@ -97,7 +99,10 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement("a");
 			a.href = url;
-			const timestamp = new Date().toISOString().replace(/[:.]/g, "-").split("T")[0];
+			const timestamp = new Date()
+				.toISOString()
+				.replace(/[:.]/g, "-")
+				.split("T")[0];
 			a.download = `${currentProject.name.replace(/[^a-z0-9]/gi, "_")}_${timestamp}.json`;
 			document.body.appendChild(a);
 			a.click();
@@ -119,16 +124,19 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
 			return;
 		}
 
-		if (!window.confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
+		if (
+			!window.confirm(
+				"Are you sure you want to delete this project? This action cannot be undone.",
+			)
+		) {
 			return;
 		}
 
 		setLoading(true);
 		try {
 			await deleteProject(currentProject.id);
-			toast.success("Project deleted successfully");
 			onProjectDelete();
-			onClose();
+			// Don't call onClose() - onProjectDelete already handles closing
 		} catch (error) {
 			console.error("Failed to delete project:", error);
 			toast.error("Failed to delete project");
@@ -138,12 +146,26 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
 	};
 
 	return (
-		<div className="dialog-backdrop" onClick={onClose}>
-			<div className="dialog-container" onClick={(e) => e.stopPropagation()}>
+		<div
+			role="dialog"
+			className="dialog-backdrop"
+			onClick={onClose}
+			onKeyDown={() => {}}
+		>
+			<div
+				role="dialog"
+				className="dialog-container"
+				onKeyDown={() => {}}
+				onClick={(e) => e.stopPropagation()}
+			>
 				{/* Header */}
 				<div className="dialog-header">
 					<h2 className="dialog-title">Project Settings</h2>
-					<button onClick={onClose} className="dialog-close-button">
+					<button
+						type="button"
+						onClick={onClose}
+						className="dialog-close-button"
+					>
 						×
 					</button>
 				</div>
@@ -151,26 +173,34 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
 				{/* Tabs */}
 				<div className="dialog-tabs">
 					<div
+						role="tablist"
 						className={`dialog-tab ${activeTab === "general" ? "active" : ""}`}
 						onClick={() => setActiveTab("general")}
+						onKeyDown={() => {}} // TODO because there's no easy keyboard interaction
 					>
 						General
 					</div>
 					<div
+						role="tablist"
 						className={`dialog-tab ${activeTab === "export" ? "active" : ""}`}
 						onClick={() => setActiveTab("export")}
+						onKeyDown={() => {}} // TODO because there's no easy keyboard interaction
 					>
 						Export
 					</div>
 					<div
+						role="tablist"
 						className={`dialog-tab ${activeTab === "import" ? "active" : ""}`}
 						onClick={() => setActiveTab("import")}
+						onKeyDown={() => {}} // TODO because there's no easy keyboard interaction
 					>
 						Import
 					</div>
 					<div
+						role="tablist"
 						className={`dialog-tab ${activeTab === "delete" ? "active" : ""}`}
 						onClick={() => setActiveTab("delete")}
+						onKeyDown={() => {}} // TODO because there's no easy keyboard interaction
 					>
 						Delete
 					</div>
@@ -182,9 +212,12 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
 					{activeTab === "general" && (
 						<div>
 							<div className="form-group">
-								<label className="form-label">Project Name *</label>
+								<label className="form-label" htmlFor={idProjectName}>
+									Project Name *
+								</label>
 								<input
 									type="text"
+									id={idProjectName}
 									value={projectName}
 									onChange={(e) => setProjectName(e.target.value)}
 									className="form-input"
@@ -193,8 +226,11 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
 							</div>
 
 							<div className="form-group">
-								<label className="form-label">Description</label>
+								<label className="form-label" htmlFor={idProjectDescription}>
+									Description
+								</label>
 								<textarea
+									id={idProjectDescription}
 									value={projectDescription}
 									onChange={(e) => setProjectDescription(e.target.value)}
 									className="form-textarea"
@@ -203,12 +239,18 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
 							</div>
 
 							<div className="form-group">
-								<label className="form-label">Tags</label>
+								<label className="form-label" htmlFor={idProjectTags}>
+									Tags
+								</label>
 								<div className="tags-container">
 									{projectTags.map((tag) => (
 										<div key={tag} className="tag">
 											{tag}
-											<button onClick={() => handleRemoveTag(tag)} className="tag-remove-button">
+											<button
+												type="button"
+												onClick={() => handleRemoveTag(tag)}
+												className="tag-remove-button"
+											>
 												×
 											</button>
 										</div>
@@ -217,6 +259,7 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
 								<div className="tag-input-group">
 									<input
 										type="text"
+										id={idProjectTags}
 										value={newTag}
 										onChange={(e) => setNewTag(e.target.value)}
 										onKeyPress={(e) => {
@@ -228,13 +271,18 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
 										className="tag-input"
 										placeholder="Add a tag"
 									/>
-									<button onClick={handleAddTag} className="btn-add-tag">
+									<button
+										type="button"
+										onClick={handleAddTag}
+										className="btn-add-tag"
+									>
 										Add
 									</button>
 								</div>
 							</div>
 
 							<button
+								type="button"
 								onClick={handleSaveGeneral}
 								disabled={loading || !projectName.trim()}
 								className="btn btn-primary"
@@ -248,21 +296,32 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
 					{activeTab === "export" && (
 						<div>
 							<p className="export-description">
-								Export your project data including all nodes, links, and metadata as a JSON file.
+								Export your project data including all nodes, links, and
+								metadata as a JSON file.
 							</p>
 
 							{exportData && (
 								<div className="export-info">
 									<h4 className="export-info-title">Export Details:</h4>
-									<p className="export-info-item">Nodes: {exportData.nodes?.length ?? 0}</p>
-									<p className="export-info-item">Links: {exportData.links?.length ?? 0}</p>
 									<p className="export-info-item">
-										Size: {(JSON.stringify(exportData).length / 1024).toFixed(2)} KB
+										Nodes: {exportData.nodes?.length ?? 0}
+									</p>
+									<p className="export-info-item">
+										Links: {exportData.links?.length ?? 0}
+									</p>
+									<p className="export-info-item">
+										Size:{" "}
+										{(JSON.stringify(exportData).length / 1024).toFixed(2)} KB
 									</p>
 								</div>
 							)}
 
-							<button onClick={handleExport} disabled={loading} className="btn btn-primary">
+							<button
+								type="button"
+								onClick={handleExport}
+								disabled={loading}
+								className="btn btn-primary"
+							>
 								{loading ? "Exporting..." : "Export Project"}
 							</button>
 						</div>
@@ -271,12 +330,15 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
 					{/* Import Tab */}
 					{activeTab === "import" && (
 						<div>
-							<p className="export-description">Import a project from a JSON file.</p>
+							<p className="export-description">
+								Import a project from a JSON file.
+							</p>
 
 							<div className="import-dropzone">
 								<p className="import-dropzone-title">Coming Soon</p>
 								<p className="import-dropzone-text">
-									Project import functionality will be available in a future update.
+									Project import functionality will be available in a future
+									update.
 								</p>
 							</div>
 						</div>
@@ -286,18 +348,23 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
 					{activeTab === "delete" && (
 						<div>
 							<div className="delete-warning">
-								<p className="delete-warning-title">⚠️ Warning: This action cannot be undone</p>
+								<p className="delete-warning-title">
+									⚠️ Warning: This action cannot be undone
+								</p>
 								<p className="delete-warning-text">
-									Deleting this project will permanently remove all nodes, links, and associated data.
+									Deleting this project will permanently remove all nodes,
+									links, and associated data.
 								</p>
 							</div>
 
 							<div className="form-group">
-								<label className="form-label">
-									Type project name to confirm: <strong>{currentProject.name}</strong>
+								<label className="form-label" htmlFor={idDeleteConfirmName}>
+									Type project name to confirm:{" "}
+									<strong>{currentProject.name}</strong>
 								</label>
 								<input
 									type="text"
+									id={idDeleteConfirmName}
 									value={deleteConfirmName}
 									onChange={(e) => setDeleteConfirmName(e.target.value)}
 									className="form-input"
@@ -306,6 +373,7 @@ export const ProjectManagementDialog: React.FC<ProjectManagementDialogProps> = (
 							</div>
 
 							<button
+								type="button"
 								onClick={handleDelete}
 								disabled={loading || deleteConfirmName !== currentProject.name}
 								className="btn btn-danger"

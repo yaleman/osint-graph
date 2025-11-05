@@ -485,15 +485,18 @@ function AppContent() {
 	}, []);
 
 	const handleProjectDelete = useCallback(async () => {
-		// Clear everything and close dialog
+		// Clear everything
 		localStorage.removeItem(PROJECT_ID_KEY);
-		setCurrentProject(null);
 		setNodes([]);
 		setEdges([]);
 		setShowProjectManagement(false);
 
-		// Let the initialization effect create a new project
-		toast.success("Project deleted");
+		// Set to null AFTER closing dialog to trigger re-initialization
+		// Use setTimeout to ensure dialog closes first
+		setTimeout(() => {
+			setCurrentProject(null);
+			toast.success("Project deleted - creating new project");
+		}, 100);
 	}, [setNodes, setEdges]);
 
 	const handleSelectExisting = useCallback(() => {

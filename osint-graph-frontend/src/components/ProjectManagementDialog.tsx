@@ -274,7 +274,7 @@ export const ProjectManagementDialog: React.FC<
 									<button
 										type="button"
 										onClick={handleAddTag}
-										className="btn-add-tag"
+										className="btn btn-primary"
 									>
 										Add
 									</button>

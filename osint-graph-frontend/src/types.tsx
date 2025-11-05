@@ -46,6 +46,7 @@ export interface ProjectExport {
 	nodelinks: NodeLink[];
 	exported_at: string;
 	version: string;
+	attachments: Attachment[];
 }
 
 export const NodeTypeInfo: Record<

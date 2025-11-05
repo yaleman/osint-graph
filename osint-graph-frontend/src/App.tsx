@@ -375,12 +375,12 @@ function AppContent() {
 		return colors[nodeType] ?? "#6b7280";
 	}, []);
 
-	// Helper function to load nodes and edges for a project
+	/** Helper function to load data for a project */
 	const loadProjectData = useCallback(
 		async (projectId: string) => {
 			try {
 				// Load project data using export endpoint (single request)
-				const exportData = await exportProject(projectId);
+				const exportData = await exportProject(projectId, false);
 
 				// Convert nodes to ReactFlow format
 				const reactFlowNodes: Node[] = exportData.nodes.map((osintNode) => ({
@@ -825,6 +825,10 @@ function AppContent() {
 			if (!editingNode || !event.target.files?.length) return;
 
 			const file = event.target.files[0];
+			if (!file) {
+				toast.error("No file selected for upload");
+				return;
+			}
 			setUploadingAttachment(true);
 
 			try {
@@ -1330,15 +1334,7 @@ function AppContent() {
 												<button
 													type="button"
 													onClick={() => handleDownloadAttachment(attachment)}
-													style={{
-														padding: "4px 8px",
-														background: "#3b82f6",
-														color: "white",
-														border: "none",
-														borderRadius: "3px",
-														cursor: "pointer",
-														fontSize: "12px",
-													}}
+													className="btn btn-primary"
 													title="Download"
 												>
 													↓
@@ -1399,28 +1395,14 @@ function AppContent() {
 						<button
 							type="button"
 							onClick={saveNodeEdit}
-							style={{
-								padding: "8px 16px",
-								background: "#3b82f6",
-								color: "white",
-								border: "none",
-								borderRadius: "4px",
-								cursor: "pointer",
-							}}
+							className="btn btn-primary"
 						>
 							Save
 						</button>
 						<button
 							type="button"
 							onClick={cancelNodeEdit}
-							style={{
-								padding: "8px 16px",
-								background: "#6b7280",
-								color: "white",
-								border: "none",
-								borderRadius: "4px",
-								cursor: "pointer",
-							}}
+							className="btn btn-secondary"
 						>
 							Cancel
 						</button>

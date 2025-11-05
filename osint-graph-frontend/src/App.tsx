@@ -1271,27 +1271,9 @@ function AppContent() {
 									}}
 								>
 									{nodeAttachments.map((attachment) => (
-										<div
-											key={attachment.id}
-											style={{
-												padding: "8px 12px",
-												borderBottom: "1px solid #e5e7eb",
-												display: "flex",
-												alignItems: "center",
-												justifyContent: "space-between",
-												background: "#f9fafb",
-											}}
-										>
+										<div key={attachment.id} className="attachment-item">
 											<div style={{ flex: 1, minWidth: 0 }}>
-												<div
-													style={{
-														fontWeight: "500",
-														fontSize: "13px",
-														overflow: "hidden",
-														textOverflow: "ellipsis",
-														whiteSpace: "nowrap",
-													}}
-												>
+												<div className="attachment-filename">
 													{attachment.filename}
 												</div>
 												<div
@@ -1317,15 +1299,7 @@ function AppContent() {
 													<button
 														type="button"
 														onClick={() => handleViewAttachment(attachment)}
-														style={{
-															padding: "4px 8px",
-															background: "#10b981",
-															color: "white",
-															border: "none",
-															borderRadius: "3px",
-															cursor: "pointer",
-															fontSize: "12px",
-														}}
+														className="btn btn-success"
 														title="View in new tab"
 													>
 														👁
@@ -1347,15 +1321,7 @@ function AppContent() {
 															attachment.filename,
 														)
 													}
-													style={{
-														padding: "4px 8px",
-														background: "#ef4444",
-														color: "white",
-														border: "none",
-														borderRadius: "3px",
-														cursor: "pointer",
-														fontSize: "12px",
-													}}
+													className="btn btn-danger"
 													title="Delete"
 												>
 													×

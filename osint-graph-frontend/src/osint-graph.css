@@ -484,3 +484,23 @@
 	color: #374151;
 	margin-top: 8px;
 }
+
+
+/* attachment things */
+
+.attachment-item {
+	padding: 8px 12px;
+	border-bottom: 1px solid #e5e7eb;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	background: #f9fafb;
+}
+
+.attachment-filename {
+	font-weight: 500;
+	font-size: 13px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}

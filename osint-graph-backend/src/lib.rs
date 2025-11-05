@@ -19,7 +19,6 @@ use axum::{
     error_handling::HandleErrorLayer,
     extract::DefaultBodyLimit,
     http::{header, Response, StatusCode},
-    response::IntoResponse,
     routing::{delete, get, post},
     Router,
 };
@@ -29,16 +28,17 @@ use project::{
     update_project,
 };
 use sea_orm::DatabaseConnection;
-use std::{borrow::Cow, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tokio::sync::RwLock;
 use tower::{BoxError, ServiceBuilder};
 use tower_http::{services::ServeDir, set_header::SetResponseHeaderLayer};
 use tracing::error;
 
 use crate::{
+    attachment::update_attachment,
     cli::{db_path_default, CliOpts},
     logging::logging_layer,
-    project::{export_project, update_node},
+    project::{export_project, update_node, WebError},
     storage::DBError,
 };
 
@@ -80,7 +80,9 @@ pub fn build_app<T>(shared_state: &SharedState) -> Router<T> {
         .route("/api/v1/node/{id}/attachments", get(list_attachments))
         .route(
             "/api/v1/attachment/{attachment_id}",
-            get(download_attachment).delete(delete_attachment),
+            get(download_attachment)
+                .delete(delete_attachment)
+                .put(update_attachment),
         )
         .route(
             "/api/v1/attachment/{attachment_id}/view",
@@ -128,27 +130,28 @@ pub fn build_app<T>(shared_state: &SharedState) -> Router<T> {
         .with_state(shared_state.clone())
 }
 
-async fn handle_error(error: BoxError) -> impl IntoResponse {
+async fn handle_error(error: BoxError) -> WebError {
     if error.is::<tower::timeout::error::Elapsed>() {
-        return (StatusCode::REQUEST_TIMEOUT, Cow::from("request timed out"));
+        return WebError::new(StatusCode::REQUEST_TIMEOUT, "request timed out");
     }
 
     if error.is::<tower::load_shed::error::Overloaded>() {
         let msg = "service is overloaded, try again later";
         error!("{}", msg);
-        return (StatusCode::SERVICE_UNAVAILABLE, Cow::from(msg));
+        return WebError::new(StatusCode::SERVICE_UNAVAILABLE, msg);
     }
 
     let msg = format!("Unhandled internal error: {error}");
     error!("{}", msg);
-    (StatusCode::INTERNAL_SERVER_ERROR, Cow::from(msg))
+    WebError::internal_server_error(msg)
 }
 
 #[tokio::test]
 async fn test_handle_error() {
+    use axum::response::IntoResponse;
     let err = tower::timeout::error::Elapsed::new();
     let res = handle_error(Box::new(err)).await.into_response();
-    let expected = (StatusCode::REQUEST_TIMEOUT, Cow::from("request timed out")).into_response();
+    let expected = (StatusCode::REQUEST_TIMEOUT, "request timed out").into_response();
 
     assert_eq!(res.status(), expected.status());
 
@@ -156,7 +159,7 @@ async fn test_handle_error() {
     let res = handle_error(Box::new(err)).await.into_response();
     let expected = (
         StatusCode::SERVICE_UNAVAILABLE,
-        Cow::from("service is overloaded, try again later"),
+        "service is overloaded, try again later",
     )
         .into_response();
 

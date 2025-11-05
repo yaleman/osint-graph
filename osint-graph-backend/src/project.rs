@@ -77,14 +77,24 @@ pub struct WebError {
 }
 
 impl WebError {
-    pub fn new(status: StatusCode, message: String) -> Self {
-        WebError { status, message }
+    pub fn new(status: StatusCode, message: impl ToString) -> Self {
+        WebError {
+            status,
+            message: message.to_string(),
+        }
     }
 
-    pub fn not_found(message: String) -> Self {
+    pub fn not_found(message: impl ToString) -> Self {
         WebError {
             status: StatusCode::NOT_FOUND,
-            message,
+            message: message.to_string(),
+        }
+    }
+
+    pub fn internal_server_error(message: impl ToString) -> Self {
+        WebError {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            message: message.to_string(),
         }
     }
 }
@@ -477,7 +487,7 @@ pub async fn export_project(
             .all(&txn)
             .await?
             .into_iter()
-            .map(|a| attachment::Model::from(a))
+            .map(attachment::Model::from)
             .collect();
 
         Ok(Json(ProjectExport {

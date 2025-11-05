@@ -7,7 +7,11 @@ use axum::{
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter,
+    TryIntoModel,
+};
+use serde::Deserialize;
 use std::io::{Read, Write};
 use tracing::{debug, error};
 use uuid::Uuid;
@@ -96,33 +100,21 @@ pub async fn upload_attachment(
         .await
         .map_err(|e| {
             error!("Failed to check if node exists: {:?}", e);
-            WebError::new(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to verify node: {}", e),
-            )
+            WebError::internal_server_error(format!("Failed to verify node: {}", e))
         })?
         .is_some();
 
     if !node_exists {
-        return Err(WebError::new(
-            StatusCode::NOT_FOUND,
-            format!("Node {} not found", node_id),
-        ));
+        return Err(WebError::not_found(format!("Node {} not found", node_id)));
     }
 
     // Compress data with gzip
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
     encoder.write_all(&file_data).map_err(|e| {
-        WebError::new(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to compress attachment data: {}", e),
-        )
+        WebError::internal_server_error(format!("Failed to compress attachment data: {}", e))
     })?;
     let compressed_data = encoder.finish().map_err(|e| {
-        WebError::new(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to finish compression: {}", e),
-        )
+        WebError::internal_server_error(format!("Failed to finish compression: {}", e))
     })?;
 
     // Create attachment entity
@@ -140,10 +132,7 @@ pub async fn upload_attachment(
     // Save to database
     let saved = new_attachment.insert(conn).await.map_err(|e| {
         error!("Failed to save attachment: {:?}", e);
-        WebError::new(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to save attachment: {}", e),
-        )
+        WebError::internal_server_error(format!("Failed to save attachment: {}", e))
     })?;
 
     debug!(
@@ -153,6 +142,58 @@ pub async fn upload_attachment(
     );
 
     Ok(Json(saved))
+}
+
+#[derive(Deserialize, Debug)]
+pub struct UpdateAttachmentData {
+    node_id: Option<Uuid>,
+    data: Option<Vec<u8>>,
+}
+
+pub async fn update_attachment(
+    State(state): State<SharedState>,
+    Path(attachment_id): Path<Uuid>,
+    Json(update_data): Json<UpdateAttachmentData>,
+) -> Result<Json<attachment::Model>, WebError> {
+    let conn = &state.read().await.conn;
+
+    // Find the attachment
+    let attachment = attachment::Entity::find_by_id(attachment_id)
+        .one(conn)
+        .await
+        .map_err(|e| {
+            error!("Failed to get attachment: {:?}", e);
+            WebError::internal_server_error(format!("Failed to get attachment: {}", e))
+        })?
+        .ok_or_else(|| WebError::not_found(format!("Attachment {} not found", attachment_id)))?;
+
+    // Update the attachment
+    let mut updated_attachment = attachment.into_active_model();
+    if let Some(node_id) = update_data.node_id {
+        updated_attachment.node_id = Set(node_id);
+    }
+    if let Some(data) = update_data.data {
+        updated_attachment.data = Set(data);
+    }
+
+    if updated_attachment.is_changed() {
+        debug!(
+            attachment_id = attachment_id.to_string(),
+            "Updating attachment"
+        );
+        // Save the updated attachment
+        let updated_attachment = updated_attachment.update(conn).await.map_err(|e| {
+            error!("Failed to update attachment: {:?}", e);
+            WebError::internal_server_error(format!("Failed to update attachment: {}", e))
+        })?;
+        Ok(Json(updated_attachment))
+    } else {
+        debug!(
+            attachment_id = attachment_id.to_string(),
+            "No changes to update for attachment"
+        );
+        Ok(Json(updated_attachment.try_into_model()?))
+    }
 }
 
 /// Download a file attachment
@@ -169,10 +210,7 @@ pub async fn download_attachment(
         .await
         .map_err(|e| {
             error!("Failed to get attachment: {:?}", e);
-            WebError::new(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to get attachment: {}", e),
-            )
+            WebError::internal_server_error(format!("Failed to get attachment: {}", e))
         })?
         .ok_or_else(|| WebError::not_found(format!("Attachment {} not found", attachment_id)))?;
 
@@ -191,10 +229,7 @@ pub async fn download_attachment(
     let mut decoder = GzDecoder::new(&attachment.data[..]);
     let mut decompressed_data = Vec::new();
     decoder.read_to_end(&mut decompressed_data).map_err(|e| {
-        WebError::new(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to decompress attachment data: {}", e),
-        )
+        WebError::internal_server_error(format!("Failed to decompress attachment data: {}", e))
     })?;
 
     debug!(
@@ -231,10 +266,7 @@ pub async fn view_attachment(
         .await
         .map_err(|e| {
             error!("Failed to get attachment: {:?}", e);
-            WebError::new(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to get attachment: {}", e),
-            )
+            WebError::internal_server_error(format!("Failed to get attachment: {}", e))
         })?
         .ok_or_else(|| WebError::not_found(format!("Attachment {} not found", attachment_id)))?;
 
@@ -242,10 +274,7 @@ pub async fn view_attachment(
     let mut decoder = GzDecoder::new(&attachment.data[..]);
     let mut decompressed_data = Vec::new();
     decoder.read_to_end(&mut decompressed_data).map_err(|e| {
-        WebError::new(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to decompress attachment data: {}", e),
-        )
+        WebError::internal_server_error(format!("Failed to decompress attachment data: {}", e))
     })?;
 
     debug!(
@@ -283,10 +312,7 @@ pub async fn delete_attachment(
         .await
         .map_err(|e| {
             error!("Failed to delete attachment: {:?}", e);
-            WebError::new(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to delete attachment: {}", e),
-            )
+            WebError::internal_server_error(format!("Failed to delete attachment: {}", e))
         })?;
 
     debug!("Deleted attachment {}", attachment_id);
@@ -308,10 +334,7 @@ pub async fn list_attachments(
         .await
         .map_err(|e| {
             error!("Failed to list attachments: {:?}", e);
-            WebError::new(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to list attachments: {:?}", e),
-            )
+            WebError::internal_server_error(format!("Failed to list attachments: {:?}", e))
         })?
         .into_iter()
         .map(|mut a| {

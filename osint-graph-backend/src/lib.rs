@@ -15,6 +15,7 @@ use attachment::{delete_attachment, download_attachment, list_attachments, uploa
 use axum::{
     body::Body,
     error_handling::HandleErrorLayer,
+    extract::DefaultBodyLimit,
     http::{header, Response, StatusCode},
     response::IntoResponse,
     routing::{delete, get, post, put},
@@ -69,7 +70,10 @@ pub fn build_app<T>(shared_state: &SharedState) -> Router<T> {
         .route("/api/v1/node/{id}", get(get_node))
         .route("/api/v1/node/{id}", delete(delete_node))
         .route("/api/v1/node/{id}", put(update_node))
-        .route("/api/v1/node/{id}/attachment", post(upload_attachment))
+        .route(
+            "/api/v1/node/{id}/attachment",
+            post(upload_attachment).layer(DefaultBodyLimit::max(100 * 1024 * 1024)), // 100MB limit
+        )
         .route("/api/v1/node/{id}/attachments", get(list_attachments))
         .route(
             "/api/v1/node/{node_id}/attachment/{attachment_id}",

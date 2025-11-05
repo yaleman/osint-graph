@@ -82,7 +82,7 @@ pub fn build_app<T>(shared_state: &SharedState) -> Router<T> {
             "/api/v1/attachment/{attachment_id}",
             get(download_attachment)
                 .delete(delete_attachment)
-                .put(update_attachment),
+                .patch(update_attachment),
         )
         .route(
             "/api/v1/attachment/{attachment_id}/view",

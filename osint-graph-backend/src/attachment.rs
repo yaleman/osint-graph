@@ -126,17 +126,15 @@ pub async fn upload_attachment(
     })?;
 
     // Create attachment entity
-    let attachment_id = Uuid::new_v4();
-    let now = chrono::Utc::now();
 
     let new_attachment = attachment::ActiveModel {
-        id: Set(attachment_id.to_string()),
-        node_id: Set(node_id.to_string()),
-        filename: Set(filename.clone()),
+        id: Set(Uuid::new_v4()),
+        node_id: Set(node_id),
+        filename: Set(filename),
         content_type: Set(content_type.clone()),
         size: Set(file_data.len() as i64),
         data: Set(compressed_data),
-        created: Set(now.to_rfc3339()),
+        created: Set(chrono::Utc::now()),
     };
 
     // Save to database
@@ -148,7 +146,11 @@ pub async fn upload_attachment(
         )
     })?;
 
-    debug!("Created attachment {} for node {}", attachment_id, node_id);
+    debug!(
+        attachment_id = saved.id.to_string(),
+        node_id = node_id.to_string(),
+        "Created attachment"
+    );
 
     Ok(Json(saved))
 }
@@ -162,7 +164,7 @@ pub async fn download_attachment(
     let conn = &state.read().await.conn;
 
     // Get attachment from database
-    let attachment = attachment::Entity::find_by_id(attachment_id.to_string())
+    let attachment = attachment::Entity::find_by_id(attachment_id)
         .one(conn)
         .await
         .map_err(|e| {
@@ -175,7 +177,7 @@ pub async fn download_attachment(
         .ok_or_else(|| WebError::not_found(format!("Attachment {} not found", attachment_id)))?;
 
     // Verify attachment belongs to the node
-    if attachment.node_id != node_id.to_string() {
+    if attachment.node_id != node_id {
         return Err(WebError::new(
             StatusCode::BAD_REQUEST,
             format!(
@@ -215,6 +217,65 @@ pub async fn download_attachment(
         .into_response())
 }
 
+/// View a file attachment (inline display for images, PDFs, text)
+/// GET /api/v1/node/{node_id}/attachment/{attachment_id}/view
+pub async fn view_attachment(
+    State(state): State<SharedState>,
+    Path((node_id, attachment_id)): Path<(Uuid, Uuid)>,
+) -> Result<Response, WebError> {
+    let conn = &state.read().await.conn;
+
+    // Get attachment from database
+    let attachment = attachment::Entity::find_by_id(attachment_id)
+        .one(conn)
+        .await
+        .map_err(|e| {
+            error!("Failed to get attachment: {:?}", e);
+            WebError::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to get attachment: {}", e),
+            )
+        })?
+        .ok_or_else(|| WebError::not_found(format!("Attachment {} not found", attachment_id)))?;
+
+    // Verify attachment belongs to the node
+    if attachment.node_id != node_id {
+        return Err(WebError::new(
+            StatusCode::BAD_REQUEST,
+            format!(
+                "Attachment {} does not belong to node {}",
+                attachment_id, node_id
+            ),
+        ));
+    }
+
+    // Decompress data
+    let mut decoder = GzDecoder::new(&attachment.data[..]);
+    let mut decompressed_data = Vec::new();
+    decoder.read_to_end(&mut decompressed_data).map_err(|e| {
+        WebError::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to decompress attachment data: {}", e),
+        )
+    })?;
+
+    debug!("Viewing attachment {} for node {}", attachment_id, node_id);
+
+    // Return file with inline disposition for viewing in browser
+    Ok((
+        StatusCode::OK,
+        [
+            ("Content-Type", attachment.content_type.as_str()),
+            (
+                "Content-Disposition",
+                &format!("inline; filename=\"{}\"", attachment.filename),
+            ),
+        ],
+        decompressed_data,
+    )
+        .into_response())
+}
+
 /// Delete a file attachment
 /// DELETE /api/v1/node/{node_id}/attachment/{attachment_id}
 pub async fn delete_attachment(
@@ -224,7 +285,7 @@ pub async fn delete_attachment(
     let conn = &state.read().await.conn;
 
     // Just attempt deletion, don't validate if it exists
-    attachment::Entity::delete_by_id(attachment_id.to_string())
+    attachment::Entity::delete_by_id(attachment_id)
         .exec(conn)
         .await
         .map_err(|e| {

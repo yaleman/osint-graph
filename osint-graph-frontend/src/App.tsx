@@ -890,6 +890,52 @@ function AppContent() {
 		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 	};
 
+	const isViewableFile = (contentType: string, filename: string): boolean => {
+		// Images
+		if (contentType.startsWith("image/")) return true;
+		// PDFs
+		if (contentType === "application/pdf") return true;
+		// Text files
+		if (contentType.startsWith("text/")) return true;
+		// JSON, XML
+		if (contentType === "application/json" || contentType === "application/xml")
+			return true;
+
+		// Check by extension if content type is generic
+		const ext = filename.toLowerCase().split(".").pop();
+		const viewableExts = [
+			"jpg",
+			"jpeg",
+			"png",
+			"gif",
+			"bmp",
+			"webp",
+			"svg",
+			"pdf",
+			"txt",
+			"md",
+			"json",
+			"xml",
+			"html",
+			"css",
+			"js",
+			"ts",
+			"tsx",
+			"jsx",
+		];
+		return ext ? viewableExts.includes(ext) : false;
+	};
+
+	const handleViewAttachment = useCallback(
+		(attachment: Attachment) => {
+			if (!editingNode) return;
+
+			const url = `/api/v1/node/${editingNode}/attachment/${attachment.id}/view`;
+			window.open(url, "_blank");
+		},
+		[editingNode],
+	);
+
 	const handleNodesChange: OnNodesChange = useCallback(
 		(changes) => {
 			// Check if any changes are removals, save history before applying
@@ -1260,6 +1306,27 @@ function AppContent() {
 													marginLeft: "12px",
 												}}
 											>
+												{isViewableFile(
+													attachment.content_type,
+													attachment.filename,
+												) && (
+													<button
+														type="button"
+														onClick={() => handleViewAttachment(attachment)}
+														style={{
+															padding: "4px 8px",
+															background: "#10b981",
+															color: "white",
+															border: "none",
+															borderRadius: "3px",
+															cursor: "pointer",
+															fontSize: "12px",
+														}}
+														title="View in new tab"
+													>
+														👁
+													</button>
+												)}
 												<button
 													type="button"
 													onClick={() => handleDownloadAttachment(attachment)}

@@ -1,3 +1,4 @@
+use chrono::Utc;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -5,14 +6,14 @@ use serde::{Deserialize, Serialize};
 #[sea_orm(table_name = "attachment")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub id: String,
-    pub node_id: String,
+    pub id: Uuid,
+    pub node_id: Uuid,
     pub filename: String,
     pub content_type: String,
     pub size: i64,
     #[sea_orm(column_type = "VarBinary(StringLen::Max)")]
     pub data: Vec<u8>,
-    pub created: String,
+    pub created: chrono::DateTime<Utc>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

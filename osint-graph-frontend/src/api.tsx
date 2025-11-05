@@ -137,9 +137,13 @@ export const deleteProject = async (projectId: string): Promise<void> => {
 
 export const exportProject = async (
 	projectId: string,
+	includeAttachments: boolean,
 ): Promise<ProjectExport> => {
+	const params =
+		(includeAttachments ?? false) ? { include_attachments: "true" } : {};
 	const response = await axios.get<ProjectExport>(
 		`${PROJECT_URL}/${projectId}/export`,
+		{ params },
 	);
 	return response.data;
 };

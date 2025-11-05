@@ -89,7 +89,7 @@ export const ProjectManagementDialog: React.FC<
 	const handleExport = async () => {
 		setLoading(true);
 		try {
-			const data = await exportProject(currentProject.id);
+			const data = await exportProject(currentProject.id, true);
 			setExportData(data);
 
 			// Create download

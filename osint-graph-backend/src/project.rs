@@ -2,7 +2,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::header::CONTENT_TYPE;
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::IntoResponse;
-use axum::Json;
+use axum::{debug_handler, Json};
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter,
@@ -414,8 +414,7 @@ pub struct ProjectExport {
     pub nodelinks: Vec<nodelink::Model>,
     pub exported_at: chrono::DateTime<Utc>,
     pub version: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub attachments: Option<Vec<attachment::Model>>,
+    pub attachments: Vec<attachment::Model>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -424,6 +423,7 @@ pub struct ExportQuery {
     pub include_attachments: bool,
 }
 
+#[debug_handler]
 pub async fn export_project(
     Path(id): Path<Uuid>,
     Query(query): Query<ExportQuery>,
@@ -456,36 +456,37 @@ pub async fn export_project(
         .await?;
 
     // Optionally fetch attachments
-    let attachments = if query.include_attachments {
-        use crate::entity::attachment;
-        use sea_orm::ColumnTrait;
-
-        // Get all node IDs for this project
-        let node_ids: Vec<String> = nodes.iter().map(|n| n.id.to_string()).collect();
-
-        if !node_ids.is_empty() {
-            Some(
-                attachment::Entity::find()
-                    .filter(attachment::Column::NodeId.is_in(node_ids))
-                    .all(&txn)
-                    .await?,
-            )
-        } else {
-            Some(vec![])
-        }
-    } else {
-        None
-    };
-
-    drop(txn);
+    // Get all node IDs for this project
+    let node_ids: Vec<Uuid> = nodes.iter().map(|n| n.id).collect();
 
     // Construct export object
-    Ok(Json(ProjectExport {
-        project,
-        nodes,
-        nodelinks,
-        exported_at: Utc::now(),
-        version: env!("CARGO_PKG_VERSION").to_string(),
-        attachments,
-    }))
+    if query.include_attachments {
+        Ok(Json(ProjectExport {
+            project,
+            nodes,
+            nodelinks,
+            exported_at: Utc::now(),
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            attachments: attachment::Entity::find()
+                .filter(attachment::Column::NodeId.is_in(node_ids))
+                .all(&txn)
+                .await?,
+        }))
+    } else {
+        let attachments: Vec<attachment::Model> = attachment::attachment_list(id)
+            .all(&txn)
+            .await?
+            .into_iter()
+            .map(|a| attachment::Model::from(a))
+            .collect();
+
+        Ok(Json(ProjectExport {
+            project,
+            nodes,
+            nodelinks,
+            exported_at: Utc::now(),
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            attachments,
+        }))
+    }
 }

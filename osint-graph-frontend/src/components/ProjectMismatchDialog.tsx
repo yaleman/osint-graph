@@ -35,7 +35,7 @@ export function ProjectMismatchDialog({
 										onProjectSelect(project.id);
 									}
 								}}
-								role="button"
+								role="menuitem"
 								tabIndex={0}
 							>
 								<div className="project-list-item-name">{project.name}</div>

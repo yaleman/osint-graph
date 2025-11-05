@@ -137,11 +137,14 @@ pub async fn get_project(
     }
 }
 
-pub async fn get_projects(State(state): State<SharedState>) -> Result<impl IntoResponse, WebError> {
+pub async fn get_projects(
+    State(state): State<SharedState>,
+) -> Result<Json<Vec<project::Model>>, WebError> {
     let val = project::Entity::find()
         .all(&state.read().await.conn)
-        .await?;
-    Ok((StatusCode::OK, serde_json::to_string_pretty(&val)?))
+        .await
+        .inspect_err(|err| error!(error=?err, "Failed to query project list"))?;
+    Ok(Json(val))
 }
 
 pub async fn get_node(

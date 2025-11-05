@@ -348,39 +348,54 @@ export const ProjectManagementDialog: React.FC<
 					{/* Delete Tab */}
 					{activeTab === "delete" && (
 						<div>
-							<div className="delete-warning">
-								<p className="delete-warning-title">
-									⚠️ Warning: This action cannot be undone
-								</p>
-								<p className="delete-warning-text">
-									Deleting this project will permanently remove all nodes,
-									links, and associated data.
-								</p>
-							</div>
+							{currentProject.id === "00000000-0000-0000-0000-000000000000" ? (
+								<div className="delete-warning">
+									<p className="delete-warning-title">
+										🔒 Inbox Project Cannot Be Deleted
+									</p>
+									<p className="delete-warning-text">
+										The Inbox project is a default system project and cannot be
+										deleted. It serves as a fallback for organizing your initial
+										work.
+									</p>
+								</div>
+							) : (
+								<>
+									<div className="delete-warning">
+										<p className="delete-warning-title">
+											⚠️ Warning: This action cannot be undone
+										</p>
+										<p className="delete-warning-text">
+											Deleting this project will permanently remove all nodes,
+											links, and associated data.
+										</p>
+									</div>
 
-							<div className="form-group">
-								<label className="form-label" htmlFor={idDeleteConfirmName}>
-									Type project name to confirm:{" "}
-									<strong>{currentProject.name}</strong>
-								</label>
-								<input
-									type="text"
-									id={idDeleteConfirmName}
-									value={deleteConfirmName}
-									onChange={(e) => setDeleteConfirmName(e.target.value)}
-									className="form-input"
-									placeholder="Enter project name"
-								/>
-							</div>
+									<div className="form-group">
+										<label className="form-label" htmlFor={idDeleteConfirmName}>
+											Type project name to confirm:{" "}
+											<strong>{currentProject.name}</strong>
+										</label>
+										<input
+											type="text"
+											id={idDeleteConfirmName}
+											value={deleteConfirmName}
+											onChange={(e) => setDeleteConfirmName(e.target.value)}
+											className="form-input"
+											placeholder="Enter project name"
+										/>
+									</div>
 
-							<button
-								type="button"
-								onClick={handleDelete}
-								disabled={loading || deleteConfirmName !== currentProject.name}
-								className="btn btn-danger"
-							>
-								{loading ? "Deleting..." : "Delete Project"}
-							</button>
+									<button
+										type="button"
+										onClick={handleDelete}
+										disabled={loading || deleteConfirmName !== currentProject.name}
+										className="btn btn-danger"
+									>
+										{loading ? "Deleting..." : "Delete Project"}
+									</button>
+								</>
+							)}
 						</div>
 					)}
 				</div>

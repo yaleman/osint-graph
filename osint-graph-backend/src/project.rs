@@ -381,6 +381,14 @@ pub async fn delete_project(
 ) -> Result<String, WebError> {
     let conn = &state.read().await.conn;
 
+    if id == Uuid::nil() {
+        debug!("Attempted to delete project with nil UUID");
+        return Err(WebError {
+            status: StatusCode::BAD_REQUEST,
+            message: "Cannot delete project with nil UUID".to_string(),
+        });
+    }
+
     let res = project::Entity::delete_by_id(id).exec(conn).await?;
     if res.rows_affected > 0 {
         info!(

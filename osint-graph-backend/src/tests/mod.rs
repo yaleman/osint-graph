@@ -629,3 +629,28 @@ async fn test_api_delete_project_not_found() {
         .await;
     assert_eq!(res.status_code(), 404);
 }
+
+#[tokio::test]
+async fn test_api_delete_inbox_project_blocked() {
+    let server = setup_test_server().await;
+
+    // Try to delete the Inbox project (nil UUID)
+    let res = server
+        .delete(&format!("/api/v1/project/{}", Uuid::nil()))
+        .expect_failure()
+        .await;
+    assert_eq!(res.status_code(), 400);
+
+    // Verify error message
+    let body = res.text();
+    assert!(body.contains("Cannot delete project with nil UUID"));
+
+    // Verify the Inbox project still exists
+    let res = server
+        .get(&format!("/api/v1/project/{}", Uuid::nil()))
+        .await;
+    res.assert_status_ok();
+    let project: project::Model = res.json();
+    assert_eq!(project.id, Uuid::nil());
+    assert_eq!(project.name, "Inbox");
+}

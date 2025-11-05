@@ -22,16 +22,20 @@ import {
 	createNode,
 	createNodeLink,
 	createProject,
+	deleteAttachment,
 	deleteNode,
 	deleteNodeLink,
+	downloadAttachment,
 	exportProject,
 	fetchProjects,
+	listAttachments,
 	updateNode,
+	uploadAttachment,
 } from "./api";
 import { ProjectManagementDialog } from "./components/ProjectManagementDialog";
 import { ProjectMismatchDialog } from "./components/ProjectMismatchDialog";
 import { ProjectSelector } from "./components/ProjectSelector";
-import type { OSINTNode, Project } from "./types";
+import type { Attachment, OSINTNode, Project } from "./types";
 import { NodeTypeInfo } from "./types";
 import "./osint-graph.css";
 
@@ -61,6 +65,8 @@ function AppContent() {
 		y: number;
 		node: Node;
 	} | null>(null);
+	const [nodeAttachments, setNodeAttachments] = useState<Attachment[]>([]);
+	const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
 	// Refs for debouncing node updates
 	const pendingUpdatesRef = useRef<Map<string, number>>(new Map());
@@ -488,41 +494,38 @@ function AppContent() {
 		setCurrentProject(updatedProject);
 	}, []);
 
-	const handleProjectDelete = useCallback(
-		async (_deletedProjectId: string) => {
-			// Clear everything
-			localStorage.removeItem(PROJECT_ID_KEY);
-			setNodes([]);
-			setEdges([]);
-			setShowProjectManagement(false);
+	const handleProjectDelete = useCallback(async () => {
+		// Clear everything
+		localStorage.removeItem(PROJECT_ID_KEY);
+		setNodes([]);
+		setEdges([]);
+		setShowProjectManagement(false);
 
-			// Fetch projects AFTER deletion is confirmed complete
-			try {
-				const projects = await fetchProjects();
+		// Fetch projects AFTER deletion is confirmed complete
+		try {
+			const projects = await fetchProjects();
 
-				if (projects.length > 0) {
-					// Show project selector if other projects exist
-					setAvailableProjects(projects);
-					setShowMismatchDialog(true);
-					setCurrentProject(null);
-					toast.success("Project deleted - please select a project");
-				} else {
-					// No other projects, create a new one
-					setTimeout(() => {
-						setCurrentProject(null);
-						toast.success("Project deleted - creating new project");
-					}, 100);
-				}
-			} catch (error) {
-				console.error("Failed to fetch projects:", error);
-				// Fallback to creating new project
+			if (projects.length > 0) {
+				// Show project selector if other projects exist
+				setAvailableProjects(projects);
+				setShowMismatchDialog(true);
+				setCurrentProject(null);
+				toast.success("Project deleted - please select a project");
+			} else {
+				// No other projects, create a new one
 				setTimeout(() => {
 					setCurrentProject(null);
+					toast.success("Project deleted - creating new project");
 				}, 100);
 			}
-		},
-		[setNodes, setEdges],
-	);
+		} catch (error) {
+			console.error("Failed to fetch projects:", error);
+			// Fallback to creating new project
+			setTimeout(() => {
+				setCurrentProject(null);
+			}, 100);
+		}
+	}, [setNodes, setEdges]);
 
 	const handleProjectChange = useCallback(
 		async (projectId: string) => {
@@ -791,6 +794,7 @@ function AppContent() {
 		setEditDisplay("");
 		setEditValue("");
 		setEditNotes("");
+		setNodeAttachments([]);
 	}, [
 		editingNode,
 		editDisplay,
@@ -801,6 +805,90 @@ function AppContent() {
 		saveHistory,
 		pendingNodes,
 	]);
+
+	// Load attachments when editing a node
+	useEffect(() => {
+		if (editingNode && !pendingNodes.has(editingNode)) {
+			listAttachments(editingNode)
+				.then(setNodeAttachments)
+				.catch((error) => {
+					console.error("Failed to load attachments:", error);
+					toast.error("Failed to load attachments");
+				});
+		} else {
+			setNodeAttachments([]);
+		}
+	}, [editingNode, pendingNodes]);
+
+	const handleFileUpload = useCallback(
+		async (event: React.ChangeEvent<HTMLInputElement>) => {
+			if (!editingNode || !event.target.files?.length) return;
+
+			const file = event.target.files[0];
+			setUploadingAttachment(true);
+
+			try {
+				const attachment = await uploadAttachment(editingNode, file);
+				setNodeAttachments((prev) => [...prev, attachment]);
+				toast.success(`Uploaded ${file.name}`);
+			} catch (error) {
+				console.error("Failed to upload attachment:", error);
+				toast.error("Failed to upload file");
+			} finally {
+				setUploadingAttachment(false);
+				// Reset input so the same file can be uploaded again
+				event.target.value = "";
+			}
+		},
+		[editingNode],
+	);
+
+	const handleDownloadAttachment = useCallback(
+		async (attachment: Attachment) => {
+			if (!editingNode) return;
+
+			try {
+				const blob = await downloadAttachment(editingNode, attachment.id);
+				const url = window.URL.createObjectURL(blob);
+				const a = document.createElement("a");
+				a.href = url;
+				a.download = attachment.filename;
+				document.body.appendChild(a);
+				a.click();
+				window.URL.revokeObjectURL(url);
+				document.body.removeChild(a);
+				toast.success(`Downloaded ${attachment.filename}`);
+			} catch (error) {
+				console.error("Failed to download attachment:", error);
+				toast.error("Failed to download file");
+			}
+		},
+		[editingNode],
+	);
+
+	const handleDeleteAttachment = useCallback(
+		async (attachmentId: string, filename: string) => {
+			if (!editingNode) return;
+
+			if (!window.confirm(`Delete ${filename}?`)) return;
+
+			try {
+				await deleteAttachment(editingNode, attachmentId);
+				setNodeAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+				toast.success(`Deleted ${filename}`);
+			} catch (error) {
+				console.error("Failed to delete attachment:", error);
+				toast.error("Failed to delete file");
+			}
+		},
+		[editingNode],
+	);
+
+	const formatFileSize = (bytes: number): string => {
+		if (bytes < 1024) return `${bytes} B`;
+		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+	};
 
 	const handleNodesChange: OnNodesChange = useCallback(
 		(changes) => {
@@ -1107,6 +1195,138 @@ function AppContent() {
 							placeholder="Additional information..."
 						/>
 					</div>
+
+					{/* Attachments section - only show for saved nodes */}
+					{!pendingNodes.has(editingNode) && (
+						<div className="modal-field">
+							<div
+								style={{
+									display: "block",
+									marginBottom: "8px",
+									fontWeight: "500",
+									fontSize: "14px",
+								}}
+							>
+								Attachments
+							</div>
+
+							{/* List of existing attachments */}
+							{nodeAttachments.length > 0 && (
+								<div
+									style={{
+										marginBottom: "12px",
+										border: "1px solid #e5e7eb",
+										borderRadius: "4px",
+										overflow: "hidden",
+									}}
+								>
+									{nodeAttachments.map((attachment) => (
+										<div
+											key={attachment.id}
+											style={{
+												padding: "8px 12px",
+												borderBottom: "1px solid #e5e7eb",
+												display: "flex",
+												alignItems: "center",
+												justifyContent: "space-between",
+												background: "#f9fafb",
+											}}
+										>
+											<div style={{ flex: 1, minWidth: 0 }}>
+												<div
+													style={{
+														fontWeight: "500",
+														fontSize: "13px",
+														overflow: "hidden",
+														textOverflow: "ellipsis",
+														whiteSpace: "nowrap",
+													}}
+												>
+													{attachment.filename}
+												</div>
+												<div
+													style={{
+														fontSize: "12px",
+														color: "#6b7280",
+													}}
+												>
+													{formatFileSize(attachment.size)}
+												</div>
+											</div>
+											<div
+												style={{
+													display: "flex",
+													gap: "8px",
+													marginLeft: "12px",
+												}}
+											>
+												<button
+													type="button"
+													onClick={() => handleDownloadAttachment(attachment)}
+													style={{
+														padding: "4px 8px",
+														background: "#3b82f6",
+														color: "white",
+														border: "none",
+														borderRadius: "3px",
+														cursor: "pointer",
+														fontSize: "12px",
+													}}
+													title="Download"
+												>
+													↓
+												</button>
+												<button
+													type="button"
+													onClick={() =>
+														handleDeleteAttachment(
+															attachment.id,
+															attachment.filename,
+														)
+													}
+													style={{
+														padding: "4px 8px",
+														background: "#ef4444",
+														color: "white",
+														border: "none",
+														borderRadius: "3px",
+														cursor: "pointer",
+														fontSize: "12px",
+													}}
+													title="Delete"
+												>
+													×
+												</button>
+											</div>
+										</div>
+									))}
+								</div>
+							)}
+
+							{/* Upload button */}
+							<label
+								style={{
+									display: "inline-block",
+									padding: "8px 12px",
+									background: "#10b981",
+									color: "white",
+									border: "none",
+									borderRadius: "4px",
+									cursor: uploadingAttachment ? "wait" : "pointer",
+									fontSize: "13px",
+									opacity: uploadingAttachment ? 0.6 : 1,
+								}}
+							>
+								{uploadingAttachment ? "Uploading..." : "Upload File"}
+								<input
+									type="file"
+									onChange={handleFileUpload}
+									disabled={uploadingAttachment}
+									style={{ display: "none" }}
+								/>
+							</label>
+						</div>
+					)}
 
 					<div style={{ display: "flex", gap: "10px" }}>
 						<button

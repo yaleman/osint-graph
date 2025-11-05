@@ -3,26 +3,30 @@ default:
 
 # Run cargo clippy on all targets
 clippy:
-    cargo clippy --all-targets --all-features --workspace
+    cargo clippy  --quiet --all-targets --all-features --workspace
 
 # Run cargo tests
 test:
-    cargo test
+    cargo test --quiet
 
 # Run cargo fmt
 fmt:
-    cargo fmt
+    cargo fmt --quiet
 
 # Run the backend
 backend:
-	cargo run --bin osint-graph
+	cargo run  --quiet --bin osint-graph
 
 # Build the frontend
 frontend:
     cd osint-graph-frontend && vite build --emptyOutDir
 
 # lint all the things
-lint: clippy fmt frontend-lint
+lint: clippy fmt frontend-fmt frontend-lint
+
+# fmt the frontend code
+frontend-fmt:
+    biome format osint-graph-frontend --fix
 
 # Run frontend linting/checks
 frontend-lint:
@@ -32,7 +36,7 @@ frontend-lint:
 run:
     killall osint-graph-backend || true
     cd osint-graph-frontend && vite build --emptyOutDir
-    cargo run
+    cargo run --quiet -- --debug
 
 # Run all checks (clippy, test, fmt, frontend-lint)
 check: clippy test fmt frontend-lint
@@ -41,7 +45,7 @@ check: clippy test fmt frontend-lint
 set positional-arguments
 
 @coverage_inner *args='':
-    cargo tarpaulin --workspace --exclude-files=src/main.rs $@
+    cargo tarpaulin --quiet --workspace --exclude-files=src/main.rs $@
 
 # run coverage checks
 coverage:

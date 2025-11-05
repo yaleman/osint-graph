@@ -31,6 +31,15 @@ export interface NodeLink {
 	linktype: "Omni" | "Directional";
 }
 
+export interface Attachment {
+	id: string;
+	node_id: string;
+	filename: string;
+	content_type: string;
+	size: number;
+	created: string;
+}
+
 export interface ProjectExport {
 	project: Project;
 	nodes: OSINTNode[];

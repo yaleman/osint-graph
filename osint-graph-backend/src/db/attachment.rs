@@ -1,7 +1,11 @@
-use axum::async_trait;
+use sea_orm::prelude::async_trait;
 use chrono::{DateTime, Utc};
+use flate2::read::GzDecoder;
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use osint_graph_shared::attachment::Attachment;
 use sea_orm::{DatabaseConnection, FromQueryResult};
+use std::io::{Read, Write};
 use tracing::debug;
 use uuid::Uuid;
 
@@ -20,9 +24,14 @@ impl DBEntity for Attachment {
     }
 
     async fn save(&self, conn: &DatabaseConnection) -> Result<(), DBError> {
-        // Compress data with zstd before saving
-        let compressed_data = zstd::encode_all(&self.data[..], 3)
+        // Compress data with gzip before saving
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder
+            .write_all(&self.data)
             .map_err(|e| DBError::Other(format!("Failed to compress attachment data: {}", e)))?;
+        let compressed_data = encoder
+            .finish()
+            .map_err(|e| DBError::Other(format!("Failed to finish compression: {}", e)))?;
 
         let querystring = format!(
             "INSERT INTO {} (id, node_id, filename, content_type, size, data, created)
@@ -76,9 +85,11 @@ impl DBEntity for Attachment {
         let attachment_row = AttachmentRow::from_query_result(row, "")?;
 
         // Decompress data when loading
-        let decompressed_data = zstd::decode_all(&attachment_row.data[..]).map_err(|e| {
-            DBError::Other(format!("Failed to decompress attachment data: {}", e))
-        })?;
+        let mut decoder = GzDecoder::new(&attachment_row.data[..]);
+        let mut decompressed_data = Vec::new();
+        decoder
+            .read_to_end(&mut decompressed_data)
+            .map_err(|e| DBError::Other(format!("Failed to decompress attachment data: {}", e)))?;
 
         Ok(Some(Attachment {
             id: attachment_row.id,
@@ -132,7 +143,9 @@ impl AttachmentExt for Attachment {
             .map(|row| {
                 let attachment_row = AttachmentRow::from_query_result(row, "")?;
 
-                let decompressed_data = zstd::decode_all(&attachment_row.data[..]).map_err(|e| {
+                let mut decoder = GzDecoder::new(&attachment_row.data[..]);
+                let mut decompressed_data = Vec::new();
+                decoder.read_to_end(&mut decompressed_data).map_err(|e| {
                     DBError::Other(format!("Failed to decompress attachment data: {}", e))
                 })?;
 

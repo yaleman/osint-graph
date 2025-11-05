@@ -15,19 +15,20 @@
 
 ### 1.4 Backend API Endpoints - File Attachments
 
-- [ ] Add `POST /api/v1/node/:id/attachment` endpoint (multipart/form-data)
+- [ ] Add `POST /api/v1/node/{id}/attachment` endpoint (multipart/form-data)
 - [ ] Implement `upload_attachment` handler with zstd compression
 - [ ] Write test for file upload with various file types
 - [ ] Write test for file upload size limits
-- [ ] Add `GET /api/v1/node/:id/attachment/:attachment_id` endpoint
+- [ ] Add `GET /api/v1/node/{id}/attachment/{attachment_id}` endpoint
 - [ ] Implement `download_attachment` handler with decompression
 - [ ] Write test for file download
-- [ ] Add `DELETE /api/v1/node/:id/attachment/:attachment_id` endpoint
+- [ ] Add `DELETE /api/v1/node/{id}/attachment/{attachment_id}` endpoint
 - [ ] Implement `delete_attachment` handler
 - [ ] Write test for attachment deletion
-- [ ] Add `GET /api/v1/node/:id/attachments` endpoint (list all attachments for a node)
+- [ ] Add `GET /api/v1/node/{id}/attachments` endpoint (list all attachments for a node)
 - [ ] Implement `list_attachments` handler
 - [ ] Write test for listing attachments
+- [ ] update project export endpoint to include zstd-compressed base64-encoded attachments when an additional query parameter of "include_attachments" is set to true
 
 ## Phase 2: Frontend Types & API
 
@@ -51,15 +52,6 @@
 - [ ] Add `listAttachments(nodeId: string): Promise<Attachment[]>` in `api.tsx`
 
 ## Phase 3: UI Components
-
-### 3.1 Project Management Dialog ✅
-
-- [x] Create ProjectManagementDialog.tsx component with tabs
-- [x] Tab 1: General - Edit project name, description, tags
-- [x] Tab 2: Export - Export project to JSON file
-- [x] Tab 4: Delete - Delete project with confirmation
-- [x] Integrate dialog into App.tsx with Settings button
-- [x] Extract styles to osint-graph.css
 
 ### 3.2 Import Tab Implementation
 
@@ -109,30 +101,20 @@
 
 ### 4.2 Frontend Integration
 
-- [x] Test settings dialog opens and closes correctly
-- [x] Test project update from UI updates backend and state
-- [x] Test export downloads valid JSON file
 - [ ] Test import with valid JSON file succeeds
 - [ ] Test import with invalid JSON shows error
-- [x] Test delete project flow completes successfully
 - [ ] Test file upload/download in node editor
-- [x] Run `pnpm run lint` and fix any issues
 
 ### 4.3 Documentation
 
-- [x] Update `CLAUDE.md` with Project Management Dialog implementation
 - [ ] Document export JSON structure in `CLAUDE.md`
 - [ ] Document import modes (new/overwrite/merge) in `CLAUDE.md`
 - [ ] Document file attachment system in `CLAUDE.md`
-- [x] Update API endpoint list in `CLAUDE.md`
 - [ ] Add example export JSON to documentation
 
 ## Phase 5: Cleanup & Polish
 
 - [ ] Run `just check` final validation
-- [x] Commit Project Management Dialog implementation
-- [x] Commit CSS extraction
-- [x] Commit deferred node creation
 - [ ] Update CLAUDE.md with latest features
 - [ ] Clean up TODO.md (remove completed sections)
 

@@ -1,4 +1,4 @@
-use axum::async_trait;
+use sea_orm::prelude::async_trait;
 use osint_graph_shared::node::Node;
 
 use sea_orm::{ConnectionTrait, DatabaseConnection, FromQueryResult};

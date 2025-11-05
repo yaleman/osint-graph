@@ -1,3 +1,4 @@
+pub mod attachment;
 pub mod cli;
 pub mod entity;
 pub mod identifier;
@@ -10,6 +11,7 @@ pub mod storage;
 #[cfg(test)]
 mod tests;
 
+use attachment::{delete_attachment, download_attachment, list_attachments, upload_attachment};
 use axum::{
     body::Body,
     error_handling::HandleErrorLayer,
@@ -67,6 +69,16 @@ pub fn build_app<T>(shared_state: &SharedState) -> Router<T> {
         .route("/api/v1/node/{id}", get(get_node))
         .route("/api/v1/node/{id}", delete(delete_node))
         .route("/api/v1/node/{id}", put(update_node))
+        .route("/api/v1/node/{id}/attachment", post(upload_attachment))
+        .route("/api/v1/node/{id}/attachments", get(list_attachments))
+        .route(
+            "/api/v1/node/{node_id}/attachment/{attachment_id}",
+            get(download_attachment),
+        )
+        .route(
+            "/api/v1/node/{node_id}/attachment/{attachment_id}",
+            delete(delete_attachment),
+        )
         .route("/api/v1/nodelink", post(post_nodelink))
         .route("/api/v1/nodelink/{id}", delete(delete_nodelink))
         .route(

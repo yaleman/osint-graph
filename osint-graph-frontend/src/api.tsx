@@ -1,7 +1,13 @@
 // api.ts
 import axios, { type AxiosResponse } from "axios";
 import { v4 as uuidv4 } from "uuid";
-import type { NodeLink, OSINTNode, Project, ProjectExport } from "./types";
+import type {
+	Attachment,
+	NodeLink,
+	OSINTNode,
+	Project,
+	ProjectExport,
+} from "./types";
 
 const PROJECTS_URL = "/api/v1/projects";
 const PROJECT_URL = "/api/v1/project";
@@ -134,6 +140,58 @@ export const exportProject = async (
 ): Promise<ProjectExport> => {
 	const response = await axios.get<ProjectExport>(
 		`${PROJECT_URL}/${projectId}/export`,
+	);
+	return response.data;
+};
+
+/** Upload a file attachment to a node */
+export const uploadAttachment = async (
+	nodeId: string,
+	file: File,
+): Promise<Attachment> => {
+	const formData = new FormData();
+	formData.append("file", file);
+
+	const response = await axios.post<Attachment>(
+		`${NODE_URL}/${nodeId}/attachment`,
+		formData,
+		{
+			headers: {
+				"Content-Type": "multipart/form-data",
+			},
+		},
+	);
+	return response.data;
+};
+
+/** Download a file attachment */
+export const downloadAttachment = async (
+	nodeId: string,
+	attachmentId: string,
+): Promise<Blob> => {
+	const response = await axios.get(
+		`${NODE_URL}/${nodeId}/attachment/${attachmentId}`,
+		{
+			responseType: "blob",
+		},
+	);
+	return response.data;
+};
+
+/** Delete a file attachment */
+export const deleteAttachment = async (
+	nodeId: string,
+	attachmentId: string,
+): Promise<void> => {
+	await axios.delete(`${NODE_URL}/${nodeId}/attachment/${attachmentId}`);
+};
+
+/** List all attachments for a node */
+export const listAttachments = async (
+	nodeId: string,
+): Promise<Attachment[]> => {
+	const response = await axios.get<Attachment[]>(
+		`${NODE_URL}/${nodeId}/attachments`,
 	);
 	return response.data;
 };

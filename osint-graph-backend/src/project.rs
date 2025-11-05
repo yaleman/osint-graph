@@ -1,4 +1,4 @@
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::header::CONTENT_TYPE;
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::IntoResponse;
@@ -13,7 +13,7 @@ use sqlx::types::chrono::Utc;
 use tracing::{debug, error, info};
 use uuid::Uuid;
 
-use crate::entity::{node, nodelink, project};
+use crate::entity::{attachment, node, nodelink, project};
 use crate::SharedState;
 
 /// Clean URL values by removing invisible Unicode characters
@@ -77,6 +77,10 @@ pub struct WebError {
 }
 
 impl WebError {
+    pub fn new(status: StatusCode, message: String) -> Self {
+        WebError { status, message }
+    }
+
     pub fn not_found(message: String) -> Self {
         WebError {
             status: StatusCode::NOT_FOUND,
@@ -410,10 +414,19 @@ pub struct ProjectExport {
     pub nodelinks: Vec<nodelink::Model>,
     pub exported_at: chrono::DateTime<Utc>,
     pub version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attachments: Option<Vec<attachment::Model>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ExportQuery {
+    #[serde(default)]
+    pub include_attachments: bool,
 }
 
 pub async fn export_project(
     Path(id): Path<Uuid>,
+    Query(query): Query<ExportQuery>,
     State(state): State<SharedState>,
 ) -> Result<Json<ProjectExport>, WebError> {
     let conn = &state.read().await.conn;
@@ -442,6 +455,28 @@ pub async fn export_project(
         .all(&txn)
         .await?;
 
+    // Optionally fetch attachments
+    let attachments = if query.include_attachments {
+        use crate::entity::attachment;
+        use sea_orm::ColumnTrait;
+
+        // Get all node IDs for this project
+        let node_ids: Vec<String> = nodes.iter().map(|n| n.id.to_string()).collect();
+
+        if !node_ids.is_empty() {
+            Some(
+                attachment::Entity::find()
+                    .filter(attachment::Column::NodeId.is_in(node_ids))
+                    .all(&txn)
+                    .await?,
+            )
+        } else {
+            Some(vec![])
+        }
+    } else {
+        None
+    };
+
     drop(txn);
 
     // Construct export object
@@ -451,5 +486,6 @@ pub async fn export_project(
         nodelinks,
         exported_at: Utc::now(),
         version: env!("CARGO_PKG_VERSION").to_string(),
+        attachments,
     }))
 }

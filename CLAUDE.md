@@ -225,3 +225,4 @@ Backend serves:
 - never ever use inline styles, use css classes for all styling
 - database migrations are in @osint-graph-backend/src/migration/
 - database entities eare in @osint-graph-backend/src/entity/
+- use relative file paths when working on files in the repository

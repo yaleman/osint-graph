@@ -46,47 +46,8 @@ pub async fn start_db(db_path: Option<&PathBuf>) -> Result<DatabaseConnection, s
         .await
         .map_err(|err| std::io::Error::other(format!("Migration failed: {err:?}")))?;
 
-    // // Create default project if it doesn't exist
-    // create_default_project(&conn).await?;
-
     Ok(conn)
 }
-
-// async fn create_default_project(conn: &DatabaseConnection) -> Result<(), std::io::Error> {
-//     let default_project_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000")
-//         .map_err(|e| std::io::Error::other(format!("Invalid UUID: {}", e)))?;
-
-//     // Check if default project already exists
-//     if let Ok(Some(_)) = project::Entity::find()
-//         .filter(project::Column::Id.eq(default_project_id))
-//         .one(conn)
-//         .await
-//     {
-//         debug!("Default project already exists");
-//         return Ok(());
-//     }
-
-//     let default_project = Project {
-//         id: default_project_id,
-//         name: "Default Project".to_string(),
-//         user: Uuid::new_v4(), // Generate a random user ID for demo
-//         creationdate: std::time::SystemTime::now().into(),
-//         last_updated: None,
-//         nodes: NodeUpdateList::new(),
-//         description: None,
-//         tags: Vec::new(),
-//     };
-
-//     let default_project = project::ActiveModel::from(default_project);
-
-//     default_project
-//         .save(conn)
-//         .await
-//         .map_err(|e| std::io::Error::other(format!("Failed to create default project: {:?}", e)))?;
-
-//     debug!("Created default project with ID: {}", default_project_id);
-//     Ok(())
-// }
 
 #[derive(Debug)]
 pub enum DBError {

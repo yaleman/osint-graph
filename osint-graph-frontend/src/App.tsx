@@ -491,12 +491,29 @@ function AppContent() {
 		setEdges([]);
 		setShowProjectManagement(false);
 
-		// Set to null AFTER closing dialog to trigger re-initialization
-		// Use setTimeout to ensure dialog closes first
-		setTimeout(() => {
-			setCurrentProject(null);
-			toast.success("Project deleted - creating new project");
-		}, 100);
+		// Check if there are other projects available
+		try {
+			const projects = await fetchProjects();
+			if (projects.length > 0) {
+				// Show project selector if other projects exist
+				setAvailableProjects(projects);
+				setShowMismatchDialog(true);
+				setCurrentProject(null);
+				toast.success("Project deleted - please select a project");
+			} else {
+				// No other projects, create a new one
+				setTimeout(() => {
+					setCurrentProject(null);
+					toast.success("Project deleted - creating new project");
+				}, 100);
+			}
+		} catch (error) {
+			console.error("Failed to fetch projects:", error);
+			// Fallback to creating new project
+			setTimeout(() => {
+				setCurrentProject(null);
+			}, 100);
+		}
 	}, [setNodes, setEdges]);
 
 	const handleSelectExisting = useCallback(() => {

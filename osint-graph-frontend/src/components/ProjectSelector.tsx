@@ -1,124 +1,117 @@
-import { useState, useEffect } from 'react';
-import { fetchProjects } from '../api';
-import type { Project } from '../types';
+import { useEffect, useState } from "react";
+import { fetchProjects } from "../api";
+import type { Project } from "../types";
 
 interface ProjectSelectorProps {
-  currentProject: Project | null;
-  onProjectChange: (projectId: string) => void;
-  onCreateNew: () => void;
-  setShowProjectManagement: (show: boolean) => void;
+	currentProject: Project | null;
+	onProjectChange: (projectId: string) => void;
+	onCreateNew: () => void;
+	setShowProjectManagement: (show: boolean) => void;
 }
 
-export function ProjectSelector({ currentProject, onProjectChange, onCreateNew, setShowProjectManagement }: ProjectSelectorProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(false);
+export function ProjectSelector({
+	currentProject,
+	onProjectChange,
+	onCreateNew,
+	setShowProjectManagement,
+}: ProjectSelectorProps) {
+	const [isOpen, setIsOpen] = useState(false);
+	const [projects, setProjects] = useState<Project[]>([]);
+	const [loading, setLoading] = useState(false);
 
-  const loadProjects = async () => {
-    setLoading(true);
-    try {
-      const projectList = await fetchProjects();
-      setProjects(projectList);
-    } catch (error) {
-      console.error('Failed to load projects:', error);
-      setProjects([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+	const loadProjects = async () => {
+		if (loading === false) {
+			setLoading(true);
+			try {
+				const projectList = await fetchProjects();
+				setProjects(projectList);
+			} catch (error) {
+				console.error("Failed to load projects:", error);
+				setProjects([]);
+			} finally {
+				setLoading(false);
+			}
+		}
+	};
 
-  useEffect(() => {
-    if (isOpen) {
-      loadProjects();
-    }
-  }, [isOpen]);
+	// biome-ignore lint: lint/correctness/useExhaustiveDependencies "adding loadProjects causes infinite loop"
+	useEffect(() => {
+		if (isOpen) {
+			loadProjects();
+		}
+	}, [isOpen]);
 
-  return (
-    <div style={{ position: 'fixed', top: '10px', left: '10px', zIndex: 1000 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="project-selector btn"
-        >
-          <span>📁</span>
-          <span>{currentProject?.name ?? 'No Project'}</span>
-          <span className="smol">{isOpen ? '▲' : '▼'}</span>
-        </button>
+	return (
+		<div style={{ position: "fixed", top: "10px", left: "10px", zIndex: 1000 }}>
+			<div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+				<button
+					type="button"
+					onClick={() => setIsOpen(!isOpen)}
+					className="project-selector btn"
+				>
+					<span>📁</span>
+					<span>{currentProject?.name ?? "No Project"}</span>
+					<span className="smol">{isOpen ? "▲" : "▼"}</span>
+				</button>
 
-        <button
-          onClick={onCreateNew}
-          className="btn btn-primary"
-          title="Create New Project"
-        >
-          + New
-        </button>
-        <button
-          onClick={() => setShowProjectManagement(true)}
-          className="btn btn-primary"
-          title="Project Settings"
-        >
-          ⚙️ Settings
-        </button>
-      </div>
+				<button
+					type="button"
+					onClick={onCreateNew}
+					className="btn btn-primary"
+					title="Create New Project"
+				>
+					+ New
+				</button>
+				<button
+					type="button"
+					onClick={() => setShowProjectManagement(true)}
+					className="btn btn-primary"
+					title="Project Settings"
+				>
+					⚙️ Settings
+				</button>
+			</div>
 
-      {isOpen && (
-        <div
-          style={{
-            marginTop: '8px',
-            background: 'white',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            minWidth: '250px',
-            maxHeight: '400px',
-            overflowY: 'auto',
-          }}
-        >
-          {loading ? (
-            <div style={{ padding: '12px', textAlign: 'center', color: '#666' }}>
-              Loading projects...
-            </div>
-          ) : projects.length === 0 ? (
-            <div style={{ padding: '12px', textAlign: 'center', color: '#666' }}>
-              No projects found
-            </div>
-          ) : (
-            <div>
-              {projects.map((project) => (
-                <div
-                  key={project.id}
-                  onClick={() => {
-                    onProjectChange(project.id);
-                    setIsOpen(false);
-                  }}
-                  style={{
-                    padding: '12px',
-                    cursor: 'pointer',
-                    borderBottom: '1px solid #eee',
-                    background: currentProject?.id === project.id ? '#f0f9ff' : 'white',
-                    fontWeight: currentProject?.id === project.id ? '600' : 'normal',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (currentProject?.id !== project.id) {
-                      e.currentTarget.style.background = '#f9fafb';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (currentProject?.id !== project.id) {
-                      e.currentTarget.style.background = 'white';
-                    }
-                  }}
-                >
-                  <div>{project.name}</div>
-                  <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>
-                    {project.id}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+			{isOpen && (
+				<div className="project-selector-dropdown">
+					{loading ? (
+						<div className="project-selector-noprojects">
+							Loading projects...
+						</div>
+					) : projects.length === 0 ? (
+						<div className="project-selector-noprojects">No projects found</div>
+					) : (
+						<div>
+							{projects.map((project, index) => (
+								<div
+									role="menuitem"
+									tabIndex={index}
+									key={project.id}
+									onKeyDown={() => {}}
+									onClick={() => {
+										onProjectChange(project.id);
+										setIsOpen(false);
+									}}
+									className={`project-selector-base ${currentProject?.id === project.id ? "project-selector-selected" : ""}`}
+									onMouseEnter={(e) => {
+										if (currentProject?.id !== project.id) {
+											e.currentTarget.style.background = "#f9fafb";
+										}
+									}}
+									onMouseLeave={(e) => {
+										if (currentProject?.id !== project.id) {
+											e.currentTarget.style.background = "white";
+										}
+									}}
+								>
+									<div>{project.name}</div>
+									<div className="project-selector-subhead">{project.id}</div>
+								</div>
+							))}
+						</div>
+					)}
+				</div>
+			)}
+		</div>
+	);
 }

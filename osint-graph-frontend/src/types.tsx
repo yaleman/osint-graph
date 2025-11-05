@@ -28,7 +28,7 @@ export interface NodeLink {
 	left: string;
 	right: string;
 	project_id: string;
-	linktype: 'Omni' | 'Directional';
+	linktype: "Omni" | "Directional";
 }
 
 export interface ProjectExport {
@@ -38,15 +38,18 @@ export interface ProjectExport {
 	attachments?: Record<string, unknown>;
 }
 
-export const NodeTypeInfo: Record<string, { label: string; defaultDisplay: string }> = {
-	person: { label: 'Person', defaultDisplay: 'Name' },
-	domain: { label: 'Domain', defaultDisplay: 'Domain' },
-	ip: { label: 'IP Address', defaultDisplay: 'Address' },
-	phone: { label: 'Phone', defaultDisplay: 'Number' },
-	email: { label: 'Email', defaultDisplay: 'Address' },
-	url: { label: 'URL', defaultDisplay: 'Link' },
-	image: { label: 'Image', defaultDisplay: 'Filename' },
-	location: { label: 'Location', defaultDisplay: 'Address' },
-	organization: { label: 'Organization', defaultDisplay: 'Name' },
-	document: { label: 'Document', defaultDisplay: 'Filename' },
+export const NodeTypeInfo: Record<
+	string,
+	{ label: string; defaultDisplay: string }
+> = {
+	person: { label: "Person", defaultDisplay: "Name" },
+	domain: { label: "Domain", defaultDisplay: "Domain" },
+	ip: { label: "IP Address", defaultDisplay: "Address" },
+	phone: { label: "Phone", defaultDisplay: "Number" },
+	email: { label: "Email", defaultDisplay: "Address" },
+	url: { label: "URL", defaultDisplay: "Link" },
+	image: { label: "Image", defaultDisplay: "Filename" },
+	location: { label: "Location", defaultDisplay: "Address" },
+	organization: { label: "Organization", defaultDisplay: "Name" },
+	document: { label: "Document", defaultDisplay: "Filename" },
 };

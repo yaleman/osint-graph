@@ -23,7 +23,7 @@
 .dialog-container {
 	background-color: white;
 	border-radius: 8px;
-	padding: 1.0rem;
+	padding: 1rem;
 	max-width: 95vw;
 	min-width: 60vw;
 	max-height: 99vh;
@@ -173,7 +173,7 @@
 }
 
 .btn {
-	padding: 0.5rem 1.0rem;
+	padding: 0.5rem 1rem;
 	border-radius: 4px;
 	cursor: pointer;
 	font-size: 14px;
@@ -184,6 +184,10 @@
 	background-color: #3b82f6;
 	border: none;
 	color: white;
+}
+
+.btn-secondary {
+	background-color: #9ca3af;
 }
 
 .btn-primary:disabled {
@@ -309,7 +313,6 @@
 	background-color: #f3f4f6;
 }
 
-
 .loading-screen {
 	width: 100vw;
 	height: 100vh;
@@ -323,14 +326,11 @@
 	margin-bottom: 10px;
 }
 
-
-
 .app-container {
 	width: 100vw;
 	height: 100vh;
 	position: relative;
 }
-
 
 .node-panel {
 	position: fixed;
@@ -352,15 +352,15 @@
 }
 
 .node-panel-collapsed {
-	right: calc(-1* var(--nodel-panel-width));
+	right: calc(-1 * var(--nodel-panel-width));
 }
 
 .node-panel-collapse-button {
 	position: absolute;
-	left: calc(-1* var(--node-collapse-button-width));
+	left: calc(-1 * var(--node-collapse-button-width));
 	top: 10px;
 	width: var(--node-collapse-button-width);
-	height: calc(1.25* var(--node-collapse-button-width));
+	height: calc(1.25 * var(--node-collapse-button-width));
 	background: var(--white);
 	border: 1px solid #ccc;
 	border-right: none;
@@ -375,4 +375,116 @@
 
 .smol {
 	font-size: 0.75rem;
+}
+
+.project-selector-dropdown {
+	margin-top: 8px;
+	background: white;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	min-width: 250px;
+	max-height: 400px;
+	overflow-y: auto;
+}
+
+.project-selector-base {
+	font-size: 12px;
+	padding: 12px;
+	cursor: pointer;
+	border-bottom: 1px solid #eee;
+}
+
+.project-selector-selected {
+	margin-top: 0.25rem;
+	font-weight: 600;
+}
+
+.project-selector-subhead {
+	color: #999;
+	margin-top: 0.25rem;
+	font-weight: 600;
+}
+
+.project-selector-noprojects {
+	padding: 12px;
+	color: #666;
+	font-style: italic;
+}
+
+/* Project Mismatch Dialog */
+
+.dialog-description {
+	margin-bottom: 20px;
+	color: #666;
+}
+
+.dialog-question {
+	margin-bottom: 16px;
+}
+
+.dialog-question-text {
+	font-weight: bold;
+	margin-bottom: 8px;
+}
+
+.dialog-buttons {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.dialog-no-projects {
+	margin-top: 16px;
+	font-size: 12px;
+	color: #999;
+	text-align: center;
+}
+
+.project-list {
+	max-height: 400px;
+	overflow-y: auto;
+	margin-bottom: 20px;
+	border: 1px solid #e5e7eb;
+	border-radius: 4px;
+}
+
+.project-list-item {
+	padding: 16px;
+	border-bottom: 1px solid #e5e7eb;
+	cursor: pointer;
+	transition: background-color 0.15s;
+}
+
+.project-list-item:last-child {
+	border-bottom: none;
+}
+
+.project-list-item:hover {
+	background-color: #f9fafb;
+}
+
+.project-list-item:focus {
+	outline: 2px solid #3b82f6;
+	outline-offset: -2px;
+}
+
+.project-list-item-name {
+	font-weight: 600;
+	font-size: 16px;
+	margin-bottom: 4px;
+	color: #111827;
+}
+
+.project-list-item-id {
+	font-size: 12px;
+	color: #6b7280;
+	font-family: monospace;
+	margin-bottom: 4px;
+}
+
+.project-list-item-description {
+	font-size: 14px;
+	color: #374151;
+	margin-top: 8px;
 }

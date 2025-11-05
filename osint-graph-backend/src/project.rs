@@ -10,7 +10,7 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::Utc;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use crate::entity::{node, nodelink, project};
@@ -375,46 +375,20 @@ pub async fn update_project(
 pub async fn delete_project(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
-) -> impl IntoResponse {
+) -> Result<String, WebError> {
     let conn = &state.read().await.conn;
 
-    // Verify project exists first
-    match project::Entity::find()
-        .filter(project::Column::Id.eq(id))
-        .one(conn)
-        .await
-    {
-        Ok(Some(project)) => {
-            // Delete the project - cascade should handle nodes and nodelinks automatically
-            match project.delete(conn).await {
-                Ok(res) => {
-                    debug!(
-                        res = format!("{:?}", res),
-                        id = id.to_string(),
-                        "Deleted project"
-                    );
-                    (StatusCode::OK, "Project deleted successfully".to_string())
-                }
-                Err(err) => {
-                    debug!("Error deleting project {}: {:?}", id, err);
-                    (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("Error deleting project: {:?}", err),
-                    )
-                }
-            }
-        }
-        Ok(None) => {
-            debug!("Project {} not found for deletion", id);
-            (StatusCode::NOT_FOUND, format!("Project {} not found", id))
-        }
-        Err(err) => {
-            debug!("Error checking project existence: {:?}", err);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Error checking project: {:?}", err),
-            )
-        }
+    let res = project::Entity::delete_by_id(id).exec(conn).await?;
+    if res.rows_affected > 0 {
+        info!(
+            rows_affected = res.rows_affected,
+            id = id.to_string(),
+            "Deleted project"
+        );
+        Ok("Project deleted successfully".to_string())
+    } else {
+        debug!("Project {} not found for deletion", id);
+        Err(WebError::not_found(format!("Project {} not found", id)))
     }
 }
 

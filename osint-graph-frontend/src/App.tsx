@@ -516,12 +516,6 @@ function AppContent() {
 		}
 	}, [setNodes, setEdges]);
 
-	const handleSelectExisting = useCallback(() => {
-		setShowMismatchDialog(false);
-		// The user can use the project selector to choose a project
-		toast("Please select a project from the dropdown");
-	}, []);
-
 	const handleProjectChange = useCallback(
 		async (projectId: string) => {
 			try {
@@ -540,6 +534,15 @@ function AppContent() {
 			}
 		},
 		[loadProjectData],
+	);
+
+	const handleProjectSelect = useCallback(
+		(projectId: string) => {
+			setShowMismatchDialog(false);
+			handleProjectChange(projectId);
+			toast.success("Project selected");
+		},
+		[handleProjectChange],
 	);
 
 	// Get viewport center position for new nodes
@@ -897,7 +900,7 @@ function AppContent() {
 			{showMismatchDialog && (
 				<ProjectMismatchDialog
 					onCreateNew={handleCreateNewProject}
-					onSelectExisting={handleSelectExisting}
+					onProjectSelect={handleProjectSelect}
 					projects={availableProjects}
 				/>
 			)}

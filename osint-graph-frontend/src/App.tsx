@@ -419,6 +419,9 @@ function AppContent() {
 		// Don't run if we already have a project
 		if (currentProject !== null) return;
 
+		// Don't run if mismatch dialog is showing (user is selecting a project)
+		if (showMismatchDialog) return;
+
 		const initializeProject = async () => {
 			try {
 				setIsLoading(true);
@@ -462,7 +465,7 @@ function AppContent() {
 		};
 
 		initializeProject();
-	}, [currentProject, loadProjectData]);
+	}, [currentProject, showMismatchDialog, loadProjectData]);
 
 	const nodeTypes = Object.keys(NodeTypeInfo);
 

@@ -24,10 +24,8 @@ import {
 	createProject,
 	deleteNode,
 	deleteNodeLink,
-	fetchNodeLinksByProject,
-	fetchNodesByProject,
+	exportProject,
 	fetchProjects,
-	getProject,
 	updateNode,
 } from "./api";
 import { ProjectManagementDialog } from "./components/ProjectManagementDialog";
@@ -375,9 +373,11 @@ function AppContent() {
 	const loadProjectData = useCallback(
 		async (projectId: string) => {
 			try {
-				// Load nodes
-				const existingNodes = await fetchNodesByProject(projectId);
-				const reactFlowNodes: Node[] = existingNodes.map((osintNode) => ({
+				// Load project data using export endpoint (single request)
+				const exportData = await exportProject(projectId);
+
+				// Convert nodes to ReactFlow format
+				const reactFlowNodes: Node[] = exportData.nodes.map((osintNode) => ({
 					id: osintNode.id,
 					type: "default",
 					position: { x: osintNode.pos_x || 100, y: osintNode.pos_y || 100 },
@@ -396,15 +396,16 @@ function AppContent() {
 				}));
 				setNodes(reactFlowNodes);
 
-				// Load node links
-				const existingLinks = await fetchNodeLinksByProject(projectId);
-				const reactFlowEdges: Edge[] = existingLinks.map((nodeLink) => ({
+				// Convert links to ReactFlow edges
+				const reactFlowEdges: Edge[] = exportData.links.map((nodeLink) => ({
 					id: nodeLink.id,
 					source: nodeLink.left,
 					target: nodeLink.right,
 					type: nodeLink.linktype === "Directional" ? "default" : "straight",
 				}));
 				setEdges(reactFlowEdges);
+
+				return exportData.project;
 			} catch (error) {
 				console.error("Failed to load project data:", error);
 				throw error;
@@ -425,22 +426,22 @@ function AppContent() {
 
 				// Check for valid project ID (not null, not "undefined", not empty)
 				if (projectId && projectId !== "undefined" && projectId.trim() !== "") {
-					// Validate project exists in backend
-					const project = await getProject(projectId);
-
-					if (project) {
-						// Project exists, load its data
-						setCurrentProject(project);
-						try {
-							await loadProjectData(projectId);
+					// Load project and data in single request
+					try {
+						const project = await loadProjectData(projectId);
+						if (project) {
+							setCurrentProject(project);
 							setIsLoading(false);
-						} catch (error) {
-							console.error("Failed to load project data:", error);
-							toast.error("Failed to load project data");
+						} else {
+							// Project doesn't exist in backend, show mismatch dialog
+							const projects = await fetchProjects();
+							setAvailableProjects(projects);
+							setShowMismatchDialog(true);
 							setIsLoading(false);
 						}
-					} else {
-						// Project doesn't exist in backend, show mismatch dialog
+					} catch (error) {
+						// If export fails (404), project doesn't exist
+						console.error("Failed to load project data:", error);
 						const projects = await fetchProjects();
 						setAvailableProjects(projects);
 						setShowMismatchDialog(true);
@@ -519,13 +520,11 @@ function AppContent() {
 	const handleProjectChange = useCallback(
 		async (projectId: string) => {
 			try {
-				const project = await getProject(projectId);
+				// Load project and data in single request
+				const project = await loadProjectData(projectId);
 				if (project) {
 					localStorage.setItem(PROJECT_ID_KEY, projectId);
 					setCurrentProject(project);
-
-					// Load nodes and links for this project
-					await loadProjectData(projectId);
 					toast.success(`Switched to project: ${project.name}`);
 				}
 			} catch (error) {

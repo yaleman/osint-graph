@@ -6,7 +6,7 @@ use axum::Json;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter,
-    TryIntoModel,
+    TransactionTrait, TryIntoModel,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::Utc;
@@ -410,10 +410,12 @@ pub async fn export_project(
 ) -> Result<Json<ProjectExport>, WebError> {
     let conn = &state.read().await.conn;
 
+    let txn = conn.begin().await?;
+
     // Fetch the project
     let project = match project::Entity::find()
         .filter(project::Column::Id.eq(id))
-        .one(conn)
+        .one(&txn)
         .await?
     {
         Some(project) => project,
@@ -423,14 +425,16 @@ pub async fn export_project(
     // Fetch nodes
     let nodes = node::Entity::find()
         .filter(node::Column::ProjectId.eq(id))
-        .all(conn)
+        .all(&txn)
         .await?;
 
     // Fetch nodelinks
     let nodelinks = nodelink::Entity::find()
         .filter(nodelink::Column::ProjectId.eq(id))
-        .all(conn)
+        .all(&txn)
         .await?;
+
+    drop(txn);
 
     // Construct export object
     Ok(Json(ProjectExport {

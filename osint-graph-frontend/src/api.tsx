@@ -180,6 +180,18 @@ export const deleteAttachment = async (attachmentId: string): Promise<void> => {
 	await axios.delete(`${ATTACHMENT_URL}/${attachmentId}`);
 };
 
+/** Update an attachment (e.g., move to a different node) */
+export const updateAttachment = async (
+	attachmentId: string,
+	nodeId: string,
+): Promise<Attachment> => {
+	const response = await axios.patch<Attachment>(
+		`${ATTACHMENT_URL}/${attachmentId}`,
+		{ node_id: nodeId },
+	);
+	return response.data;
+};
+
 /** List all attachments for a node */
 export const listAttachments = async (
 	nodeId: string,

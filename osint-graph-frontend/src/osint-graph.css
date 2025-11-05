@@ -195,6 +195,11 @@
 	color: white;
 }
 
+.btn-warning {
+	background-color: #f59e0b;
+	color: white;
+}
+
 .btn-primary:disabled {
 	background-color: #9ca3af;
 	cursor: not-allowed;

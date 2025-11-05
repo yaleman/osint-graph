@@ -29,6 +29,7 @@ import {
 	exportProject,
 	fetchProjects,
 	listAttachments,
+	updateAttachment,
 	updateNode,
 	uploadAttachment,
 } from "./api";
@@ -51,6 +52,7 @@ function AppContent() {
 	const { project } = useReactFlow();
 	const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
 	const [editingNode, setEditingNode] = useState<string | null>(null);
+	const [editingNodeType, setEditingNodeType] = useState<string | null>(null);
 	const [editDisplay, setEditDisplay] = useState("");
 	const [editValue, setEditValue] = useState("");
 	const [editNotes, setEditNotes] = useState("");
@@ -68,6 +70,11 @@ function AppContent() {
 	const [nodeAttachments, setNodeAttachments] = useState<Attachment[]>([]);
 	const [uploadingAttachment, setUploadingAttachment] = useState(false);
 	const [allAttachments, setAllAttachments] = useState<Attachment[]>([]);
+	const [movingAttachment, setMovingAttachment] = useState<{
+		attachmentId: string;
+		filename: string;
+		sourceNodeId: string;
+	} | null>(null);
 
 	// Refs for debouncing node updates
 	const pendingUpdatesRef = useRef<Map<string, number>>(new Map());
@@ -662,7 +669,51 @@ function AppContent() {
 	const handleNodeDoubleClick = useCallback(
 		(event: React.MouseEvent, node: Node) => {
 			event.stopPropagation();
+
+			// If we're in move mode, complete the move
+			if (movingAttachment) {
+				const targetNodeId = node.id;
+				const { attachmentId, filename, sourceNodeId } = movingAttachment;
+
+				// Don't move to the same node
+				if (targetNodeId === sourceNodeId) {
+					toast.error("Cannot move attachment to the same node");
+					return;
+				}
+
+				// Perform the move
+				updateAttachment(attachmentId, targetNodeId)
+					.then((updatedAttachment) => {
+						// Update the cache
+						setAllAttachments((prev) =>
+							prev.map((a) => (a.id === attachmentId ? updatedAttachment : a)),
+						);
+
+						// If we're still viewing the source node, remove from its list
+						if (editingNode === sourceNodeId) {
+							setNodeAttachments((prev) =>
+								prev.filter((a) => a.id !== attachmentId),
+							);
+						}
+
+						toast.success(
+							`Moved "${filename}" to ${node.data.label as string}`,
+						);
+						setMovingAttachment(null);
+					})
+					.catch((error) => {
+						console.error("Failed to move attachment:", error);
+						toast.error("Failed to move attachment");
+					});
+
+				return;
+			}
+
+			// Normal edit mode
 			setEditingNode(node.id);
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+			const nodeType = node.data.nodeType as string;
+			setEditingNodeType(nodeType);
 			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 			setEditDisplay(node.data.osintNode?.display ?? node.data.label ?? "");
 			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
@@ -670,7 +721,7 @@ function AppContent() {
 			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 			setEditNotes(node.data.osintNode?.notes ?? "");
 		},
-		[],
+		[movingAttachment, editingNode],
 	);
 
 	const handleNodeContextMenu = useCallback(
@@ -735,10 +786,56 @@ function AppContent() {
 		}
 
 		setEditingNode(null);
+		setEditingNodeType(null);
 		setEditDisplay("");
 		setEditValue("");
 		setEditNotes("");
 	}, [editingNode, pendingNodes, setNodes]);
+
+	const handleDeleteNodeFromDialog = useCallback(() => {
+		if (!editingNode) return;
+
+		const node = nodes.find((n) => n.id === editingNode);
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+		const nodeName = node?.data?.osintNode?.display ?? "this node";
+
+		if (!window.confirm(`Delete "${nodeName}"?`)) return;
+
+		const isPending = pendingNodes.has(editingNode);
+
+		// Save history before deletion
+		saveHistory();
+
+		// Remove from UI
+		setNodes((nds) => nds.filter((n) => n.id !== editingNode));
+
+		// If it's not a pending node, delete from backend
+		if (!isPending) {
+			deleteNode(editingNode)
+				.then(() => {
+					toast.success("Node deleted");
+				})
+				.catch((error) => {
+					console.error("Failed to delete node:", error);
+					toast.error("Failed to delete node from backend");
+				});
+		} else {
+			// Just remove from pending set for unsaved nodes
+			setPendingNodes((prev) => {
+				const newSet = new Set(prev);
+				newSet.delete(editingNode);
+				return newSet;
+			});
+		}
+
+		// Close the edit dialog
+		setEditingNode(null);
+		setEditingNodeType(null);
+		setEditDisplay("");
+		setEditValue("");
+		setEditNotes("");
+		setNodeAttachments([]);
+	}, [editingNode, nodes, pendingNodes, setNodes, saveHistory]);
 
 	const saveNodeEdit = useCallback(async () => {
 		if (!editingNode) return;
@@ -748,6 +845,17 @@ function AppContent() {
 		// Save history before making changes
 		saveHistory();
 
+		// For person, organization, image, and document nodes, sync value with display
+		const nodeTypesWithSyncedValue = [
+			"person",
+			"organization",
+			"image",
+			"document",
+		];
+		const finalValue = nodeTypesWithSyncedValue.includes(editingNodeType ?? "")
+			? editDisplay
+			: editValue;
+
 		setNodes((nds) =>
 			nds.map((node) => {
 				if (node.id === editingNode) {
@@ -755,7 +863,7 @@ function AppContent() {
 						// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 						...node.data.osintNode,
 						display: editDisplay,
-						value: editValue,
+						value: finalValue,
 						notes: editNotes || undefined,
 						updated: new Date().toISOString(),
 					};
@@ -795,12 +903,14 @@ function AppContent() {
 		);
 
 		setEditingNode(null);
+		setEditingNodeType(null);
 		setEditDisplay("");
 		setEditValue("");
 		setEditNotes("");
 		setNodeAttachments([]);
 	}, [
 		editingNode,
+		editingNodeType,
 		editDisplay,
 		editValue,
 		editNotes,
@@ -906,6 +1016,27 @@ function AppContent() {
 		},
 		[editingNode],
 	);
+
+	const handleMoveAttachment = useCallback(
+		(attachmentId: string, filename: string) => {
+			if (!editingNode) return;
+
+			setMovingAttachment({
+				attachmentId,
+				filename,
+				sourceNodeId: editingNode,
+			});
+			toast.success(`Click on a node to move "${filename}" to it`, {
+				duration: 5000,
+			});
+		},
+		[editingNode],
+	);
+
+	const handleCancelMoveAttachment = useCallback(() => {
+		setMovingAttachment(null);
+		toast.success("Cancelled moving attachment");
+	}, []);
 
 	const formatFileSize = (bytes: number): string => {
 		if (bytes < 1024) return `${bytes} B`;
@@ -1088,6 +1219,9 @@ function AppContent() {
 				onNodeDoubleClick={handleNodeDoubleClick}
 				onNodeContextMenu={handleNodeContextMenu}
 				fitView
+				style={{
+					cursor: movingAttachment ? "crosshair" : "default",
+				}}
 			>
 				<Controls />
 				<MiniMap />
@@ -1207,33 +1341,39 @@ function AppContent() {
 						/>
 					</div>
 
-					<div className="modal-field">
-						<label
-							htmlFor={idValue}
-							style={{
-								display: "block",
-								marginBottom: "4px",
-								fontWeight: "500",
-								fontSize: "14px",
-							}}
-						>
-							Value
-						</label>
-						<input
-							type="text"
-							value={editValue}
-							id={idValue}
-							onChange={(e) => setEditValue(e.target.value)}
-							style={{
-								width: "100%",
-								padding: "8px",
-								border: "1px solid #ccc",
-								borderRadius: "4px",
-								boxSizing: "border-box",
-							}}
-							placeholder="Actual value (e.g., email, phone number)"
-						/>
-					</div>
+					{/* Only show value field for nodes that need it (not person, organization, image, document) */}
+					{editingNodeType !== "person" &&
+						editingNodeType !== "organization" &&
+						editingNodeType !== "image" &&
+						editingNodeType !== "document" && (
+							<div className="modal-field">
+								<label
+									htmlFor={idValue}
+									style={{
+										display: "block",
+										marginBottom: "4px",
+										fontWeight: "500",
+										fontSize: "14px",
+									}}
+								>
+									Value
+								</label>
+								<input
+									type="text"
+									value={editValue}
+									id={idValue}
+									onChange={(e) => setEditValue(e.target.value)}
+									style={{
+										width: "100%",
+										padding: "8px",
+										border: "1px solid #ccc",
+										borderRadius: "4px",
+										boxSizing: "border-box",
+									}}
+									placeholder="Actual value (e.g., email, phone number)"
+								/>
+							</div>
+						)}
 
 					<div className="modal-field">
 						<label
@@ -1335,6 +1475,19 @@ function AppContent() {
 												<button
 													type="button"
 													onClick={() =>
+														handleMoveAttachment(
+															attachment.id,
+															attachment.filename,
+														)
+													}
+													className="btn btn-warning"
+													title="Move to another node"
+												>
+													📦
+												</button>
+												<button
+													type="button"
+													onClick={() =>
 														handleDeleteAttachment(
 															attachment.id,
 															attachment.filename,
@@ -1376,20 +1529,36 @@ function AppContent() {
 						</div>
 					)}
 
-					<div style={{ display: "flex", gap: "10px" }}>
+					<div
+						style={{
+							display: "flex",
+							gap: "10px",
+							justifyContent: "space-between",
+						}}
+					>
+						<div style={{ display: "flex", gap: "10px" }}>
+							<button
+								type="button"
+								onClick={saveNodeEdit}
+								className="btn btn-primary"
+							>
+								Save
+							</button>
+							<button
+								type="button"
+								onClick={cancelNodeEdit}
+								className="btn btn-secondary"
+							>
+								Cancel
+							</button>
+						</div>
 						<button
 							type="button"
-							onClick={saveNodeEdit}
-							className="btn btn-primary"
+							onClick={handleDeleteNodeFromDialog}
+							className="btn btn-danger"
+							title="Delete this node"
 						>
-							Save
-						</button>
-						<button
-							type="button"
-							onClick={cancelNodeEdit}
-							className="btn btn-secondary"
-						>
-							Cancel
+							Delete
 						</button>
 					</div>
 				</div>
@@ -1412,6 +1581,50 @@ function AppContent() {
 					>
 						<span>🔗</span>
 						<span>Open in new tab</span>
+					</button>
+				</div>
+			)}
+
+			{/* Move attachment mode indicator */}
+			{movingAttachment && (
+				<div
+					style={{
+						position: "fixed",
+						top: "20px",
+						left: "50%",
+						transform: "translateX(-50%)",
+						background: "#3b82f6",
+						color: "white",
+						padding: "12px 20px",
+						borderRadius: "8px",
+						boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+						zIndex: 1002,
+						display: "flex",
+						alignItems: "center",
+						gap: "12px",
+						fontSize: "14px",
+						fontWeight: "500",
+					}}
+				>
+					<span>
+						📦 Moving "{movingAttachment.filename}" - Double-click a node to
+						move it there
+					</span>
+					<button
+						type="button"
+						onClick={handleCancelMoveAttachment}
+						style={{
+							background: "white",
+							color: "#3b82f6",
+							border: "none",
+							borderRadius: "4px",
+							padding: "6px 12px",
+							cursor: "pointer",
+							fontSize: "13px",
+							fontWeight: "600",
+						}}
+					>
+						Cancel
 					</button>
 				</div>
 			)}

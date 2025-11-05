@@ -12,7 +12,11 @@ use std::io::{Read, Write};
 use tracing::{debug, error};
 use uuid::Uuid;
 
-use crate::{entity::attachment, project::WebError, SharedState};
+use crate::{
+    entity::{attachment, node},
+    project::WebError,
+    SharedState,
+};
 
 /// Upload a file attachment to a node
 /// POST /api/v1/node/{id}/attachment
@@ -85,6 +89,26 @@ pub async fn upload_attachment(
             )
         })?
         .to_vec();
+
+    // Verify the node exists before creating the attachment
+    let node_exists = node::Entity::find_by_id(node_id)
+        .one(conn)
+        .await
+        .map_err(|e| {
+            error!("Failed to check if node exists: {:?}", e);
+            WebError::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to verify node: {}", e),
+            )
+        })?
+        .is_some();
+
+    if !node_exists {
+        return Err(WebError::new(
+            StatusCode::NOT_FOUND,
+            format!("Node {} not found", node_id),
+        ));
+    }
 
     // Compress data with gzip
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());

@@ -34,8 +34,9 @@ export interface NodeLink {
 export interface ProjectExport {
 	project: Project;
 	nodes: OSINTNode[];
-	links: NodeLink[];
-	attachments?: Record<string, unknown>;
+	nodelinks: NodeLink[];
+	exported_at: string;
+	version: string;
 }
 
 export const NodeTypeInfo: Record<

@@ -397,7 +397,7 @@ function AppContent() {
 				setNodes(reactFlowNodes);
 
 				// Convert links to ReactFlow edges
-				const reactFlowEdges: Edge[] = exportData.links.map((nodeLink) => ({
+				const reactFlowEdges: Edge[] = exportData.nodelinks.map((nodeLink) => ({
 					id: nodeLink.id,
 					source: nodeLink.left,
 					target: nodeLink.right,

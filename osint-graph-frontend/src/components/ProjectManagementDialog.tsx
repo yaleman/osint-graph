@@ -307,7 +307,7 @@ export const ProjectManagementDialog: React.FC<
 										Nodes: {exportData.nodes?.length ?? 0}
 									</p>
 									<p className="export-info-item">
-										Links: {exportData.links?.length ?? 0}
+										Links: {exportData.nodelinks?.length ?? 0}
 									</p>
 									<p className="export-info-item">
 										Size:{" "}

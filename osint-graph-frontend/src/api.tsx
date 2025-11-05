@@ -152,14 +152,10 @@ export const uploadAttachment = async (
 	const formData = new FormData();
 	formData.append("file", file);
 
+	// Don't set Content-Type - let axios set it with the correct boundary
 	const response = await axios.post<Attachment>(
 		`${NODE_URL}/${nodeId}/attachment`,
 		formData,
-		{
-			headers: {
-				"Content-Type": "multipart/form-data",
-			},
-		},
 	);
 	return response.data;
 };

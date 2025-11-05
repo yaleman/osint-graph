@@ -23,29 +23,44 @@ pub async fn upload_attachment(
 ) -> Result<Json<attachment::Model>, WebError> {
     let conn = &state.read().await.conn;
 
+    debug!("Starting file upload for node {}", node_id);
+
     // Extract file from multipart form data
     let mut filename = None;
     let mut content_type = None;
     let mut data = None;
 
     while let Some(field) = multipart.next_field().await.map_err(|e| {
+        error!("Failed to read multipart field: {:?}", e);
         WebError::new(
             StatusCode::BAD_REQUEST,
             format!("Failed to read multipart field: {}", e),
         )
     })? {
         let field_name = field.name().unwrap_or("").to_string();
+        debug!("Processing field: {}", field_name);
 
         match field_name.as_str() {
             "file" => {
                 filename = field.file_name().map(|s| s.to_string());
                 content_type = field.content_type().map(|s| s.to_string());
+                debug!(
+                    "File name: {:?}, content type: {:?}",
+                    filename, content_type
+                );
+
                 data = Some(field.bytes().await.map_err(|e| {
+                    error!("Failed to read file data: {:?}", e);
                     WebError::new(
                         StatusCode::BAD_REQUEST,
                         format!("Failed to read file data: {}", e),
                     )
                 })?);
+
+                debug!(
+                    "Successfully read {} bytes",
+                    data.as_ref().map(|d| d.len()).unwrap_or(0)
+                );
             }
             _ => {
                 debug!("Ignoring unknown multipart field: {}", field_name);

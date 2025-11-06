@@ -1,22 +1,23 @@
 use chrono::{DateTime, Utc};
+use osint_graph_shared::node::NodeType;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize, ToSchema)]
 #[sea_orm(table_name = "node")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     pub project_id: Uuid,
-    #[sea_orm(column_name = "type")]
-    pub node_type: String,
+    #[sea_orm(column_name = "type", column_type = "String(StringLen::N(15))")]
+    pub node_type: NodeType,
     pub display: String,
     pub value: String,
     pub updated: DateTime<Utc>,
     pub notes: Option<String>,
     pub pos_x: Option<i32>,
     pub pos_y: Option<i32>,
-    pub attachments: serde_json::Value,
 }
 
 impl Default for Model {
@@ -24,14 +25,13 @@ impl Default for Model {
         Self {
             id: Uuid::new_v4(),
             project_id: Uuid::new_v4(),
-            node_type: String::new(),
+            node_type: NodeType::Document,
             display: String::new(),
             value: String::new(),
             updated: Utc::now(),
             notes: None,
             pos_x: None,
             pos_y: None,
-            attachments: serde_json::Value::Array(Vec::new()),
         }
     }
 }

@@ -1,6 +1,10 @@
 use axum::{
+    body::Body,
     extract::{Multipart, Path, State},
-    http::StatusCode,
+    http::{
+        header::{ACCEPT_ENCODING, CONTENT_DISPOSITION, CONTENT_ENCODING, CONTENT_TYPE, COOKIE},
+        HeaderMap, HeaderValue, StatusCode,
+    },
     response::{IntoResponse, Response},
     Json,
 };
@@ -255,14 +259,13 @@ pub async fn download_attachment(
 /// View a file attachment (inline display for images, PDFs, text)
 /// GET /api/v1//attachment/{attachment_id}/view
 pub async fn view_attachment(
+    headers: HeaderMap,
     State(state): State<SharedState>,
     Path(attachment_id): Path<Uuid>,
 ) -> Result<Response, WebError> {
-    let conn = &state.read().await.conn;
-
     // Get attachment from database
     let attachment = attachment::Entity::find_by_id(attachment_id)
-        .one(conn)
+        .one(&state.read().await.conn)
         .await
         .map_err(|e| {
             error!("Failed to get attachment: {:?}", e);
@@ -270,32 +273,52 @@ pub async fn view_attachment(
         })?
         .ok_or_else(|| WebError::not_found(format!("Attachment {} not found", attachment_id)))?;
 
-    // Decompress data
-    let mut decoder = GzDecoder::new(&attachment.data[..]);
-    let mut decompressed_data = Vec::new();
-    decoder.read_to_end(&mut decompressed_data).map_err(|e| {
-        WebError::internal_server_error(format!("Failed to decompress attachment data: {}", e))
-    })?;
+    let mut need_decompress = false;
+
+    if let Some(accept) = headers.get(ACCEPT_ENCODING) {
+        if accept.to_str().unwrap_or("").contains("gzip") {
+            need_decompress = true;
+        }
+    }
 
     debug!(
         attachment_id = attachment_id.to_string(),
         node_id = attachment.node_id.to_string(),
+        requires_decompression = need_decompress,
         "Viewing attachment"
     );
 
-    // Return file with inline disposition for viewing in browser
-    Ok((
-        StatusCode::OK,
-        [
-            ("Content-Type", attachment.content_type.as_str()),
-            (
-                "Content-Disposition",
-                &format!("inline; filename=\"{}\"", attachment.filename),
-            ),
-        ],
-        decompressed_data,
-    )
-        .into_response())
+    let headers = [
+        (
+            CONTENT_TYPE,
+            HeaderValue::from_str(attachment.content_type.as_str())?,
+        ),
+        (
+            CONTENT_DISPOSITION,
+            HeaderValue::from_str(&format!("inline; filename=\"{}\"", attachment.filename))?,
+        ),
+        (COOKIE, HeaderValue::from_static("")),
+    ];
+    // Decompress data
+    if need_decompress {
+        // TODO: work out if we can stream this instead of loading whole file into memory
+        let mut decoder = GzDecoder::new(attachment.data.as_slice());
+        let mut decompressed_data = Vec::new();
+        decoder.read_to_end(&mut decompressed_data).map_err(|e| {
+            WebError::internal_server_error(format!("Failed to decompress attachment data: {}", e))
+        })?;
+        Ok((StatusCode::OK, headers, decompressed_data).into_response())
+    } else {
+        let mut headers_vec = headers.to_vec();
+        headers_vec.push((CONTENT_ENCODING, HeaderValue::from_static("gzip")));
+        // Return file with inline disposition for viewing in browser
+        let mut res = Response::new(Body::from(attachment.data));
+        *res.status_mut() = StatusCode::OK;
+        res.headers_mut().extend(headers_vec);
+        res.headers_mut()
+            .extend([(CONTENT_ENCODING, HeaderValue::from_static("gzip"))]);
+        Ok(res)
+    }
 }
 
 /// Delete a file attachment
@@ -304,11 +327,9 @@ pub async fn delete_attachment(
     State(state): State<SharedState>,
     Path((_node_id, attachment_id)): Path<(Uuid, Uuid)>,
 ) -> Result<String, WebError> {
-    let conn = &state.read().await.conn;
-
     // Just attempt deletion, don't validate if it exists
     attachment::Entity::delete_by_id(attachment_id)
-        .exec(conn)
+        .exec(&state.read().await.conn)
         .await
         .map_err(|e| {
             error!("Failed to delete attachment: {:?}", e);
@@ -326,11 +347,9 @@ pub async fn list_attachments(
     State(state): State<SharedState>,
     Path(node_id): Path<Uuid>,
 ) -> Result<Json<Vec<attachment::Model>>, WebError> {
-    let conn = &state.read().await.conn;
-
     let attachments = attachment::Entity::find()
         .filter(attachment::Column::NodeId.eq(node_id.to_string()))
-        .all(conn)
+        .all(&state.read().await.conn)
         .await
         .map_err(|e| {
             error!("Failed to list attachments: {:?}", e);

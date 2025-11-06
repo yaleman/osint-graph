@@ -1,8 +1,12 @@
 :root {
-	--nodel-panel-width: 15rem;
-	--white: #ffffff;
-	--node-collapse-button-width: 32px;
+	--node-panel-width: 15rem;
+
+	--node-collapse-button-width: 1.8rem;
 	--default-font-weight: var(--default-font-weight);
+	--default-border-radius: 0.5rem;
+
+	--colour-medium-grey: #666;
+	--colour-primary-blue: #3b82f6;
 }
 
 /* Project Management Dialog Styles */
@@ -22,7 +26,7 @@
 
 .dialog-container {
 	background-color: white;
-	border-radius: 8px;
+	border-radius: var(--default-border-radius);
 	padding: 1rem;
 	max-width: 95vw;
 	min-width: 60vw;
@@ -33,7 +37,8 @@
 }
 
 .dialog-header {
-	padding: 20px;
+	padding: 1rem;
+	padding-top: 0;
 	border-bottom: 1px solid #e5e7eb;
 	display: flex;
 	justify-content: space-between;
@@ -42,19 +47,8 @@
 
 .dialog-title {
 	margin: 0;
-	font-size: 20px;
+	font-size: 1.5rem;
 	font-weight: 600;
-}
-
-.dialog-close-button {
-	background: none;
-	border: none;
-	font-size: 24px;
-	cursor: pointer;
-	color: #6b7280;
-	padding: 0;
-	width: 30px;
-	height: 30px;
 }
 
 .dialog-tabs {
@@ -73,8 +67,8 @@
 }
 
 .dialog-tab.active {
-	border-bottom-color: #3b82f6;
-	color: #3b82f6;
+	border-bottom-color: var(--colour-primary-blue);
+	color: var(--colour-primary-blue);
 	font-weight: 600;
 }
 
@@ -82,7 +76,6 @@
 	padding: 20px;
 	overflow-y: auto;
 	max-width: 95%;
-	/* flex: 1; */
 }
 
 /* Form Elements */
@@ -126,7 +119,7 @@
 }
 
 .tag {
-	background-color: #3b82f6;
+	background-color: var(--colour-primary-blue);
 	color: white;
 	padding: 4px 12px;
 	border-radius: 16px;
@@ -174,14 +167,18 @@
 
 .btn {
 	padding: 0.5rem 1rem;
-	border-radius: 5px;
+	border: none;
+	border-radius: var(--default-border-radius);
 	cursor: pointer;
 	font-size: 14px;
 	font-weight: var(--default-font-weight);
 }
+.btn:hover {
+	opacity: 0.9;
+}
 
 .btn-primary {
-	background-color: #3b82f6;
+	background-color: var(--colour-primary-blue);
 	color: white;
 }
 
@@ -334,10 +331,10 @@
 .node-panel {
 	position: fixed;
 	top: 4rem;
-	width: var(--nodel-panel-width);
+	width: var(--node-panel-width);
 	background: white;
 	border: 1px solid #ccc;
-	border-radius: 0.75rem;
+	border-radius: var(--default-border-radius);
 	box-shadow: 0 4px 0.5rem rgba(0, 0, 0, 0.15);
 	z-index: 1000;
 	transition: right 0.2s ease;
@@ -351,7 +348,7 @@
 }
 
 .node-panel-collapsed {
-	right: calc(-1 * var(--nodel-panel-width));
+	right: calc(-1 * var(--node-panel-width));
 }
 
 .node-panel-collapse-button {
@@ -360,10 +357,10 @@
 	top: 10px;
 	width: var(--node-collapse-button-width);
 	height: calc(1.25 * var(--node-collapse-button-width));
-	background: var(--white);
+	background: white;
 	border: 1px solid #ccc;
 	border-right: none;
-	border-radius: 8px 0 0 8px;
+	border-radius: var(--default-border-radius) 0 0 var(--default-border-radius);
 	cursor: pointer;
 	display: flex;
 	align-items: center;
@@ -407,7 +404,7 @@
 
 .project-selector-noprojects {
 	padding: 12px;
-	color: #666;
+	color: var(--colour-medium-grey);
 	font-style: italic;
 }
 
@@ -415,7 +412,7 @@
 
 .dialog-description {
 	margin-bottom: 20px;
-	color: #666;
+	color: var(--colour-medium-grey);
 }
 
 .dialog-question {
@@ -464,7 +461,7 @@
 }
 
 .project-list-item:focus {
-	outline: 2px solid #3b82f6;
+	outline: 2px solid var(--colour-primary-blue);
 	outline-offset: -2px;
 }
 
@@ -476,14 +473,15 @@
 }
 
 .project-list-item-id {
-	font-size: 12px;
-	color: #6b7280;
+	font-size: 0.8rem;
+	color: var(--colour-medium-grey);
 	font-family: monospace;
 	margin-bottom: 4px;
+	display: none;
 }
 
 .project-list-item-description {
-	font-size: 14px;
+	font-size: 0.875rem;
 	color: #374151;
 	margin-top: 8px;
 }
@@ -505,4 +503,12 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.react-node {
+	color: white;
+	border: 1px solid var(--colour-medium-grey);
+	width: 13rem;
+	cursor: pointer;
+	border-radius: var(--default-border-radius);
 }

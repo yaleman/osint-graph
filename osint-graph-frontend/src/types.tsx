@@ -51,16 +51,57 @@ export interface ProjectExport {
 
 export const NodeTypeInfo: Record<
 	string,
-	{ label: string; defaultDisplay: string }
+	{
+		label: string;
+		defaultDisplay: string;
+		color: string;
+		syncedvalue?: boolean;
+	}
 > = {
-	person: { label: "Person", defaultDisplay: "Name" },
-	domain: { label: "Domain", defaultDisplay: "Domain" },
-	ip: { label: "IP Address", defaultDisplay: "Address" },
-	phone: { label: "Phone", defaultDisplay: "Number" },
-	email: { label: "Email", defaultDisplay: "Address" },
-	url: { label: "URL", defaultDisplay: "Link" },
-	image: { label: "Image", defaultDisplay: "Filename" },
-	location: { label: "Location", defaultDisplay: "Address" },
-	organization: { label: "Organization", defaultDisplay: "Name" },
-	document: { label: "Document", defaultDisplay: "Filename" },
+	person: {
+		label: "Person",
+		defaultDisplay: "Name",
+		color: "#3b82f6",
+		syncedvalue: true,
+	},
+	domain: { label: "Domain", defaultDisplay: "Domain", color: "#f59e0b" },
+	ip: { label: "IP Address", defaultDisplay: "Address", color: "#ef4444" },
+	phone: { label: "Phone", defaultDisplay: "Number", color: "#8b5cf6" },
+	email: { label: "Email", defaultDisplay: "Address", color: "#ec4899" },
+	url: { label: "URL", defaultDisplay: "Link", color: "#06b6d4" },
+	image: {
+		label: "Image",
+		defaultDisplay: "Filename",
+		color: "#10b981",
+		syncedvalue: true,
+	},
+	location: { label: "Location", defaultDisplay: "Address", color: "#84cc16" },
+	organisation: {
+		label: "Organisation",
+		defaultDisplay: "Name",
+		color: "#f97316",
+		syncedvalue: true,
+	},
+	document: {
+		label: "Document",
+		defaultDisplay: "Filename",
+		color: "#6b7280",
+		syncedvalue: true,
+	},
+	currency: {
+		label: "Currency",
+		defaultDisplay: "Amount",
+		color: "#c7c400ff",
+		syncedvalue: false,
+	},
+};
+
+export const hasSyncedValue = (nodeType: string): boolean => {
+	const info = NodeTypeInfo[nodeType];
+	return info?.syncedvalue ?? false;
+};
+
+export const getNodeColor = (nodeType: string): string => {
+	const typeInfo = NodeTypeInfo[nodeType] ?? { color: "#6b7280" };
+	return typeInfo.color;
 };

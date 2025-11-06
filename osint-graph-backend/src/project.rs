@@ -1,8 +1,9 @@
 use axum::extract::{Path, Query, State};
-use axum::http::header::CONTENT_TYPE;
+use axum::http::header::{InvalidHeaderValue, CONTENT_TYPE};
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use axum::{debug_handler, Json};
+use osint_graph_shared::node::NodeType;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter,
@@ -40,8 +41,7 @@ pub async fn post_project(
     State(state): State<SharedState>,
     Json(project): Json<project::Model>,
 ) -> Result<Json<project::Model>, WebError> {
-    let project = match project::Entity::find()
-        .filter(project::Column::Id.eq(project.id))
+    let project = match project::Entity::find_by_id(project.id)
         .one(&state.read().await.conn)
         .await?
     {
@@ -99,6 +99,12 @@ impl WebError {
     }
 }
 
+impl From<InvalidHeaderValue> for WebError {
+    fn from(err: InvalidHeaderValue) -> Self {
+        WebError::internal_server_error(format!("Invalid header value: {:?}", err))
+    }
+}
+
 impl IntoResponse for WebError {
     fn into_response(self) -> axum::response::Response {
         let body = serde_json::json!({
@@ -135,19 +141,14 @@ impl From<serde_json::Error> for WebError {
 pub async fn get_project(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
-) -> Result<impl IntoResponse, WebError> {
-    let res = project::Entity::find()
-        .filter(project::Column::Id.eq(id))
+) -> Result<Json<project::Model>, WebError> {
+    let res = project::Entity::find_by_id(id)
         .one(&state.read().await.conn)
         .await?;
 
     match res {
-        Some(project) => Ok((
-            StatusCode::OK,
-            serde_json::to_string_pretty(&project)
-                .expect("Failed to serialise get project response"), // TODO: handle this better
-        )),
-        None => Ok((StatusCode::NOT_FOUND, "Project not found".to_string())),
+        Some(project) => Ok(Json(project)),
+        None => Err(WebError::not_found(format!("Project {} not found", id))),
     }
 }
 
@@ -161,20 +162,23 @@ pub async fn get_projects(
     Ok(Json(val))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/node/{id}",
+    responses(
+        (status = OK, description = "One result ok", body = node::Model)
+    )
+)]
 pub async fn get_node(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
-) -> Result<impl IntoResponse, WebError> {
-    match node::Entity::find()
-        .filter(node::Column::Id.eq(id))
+) -> Result<Json<node::Model>, WebError> {
+    match node::Entity::find_by_id(id)
         .one(&state.read().await.conn)
         .await?
     {
-        Some(val) => Ok((
-            StatusCode::OK,
-            serde_json::to_string(&val).expect("Failed to serialize node"),
-        )),
-        None => Ok((StatusCode::NOT_FOUND, "".to_string())),
+        Some(val) => Ok(Json(val)),
+        None => Err(WebError::not_found(format!("Node {} not found", id))),
     }
 }
 
@@ -190,61 +194,64 @@ pub async fn get_nodes_by_project(
     Ok(Json(nodes))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/node",
+    responses(
+        (status = OK, description = "One result ok", body = node::Model)
+    )
+)]
 pub async fn post_node(
     State(state): State<SharedState>,
     Json(mut node): Json<node::Model>,
 ) -> Result<Json<node::Model>, WebError> {
-    let conn = &state.read().await.conn;
+    let txn = state
+        .read()
+        .await
+        .conn
+        .begin()
+        .await
+        .inspect_err(|err| error!(error=?err, "failed to get transaction!"))?;
+
+    if project::Entity::find_by_id(node.project_id)
+        .one(&txn)
+        .await?
+        .is_none()
+    {
+        return Err(WebError::not_found(format!(
+            "Project {} not found for new node",
+            node.project_id
+        )));
+    }
 
     // Clean URL values before saving
-    if node.node_type == "url" {
+    if node.node_type == NodeType::Url {
         node.value = clean_url_value(&node.value);
     }
 
-    // Validate that the project exists before saving the node
-    match project::Entity::find()
-        .filter(project::Column::Id.eq(node.project_id))
-        .one(conn)
+    let node = node::ActiveModel::from(node);
+    let res = node
+        .insert(&txn)
         .await
-        .inspect_err(|err| error!("Failed to find project {}: {:?}", node.project_id, err))?
-    {
-        Some(_) => {
-            // Project exists, proceed with saving the node
-            let node = node::ActiveModel::from(node);
-            let res = node
-                .insert(conn)
-                .await
-                .inspect_err(|err| error!("Failed to insert node: {:?}", err))?;
-            debug!("Saved node: {:?}", res);
-            let model = res
-                .try_into_model()
-                .inspect_err(|err| error!("Failed to convert inserted node to model: {:?}", err))?;
-
-            Ok(Json(model))
-        }
-        None => {
-            // Project doesn't exist
-            debug!("Cannot save node: project {} not found", node.project_id);
-            Err(WebError::not_found(format!(
-                "Project {} not found",
-                node.project_id
-            )))
-        }
-    }
+        .inspect_err(|err| error!(error=?err, "Failed to insert node"))?;
+    debug!("Saved node: {:?}", res);
+    let model = res
+        .try_into_model()
+        .inspect_err(|err| error!("Failed to convert inserted node to model: {:?}", err))?;
+    txn.commit().await.inspect_err(
+        |err| error!(error=?err, node=?model, "Failed to commit transaction for new node"),
+    )?;
+    Ok(Json(model))
 }
 
 pub async fn post_nodelink(
     State(state): State<SharedState>,
     Json(nodelink): Json<nodelink::Model>,
 ) -> Result<Json<nodelink::Model>, WebError> {
-    let conn = &state.read().await.conn;
+    let txn = state.read().await.conn.begin().await?;
 
     // Validate that the project exists before saving the nodelink
-    match nodelink::Entity::find()
-        .filter(nodelink::Column::Id.eq(nodelink.id))
-        .one(conn)
-        .await?
-    {
+    match nodelink::Entity::find_by_id(nodelink.id).one(&txn).await? {
         Some(_) => {
             // throw an error because it already exists
             Err(WebError {
@@ -255,9 +262,10 @@ pub async fn post_nodelink(
         None => {
             // Project doesn't exist
             let nodelink = nodelink.into_active_model();
-            let res = nodelink.insert(conn).await?;
+            let res = nodelink.insert(&txn).await?;
             debug!("Saved nodelink: {:?}", res);
             let model = res.try_into_model()?;
+            txn.commit().await?;
             Ok(Json(model))
         }
     }
@@ -278,20 +286,20 @@ pub async fn get_nodelinks_by_project(
 pub async fn delete_node(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
-) -> Result<impl IntoResponse, WebError> {
-    let conn = &state.read().await.conn;
-    // find the node
-    let node = match node::Entity::find_by_id(id).one(conn).await? {
-        Some(node) => node,
-        None => {
-            debug!("Node {} not found for deletion", id);
-            return Ok((StatusCode::NOT_FOUND, format!("Node {} not found", id)));
+) -> Result<Json<String>, WebError> {
+    let res = node::Entity::delete_by_id(id)
+        .exec(&state.read().await.conn)
+        .await?;
+    match res.rows_affected {
+        0 => {
+            debug!(node_id = id.to_string(), "Node not found for deletion");
+            Err(WebError::not_found(format!("Node {} not found", id)))
         }
-    };
-
-    node.delete(conn).await?;
-
-    Ok((StatusCode::OK, "Node deleted successfully".to_string()))
+        _ => {
+            debug!(node_id = id.to_string(), "Deleted node");
+            Ok(Json(format!("Node {id} deleted successfully")))
+        }
+    }
 }
 
 pub async fn update_node(
@@ -299,19 +307,15 @@ pub async fn update_node(
     State(state): State<SharedState>,
     Json(mut node): Json<node::Model>,
 ) -> Result<Json<node::Model>, WebError> {
-    let conn = &state.read().await.conn;
+    let txn = state.read().await.conn.begin().await?;
 
     // Clean URL values before updating
-    if node.node_type == "url" {
+    if node.node_type == NodeType::Url {
         node.value = clean_url_value(&node.value);
     }
 
     // Verify node exists first
-    match node::Entity::find()
-        .filter(node::Column::Id.eq(id))
-        .one(conn)
-        .await?
-    {
+    match node::Entity::find_by_id(id).one(&txn).await? {
         Some(db_node) => {
             // Update the node ID to match the path parameter
             debug!("Updating node {}: {:?}", id, node);
@@ -323,9 +327,10 @@ pub async fn update_node(
             db_node.notes = Set(node.notes);
             db_node.pos_x = Set(node.pos_x);
             db_node.pos_y = Set(node.pos_y);
-            db_node.attachments = Set(node.attachments.clone());
 
-            let res = db_node.update(conn).await?;
+            let res = db_node.update(&txn).await?;
+            txn.commit().await?;
+
             Ok(Json(res.try_into_model()?))
         }
         None => {
@@ -339,18 +344,21 @@ pub async fn delete_nodelink(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
 ) -> Result<Json<()>, WebError> {
-    let conn = &state.read().await.conn;
-    let nodelink = nodelink::Entity::find_by_id(id).one(conn).await?;
+    let result = nodelink::Entity::delete_by_id(id)
+        .exec(&state.read().await.conn)
+        .await?;
 
-    match nodelink {
-        Some(nodelink) => {
-            debug!("Deleted nodelink: {}", id);
-            nodelink.delete(conn).await?;
-            Ok(Json(()))
-        }
-        None => {
-            debug!("Nodelink {} not found for deletion", id);
+    match result.rows_affected {
+        0 => {
+            debug!(
+                nodelink_id = id.to_string(),
+                "Nodelink not found for deletion"
+            );
             Err(WebError::not_found(format!("Nodelink {} not found", id)))
+        }
+        _ => {
+            debug!(nodelink_id = id.to_string(), "Deleted nodelink");
+            Ok(Json(()))
         }
     }
 }
@@ -361,11 +369,10 @@ pub async fn update_project(
     State(state): State<SharedState>,
     Json(project): Json<project::Model>,
 ) -> Result<Json<project::Model>, WebError> {
-    let conn = &state.read().await.conn;
+    let txn = state.read().await.conn.begin().await?;
     // Verify project exists first
-    match project::Entity::find()
-        .filter(project::Column::Id.eq(id))
-        .one(conn)
+    match project::Entity::find_by_id(id)
+        .one(&txn)
         .await
         .inspect_err(|err| error!("Failed to find project {}: {:?}", id, err))?
     {
@@ -378,7 +385,8 @@ pub async fn update_project(
             db_project.tags = Set(project.tags.clone());
             db_project.last_updated = Set(Some(Utc::now()));
             debug!("db_project.is_changed(): {}", db_project.is_changed());
-            let res = db_project.update(conn).await?;
+            let res = db_project.update(&txn).await?;
+            txn.commit().await?;
             Ok(Json(res.try_into_model()?))
         }
         None => {
@@ -393,8 +401,6 @@ pub async fn delete_project(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
 ) -> Result<String, WebError> {
-    let conn = &state.read().await.conn;
-
     if id == Uuid::nil() {
         debug!("Attempted to delete project with nil UUID");
         return Err(WebError {
@@ -403,7 +409,9 @@ pub async fn delete_project(
         });
     }
 
-    let res = project::Entity::delete_by_id(id).exec(conn).await?;
+    let res = project::Entity::delete_by_id(id)
+        .exec(&state.read().await.conn)
+        .await?;
     if res.rows_affected > 0 {
         info!(
             rows_affected = res.rows_affected,
@@ -439,31 +447,19 @@ pub async fn export_project(
     Query(query): Query<ExportQuery>,
     State(state): State<SharedState>,
 ) -> Result<Json<ProjectExport>, WebError> {
-    let conn = &state.read().await.conn;
-
-    let txn = conn.begin().await?;
+    let txn = state.read().await.conn.begin().await?;
 
     // Fetch the project
-    let project = match project::Entity::find()
-        .filter(project::Column::Id.eq(id))
-        .one(&txn)
-        .await?
-    {
+    let project = match project::Entity::find_by_id(id).one(&txn).await? {
         Some(project) => project,
         None => return Err(WebError::not_found(format!("Project {} not found", id))),
     };
 
     // Fetch nodes
-    let nodes = node::Entity::find()
-        .filter(node::Column::ProjectId.eq(id))
-        .all(&txn)
-        .await?;
+    let nodes = project.find_related(node::Entity).all(&txn).await?;
 
     // Fetch nodelinks
-    let nodelinks = nodelink::Entity::find()
-        .filter(nodelink::Column::ProjectId.eq(id))
-        .all(&txn)
-        .await?;
+    let nodelinks = project.find_related(nodelink::Entity).all(&txn).await?;
 
     // Optionally fetch attachments
     // Get all node IDs for this project

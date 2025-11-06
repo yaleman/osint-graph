@@ -37,7 +37,7 @@ import { ProjectManagementDialog } from "./components/ProjectManagementDialog";
 import { ProjectMismatchDialog } from "./components/ProjectMismatchDialog";
 import { ProjectSelector } from "./components/ProjectSelector";
 import type { Attachment, OSINTNode, Project } from "./types";
-import { NodeTypeInfo } from "./types";
+import { getNodeColor, hasSyncedValue, NodeTypeInfo } from "./types";
 import "./osint-graph.css";
 
 const initialNodes: Node[] = [];
@@ -367,21 +367,7 @@ function AppContent() {
 		[setEdges, saveHistory],
 	);
 
-	const getNodeColor = useCallback((nodeType: string): string => {
-		const colors: Record<string, string> = {
-			person: "#3b82f6",
-			domain: "#f59e0b",
-			ip: "#ef4444",
-			phone: "#8b5cf6",
-			email: "#ec4899",
-			url: "#06b6d4",
-			image: "#10b981",
-			location: "#84cc16",
-			organization: "#f97316",
-			document: "#6b7280",
-		};
-		return colors[nodeType] ?? "#6b7280";
-	}, []);
+	const getNodeColorCallBack = useCallback(getNodeColor, []);
 
 	/** Helper function to load data for a project */
 	const loadProjectData = useCallback(
@@ -403,12 +389,9 @@ function AppContent() {
 						nodeType: osintNode.node_type,
 						osintNode: osintNode,
 					},
+					className: "react-node",
 					style: {
-						background: getNodeColor(osintNode.node_type),
-						color: "white",
-						border: "1px solid #222",
-						width: 180,
-						cursor: "pointer",
+						background: getNodeColorCallBack(osintNode.node_type),
 					},
 				}));
 				setNodes(reactFlowNodes);
@@ -428,7 +411,7 @@ function AppContent() {
 				throw error;
 			}
 		},
-		[setNodes, setEdges, getNodeColor],
+		[setNodes, setEdges, getNodeColorCallBack],
 	);
 
 	// Initialize project on component mount or when currentProject is cleared
@@ -638,12 +621,9 @@ function AppContent() {
 					nodeType: nodeType,
 					osintNode: osintNode,
 				},
+				className: "react-node",
 				style: {
-					background: getNodeColor(nodeType),
-					color: "white",
-					border: "1px solid #222",
-					width: 180,
-					cursor: "pointer",
+					background: getNodeColorCallBack(nodeType),
 				},
 			};
 
@@ -663,7 +643,7 @@ function AppContent() {
 
 			// Don't save to backend yet - wait for user to click Save
 		},
-		[getViewportCenterPosition, setNodes, getNodeColor, saveHistory],
+		[getViewportCenterPosition, setNodes, getNodeColorCallBack, saveHistory],
 	);
 
 	const handleNodeDoubleClick = useCallback(
@@ -845,14 +825,9 @@ function AppContent() {
 		// Save history before making changes
 		saveHistory();
 
-		// For person, organization, image, and document nodes, sync value with display
-		const nodeTypesWithSyncedValue = [
-			"person",
-			"organization",
-			"image",
-			"document",
-		];
-		const finalValue = nodeTypesWithSyncedValue.includes(editingNodeType ?? "")
+		// For person, organisation, image, and document nodes, sync value with display
+
+		const finalValue = hasSyncedValue(editingNodeType ?? "")
 			? editDisplay
 			: editValue;
 
@@ -1265,7 +1240,7 @@ function AppContent() {
 								margin: "4px 0",
 								border: "none",
 								borderRadius: "6px",
-								background: getNodeColor(type),
+								background: getNodeColorCallBack(type),
 								color: "white",
 								cursor: "pointer",
 								textAlign: "left",
@@ -1341,39 +1316,36 @@ function AppContent() {
 						/>
 					</div>
 
-					{/* Only show value field for nodes that need it (not person, organization, image, document) */}
-					{editingNodeType !== "person" &&
-						editingNodeType !== "organization" &&
-						editingNodeType !== "image" &&
-						editingNodeType !== "document" && (
-							<div className="modal-field">
-								<label
-									htmlFor={idValue}
-									style={{
-										display: "block",
-										marginBottom: "4px",
-										fontWeight: "500",
-										fontSize: "14px",
-									}}
-								>
-									Value
-								</label>
-								<input
-									type="text"
-									value={editValue}
-									id={idValue}
-									onChange={(e) => setEditValue(e.target.value)}
-									style={{
-										width: "100%",
-										padding: "8px",
-										border: "1px solid #ccc",
-										borderRadius: "4px",
-										boxSizing: "border-box",
-									}}
-									placeholder="Actual value (e.g., email, phone number)"
-								/>
-							</div>
-						)}
+					{/* Only show value field for nodes that need it (not person, organisation, image, document) */}
+					{!hasSyncedValue(editingNodeType ?? "") && (
+						<div className="modal-field">
+							<label
+								htmlFor={idValue}
+								style={{
+									display: "block",
+									marginBottom: "4px",
+									fontWeight: "500",
+									fontSize: "14px",
+								}}
+							>
+								Value
+							</label>
+							<input
+								type="text"
+								value={editValue}
+								id={idValue}
+								onChange={(e) => setEditValue(e.target.value)}
+								style={{
+									width: "100%",
+									padding: "8px",
+									border: "1px solid #ccc",
+									borderRadius: "4px",
+									boxSizing: "border-box",
+								}}
+								placeholder="Actual value (e.g., email, phone number)"
+							/>
+						</div>
+					)}
 
 					<div className="modal-field">
 						<label
@@ -1506,15 +1478,9 @@ function AppContent() {
 
 							{/* Upload button */}
 							<label
+								className="btn btn-success"
 								style={{
-									display: "inline-block",
-									padding: "8px 12px",
-									background: "#10b981",
-									color: "white",
-									border: "none",
-									borderRadius: "4px",
 									cursor: uploadingAttachment ? "wait" : "pointer",
-									fontSize: "13px",
 									opacity: uploadingAttachment ? 0.6 : 1,
 								}}
 							>

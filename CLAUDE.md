@@ -47,7 +47,7 @@ The backend uses **SeaORM** as the ORM layer with SQLite:
 - **URL** - Web links and resources
 - **Image** - Image files and photos
 - **Location** - Physical addresses and places
-- **Organization** - Companies and groups
+- **Organisation** - Companies and groups
 - **Document** - Files and documents
 
 ### Node Structure
@@ -59,12 +59,83 @@ The backend uses **SeaORM** as the ORM layer with SQLite:
 - **Timestamps**: Automatic tracking of creation and updates
 - **Position**: X/Y coordinates for graph layout
 - **Metadata**: Optional notes and additional information
+- **Attachments**: File attachments with gzip compression in database
 
 ### Backend Synchronization
 
 - All node operations (create, update, move) automatically sync to backend
 - Timestamp tracking for every change
 - Real-time updates with proper conflict resolution via NodeUpdateList
+
+## File Attachment System
+
+### Overview
+
+Each node can have multiple file attachments stored in the database with automatic gzip compression. The system supports upload, download, view (inline), delete, and list operations.
+
+### Backend Implementation
+
+- **Location**: `osint-graph-backend/src/attachment.rs`
+- **Database Entity**: `osint-graph-backend/src/entity/attachment.rs`
+- **Storage**: Files stored as gzip-compressed blobs in SQLite database
+- **Foreign Key**: Attachments cascade delete when parent node is deleted
+- **Size Limit**: 100MB per file upload
+
+### API Endpoints
+
+- `POST /api/v1/node/{id}/attachment` - Upload file (multipart/form-data)
+- `GET /api/v1/node/{node_id}/attachment/{attachment_id}` - Download file
+- `GET /api/v1/node/{node_id}/attachment/{attachment_id}/view` - View file inline
+- `DELETE /api/v1/node/{node_id}/attachment/{attachment_id}` - Delete attachment
+- `GET /api/v1/node/{id}/attachments` - List all attachments for node
+
+### Attachment Model
+
+```rust
+pub struct Model {
+    pub id: Uuid,
+    pub node_id: Uuid,
+    pub filename: String,
+    pub content_type: String,
+    pub size: i64,           // Original uncompressed size
+    pub data: Vec<u8>,       // Gzip compressed data
+    pub created: DateTime<Utc>,
+}
+```
+
+### Features
+
+- **Compression**: All files automatically compressed with gzip before storage
+- **Decompression**: Transparent decompression on download/view
+- **Content-Type Preservation**: Original MIME types maintained
+- **Inline Viewing**: Images, PDFs, and text files can be viewed in browser
+- **Download**: All files can be downloaded with proper Content-Disposition headers
+- **Validation**: Node existence validated before attachment creation
+- **Protection**: Attachments only available for saved nodes (not pending nodes)
+
+### Frontend Integration
+
+- **Upload**: Drag-and-drop or file picker in node edit dialog
+- **View Button** (👁): Opens viewable files (images, PDFs, text) in new tab
+- **Download Button** (↓): Downloads file to user's device
+- **Delete Button** (×): Removes attachment from database
+- **File Type Detection**: Automatic detection of viewable file types by MIME type and extension
+
+### Viewable File Types
+
+The system automatically detects and allows inline viewing for:
+
+- **Images**: jpg, jpeg, png, gif, bmp, webp, svg
+- **Documents**: pdf
+- **Text**: txt, md, json, xml, html, css
+- **Code**: js, ts, tsx, jsx
+
+### Error Handling
+
+- Foreign key validation prevents attachments on non-existent nodes
+- Toast notifications for upload/download/delete success and failures
+- Proper HTTP status codes (404 for not found, 500 for server errors)
+- Debug logging throughout attachment operations
 
 ## Development Commands
 
@@ -125,7 +196,7 @@ cargo tarpaulin --packages osint-graph-shared
 
 ## Key Files
 
-- **API Routes**: `osint-graph-backend/src/main.rs` - RESTful endpoints under `/api/v1/`
+- **API Routes**: `osint-graph-backend/src/lib.rs` - RESTful endpoints under `/api/v1/`
 - **Frontend Entry**: `osint-graph-frontend/src/App.tsx` - Main React component with project management
 - **Shared Types**: `osint-graph-shared/src/node.rs` - Node structure and NodeUpdateList
 - **Database Layer**:
@@ -133,6 +204,7 @@ cargo tarpaulin --packages osint-graph-shared
   - `osint-graph-backend/src/entity/` - SeaORM entity definitions
   - `osint-graph-backend/src/migration/` - Migration files for schema versioning
   - `osint-graph-backend/src/db/` - Database operations (node, project, nodelink, attachment)
+- **Attachment System**: `osint-graph-backend/src/attachment.rs` - File upload/download with gzip compression
 - **API Integration**: `osint-graph-frontend/src/api.tsx` - Backend communication with validation
 - **Node Types**: `osint-graph-frontend/src/types.tsx` - TypeScript definitions
 - **Project Components**:
@@ -146,8 +218,15 @@ Backend serves:
 - Static files from `/dist/` (built frontend)
 - API endpoints:
   - `GET/POST /api/v1/projects` - Project management
-  - `GET/POST /api/v1/project/{id}` - Individual project operations
-  - `GET/POST /api/v1/node/{id}` - Node CRUD operations
+  - `GET/POST/PUT/DELETE /api/v1/project/{id}` - Individual project operations
+  - `GET/POST/PUT/DELETE /api/v1/node/{id}` - Node CRUD operations
+  - `POST /api/v1/node/{id}/attachment` - File upload
+  - `GET /api/v1/node/{id}/attachments` - List attachments
+  - `GET /api/v1/node/{node_id}/attachment/{attachment_id}` - Download file
+  - `GET /api/v1/node/{node_id}/attachment/{attachment_id}/view` - View file inline
+  - `DELETE /api/v1/node/{node_id}/attachment/{attachment_id}` - Delete file
+  - `GET/POST/DELETE /api/v1/nodelink` - Node link operations
+  - `GET /api/v1/project/{id}/export` - Export project data
 - Uses `Arc<RwLock<AppState>>` for thread-safe shared state
 - AppState contains `DatabaseConnection` for SeaORM access
 
@@ -161,6 +240,7 @@ Backend serves:
 - **Node Editing**: Double-click any node to edit its display name
 - **Drag & Drop**: Move nodes around, positions auto-save to backend
 - **Connections**: Drag between nodes to create relationships
+- **File Attachments**: Upload, view, download, and delete files attached to nodes
 
 ### Real-time Sync
 
@@ -186,7 +266,6 @@ Backend serves:
 ## Development Notes
 
 - Frontend builds to `../dist/` relative to frontend directory
-- Hot module replacement via Vite on custom port 8189
 - Database managed through SeaORM migrations
 - All database operations use `ConnectionTrait` for execution
 - All shared types use Serde for JSON serialization

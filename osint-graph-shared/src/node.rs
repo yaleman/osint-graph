@@ -1,9 +1,11 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 use chrono::{DateTime, Utc};
+use sea_orm::{DeriveValueType, EnumIter};
 use serde::{Deserialize, Serialize};
 use sqlx::{Decode, Encode, FromRow};
 
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 #[derive(Encode, Decode, FromRow, Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
@@ -73,6 +75,86 @@ impl NodeUpdateList {
 
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+}
+
+#[derive(
+    Debug, Copy, Clone, Eq, PartialEq, EnumIter, Serialize, Deserialize, ToSchema, DeriveValueType,
+)]
+#[sea_orm(value_type = "String")]
+#[serde(rename_all = "lowercase")]
+pub enum NodeType {
+    Person,
+    Domain,
+    Ip,
+    Phone,
+    Email,
+    Url,
+    Image,
+    Location,
+    Organisation,
+    Document,
+    Currency,
+}
+
+impl AsRef<str> for NodeType {
+    fn as_ref(&self) -> &str {
+        match self {
+            NodeType::Person => "person",
+            NodeType::Domain => "domain",
+            NodeType::Ip => "ip",
+            NodeType::Phone => "phone",
+            NodeType::Email => "email",
+            NodeType::Url => "url",
+            NodeType::Image => "image",
+            NodeType::Location => "location",
+            NodeType::Organisation => "organisation",
+            NodeType::Document => "document",
+            NodeType::Currency => "currency",
+        }
+    }
+}
+
+impl std::fmt::Display for NodeType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.as_ref())
+    }
+}
+
+impl TryFrom<&str> for NodeType {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "person" => Ok(NodeType::Person),
+            "domain" => Ok(NodeType::Domain),
+            "ip" => Ok(NodeType::Ip),
+            "phone" => Ok(NodeType::Phone),
+            "email" => Ok(NodeType::Email),
+            "url" => Ok(NodeType::Url),
+            "image" => Ok(NodeType::Image),
+            "location" => Ok(NodeType::Location),
+            "organisation" => Ok(NodeType::Organisation),
+            "document" => Ok(NodeType::Document),
+            "currency" => Ok(NodeType::Currency),
+            _ => Err(format!("Unknown NodeType: {}", value)),
+        }
+    }
+}
+
+impl FromStr for NodeType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.try_into()
+    }
+}
+
+impl TryFrom<String> for NodeType {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        value.as_str().try_into()
     }
 }
 

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod attachment;
 pub mod data;
+pub mod error;
 pub mod node;
 pub mod nodelink;
 pub mod storage;
@@ -108,5 +109,26 @@ impl StringVec {
 impl Default for StringVec {
     fn default() -> Self {
         Self::empty()
+    }
+}
+
+pub enum Urls {
+    Login,
+    Callback,
+    Logout,
+}
+
+impl Urls {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Urls::Login => "/auth/login",
+            Urls::Callback => "/oauth2/callback",
+            Urls::Logout => "/auth/logout",
+        }
+    }
+}
+impl AsRef<str> for Urls {
+    fn as_ref(&self) -> &str {
+        self.as_str()
     }
 }

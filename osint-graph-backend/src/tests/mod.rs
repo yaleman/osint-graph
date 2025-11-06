@@ -4,14 +4,13 @@ use crate::entity::{node, project};
 use crate::project::ProjectExport;
 use crate::{build_app, AppState};
 use axum_test::*;
+use osint_graph_shared::node::NodeType;
 use osint_graph_shared::StringVec;
 use tokio::sync::RwLock;
 use tracing::debug;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use uuid::Uuid;
-
-use sea_orm::JsonValue;
 
 static INIT: Once = Once::new();
 
@@ -24,9 +23,10 @@ async fn setup_test_server() -> TestServer {
             .with(tracing_subscriber::fmt::layer())
             .init();
     });
-
-    let shared_state = Arc::new(RwLock::new(AppState::test().await));
-    let app = build_app(&shared_state);
+    let appstate = AppState::test().await;
+    let dbpool: sqlx::Pool<sqlx::Sqlite> = appstate.conn.get_sqlite_connection_pool().clone();
+    let shared_state = Arc::new(RwLock::new(appstate));
+    let app = build_app(&shared_state, dbpool, false).await;
 
     let config = TestServerConfig {
         // Preserve cookies across requests
@@ -82,7 +82,7 @@ async fn test_api_project_node_save_load() {
         .json(&node::Model {
             project_id,
             id: node_id,
-            node_type: "person".to_string(),
+            node_type: NodeType::Person,
             display: "Test Person".to_string(),
             value: "foo".to_string(),
             updated: chrono::Utc::now(),
@@ -184,41 +184,38 @@ async fn test_api_get_nodes_by_project() {
     let node1 = node::Model {
         project_id,
         id: node_id1,
-        node_type: "person".to_string(),
+        node_type: NodeType::Person,
         display: "John Doe".to_string(),
         value: "john@example.com".to_string(),
         updated: chrono::Utc::now(),
         notes: Some("First person".to_string()),
         pos_x: Some(100),
         pos_y: Some(200),
-        attachments: serde_json::to_value([0; 0]).expect("Failed to serialize attachments"),
     };
 
     let node2 = node::Model {
         project_id,
         id: node_id2,
-        node_type: "domain".to_string(),
+        node_type: NodeType::Domain,
         display: "example.com".to_string(),
         value: "example.com".to_string(),
         updated: chrono::Utc::now(),
         notes: Some("Domain node".to_string()),
         pos_x: Some(300),
         pos_y: Some(400),
-        attachments: serde_json::to_value([0; 0]).expect("Failed to serialize attachments"),
     };
 
     // Create node for second project
     let other_node = node::Model {
         project_id: other_project_id,
         id: other_node_id,
-        node_type: "ip".to_string(),
+        node_type: NodeType::Ip,
         display: "192.168.1.1".to_string(),
         value: "192.168.1.1".to_string(),
         updated: chrono::Utc::now(),
         notes: None,
         pos_x: Some(500),
         pos_y: Some(600),
-        attachments: serde_json::to_value([0; 0]).expect("Failed to serialize attachments"),
     };
 
     // Add all nodes
@@ -353,14 +350,13 @@ async fn test_api_nodes_crud() {
     let node = node::Model {
         project_id,
         id: node_id,
-        node_type: "email".to_string(),
+        node_type: NodeType::Email,
         display: "test@example.com".to_string(),
         value: "test@example.com".to_string(),
         updated: chrono::Utc::now(),
         notes: Some("Test email node".to_string()),
         pos_x: Some(150),
         pos_y: Some(250),
-        attachments: serde_json::Value::Array(Vec::new()),
     };
 
     let res = server.post("/api/v1/node").json(&node).await;
@@ -372,7 +368,7 @@ async fn test_api_nodes_crud() {
     let retrieved_node: node::Model = res.json();
     assert_eq!(retrieved_node.id, node_id);
     assert_eq!(retrieved_node.project_id, project_id);
-    assert_eq!(retrieved_node.node_type, "email");
+    assert_eq!(retrieved_node.node_type, NodeType::Email);
     assert_eq!(retrieved_node.display, "test@example.com");
     assert_eq!(retrieved_node.value, "test@example.com");
     assert_eq!(retrieved_node.notes, Some("Test email node".to_string()));
@@ -383,14 +379,13 @@ async fn test_api_nodes_crud() {
     let updated_node = node::Model {
         project_id,
         id: node_id,
-        node_type: "email".to_string(),
+        node_type: NodeType::Email,
         display: "updated@example.com".to_string(),
         value: "updated@example.com".to_string(),
         updated: chrono::Utc::now(),
         notes: Some("Updated test email node".to_string()),
         pos_x: Some(300),
         pos_y: Some(400),
-        attachments: JsonValue::Array(Vec::new()),
     };
 
     let res = server
@@ -430,14 +425,13 @@ async fn test_api_node_foreign_key_constraint() {
     let node = node::Model {
         project_id: non_existent_project_id,
         id: node_id,
-        node_type: "person".to_string(),
+        node_type: NodeType::Person,
         display: "Test Person".to_string(),
         value: "test".to_string(),
         updated: chrono::Utc::now(),
         notes: None,
         pos_x: None,
         pos_y: None,
-        attachments: JsonValue::Array(Vec::new()),
     };
 
     // This should fail due to project validation (project doesn't exist)
@@ -547,27 +541,25 @@ async fn test_api_delete_project() {
     let node1 = node::Model {
         project_id,
         id: node_id1,
-        node_type: "person".to_string(),
+        node_type: NodeType::Person,
         display: "Test Person".to_string(),
         value: "test".to_string(),
         updated: chrono::Utc::now(),
         notes: None,
         pos_x: None,
         pos_y: None,
-        attachments: JsonValue::Array(Vec::new()),
     };
     let node_id2 = Uuid::new_v4();
     let node2 = node::Model {
         project_id,
         id: node_id2,
-        node_type: "email".to_string(),
+        node_type: NodeType::Email,
         display: "test@example.com".to_string(),
         value: "test@example.com".to_string(),
         updated: chrono::Utc::now(),
         notes: None,
         pos_x: None,
         pos_y: None,
-        attachments: JsonValue::Array(Vec::new()),
     };
 
     server
@@ -653,4 +645,25 @@ async fn test_api_delete_inbox_project_blocked() {
     let project: project::Model = res.json();
     assert_eq!(project.id, Uuid::nil());
     assert_eq!(project.name, "Inbox");
+}
+
+#[tokio::test]
+async fn test_handle_error() {
+    use super::*;
+    use axum::response::IntoResponse;
+    let err = tower::timeout::error::Elapsed::new();
+    let res = handle_error(Box::new(err)).await.into_response();
+    let expected = (StatusCode::REQUEST_TIMEOUT, "request timed out").into_response();
+
+    assert_eq!(res.status(), expected.status());
+
+    let err = tower::load_shed::error::Overloaded::new();
+    let res = handle_error(Box::new(err)).await.into_response();
+    let expected = (
+        StatusCode::SERVICE_UNAVAILABLE,
+        "service is overloaded, try again later",
+    )
+        .into_response();
+
+    assert_eq!(res.status(), expected.status());
 }

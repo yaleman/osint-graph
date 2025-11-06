@@ -34,6 +34,7 @@ import {
 	updateNode,
 	uploadAttachment,
 } from "./api";
+import { ContextMenuItem } from "./components/ContextMenuItem";
 import { LoginDialog } from "./components/LoginDialog";
 import { ProjectManagementDialog } from "./components/ProjectManagementDialog";
 import { ProjectMismatchDialog } from "./components/ProjectMismatchDialog";
@@ -52,7 +53,7 @@ const DEBOUNCE_DELAY = 100; // ms
 function AppContent() {
 	const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
 	const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-	const { project } = useReactFlow();
+	const { screenToFlowPosition } = useReactFlow();
 	const { requireLogin } = useAuth();
 	const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
 	const [editingNode, setEditingNode] = useState<string | null>(null);
@@ -574,7 +575,8 @@ function AppContent() {
 		const centerY = reactFlowBounds.height / 2;
 
 		// Convert screen coordinates to flow coordinates
-		const position = project({ x: centerX, y: centerY });
+		// const position = project({ x: centerX, y: centerY });
+		const position = screenToFlowPosition({ x: centerX, y: centerY });
 
 		// Add small random offset to prevent exact stacking
 		const offsetX = (Math.random() - 0.5) * 40; // ±20px
@@ -584,7 +586,7 @@ function AppContent() {
 			x: Math.round(position.x + offsetX),
 			y: Math.round(position.y + offsetY),
 		};
-	}, [project]);
+	}, [screenToFlowPosition]);
 
 	const createOSINTNode = useCallback(
 		async (nodeType: string) => {
@@ -613,7 +615,7 @@ function AppContent() {
 				id: nodeId,
 				project_id: projectId,
 				node_type: nodeType,
-				display: `New ${NodeTypeInfo[nodeType]?.label ?? nodeType}`,
+				display: "",
 				value: "",
 				updated: new Date().toISOString(),
 				pos_x: Math.round(x),
@@ -719,8 +721,8 @@ function AppContent() {
 			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 			const nodeType = node.data.nodeType as string;
 
-			// Only show context menu for URL nodes
-			if (nodeType === "url") {
+			// Show context menu for URL and domain nodes
+			if (nodeType === "url" || nodeType === "domain") {
 				setContextMenu({
 					x: event.clientX,
 					y: event.clientY,
@@ -744,6 +746,67 @@ function AppContent() {
 				? cleanUrl
 				: `https://${cleanUrl}`;
 			window.open(fullUrl, "_blank", "noopener,noreferrer");
+		}
+
+		setContextMenu(null);
+	}, [contextMenu]);
+
+	const handleSearchUrlscan = useCallback(() => {
+		if (!contextMenu) return;
+
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+		const nodeType = contextMenu.node.data.nodeType as string;
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+		const value = contextMenu.node.data.osintNode?.value as string;
+
+		if (value) {
+			const cleanValue = value.trim();
+			let searchQuery = "";
+
+			if (nodeType === "domain") {
+				// For domains, use domain: search
+				searchQuery = `domain:${cleanValue}`;
+			} else if (nodeType === "url") {
+				// For URLs, use page.url.keyword: search with backslash escaping
+				const escapedUrl = cleanValue.replace(/[:/]/g, (match) => `\\${match}`);
+				searchQuery = `page.url.keyword:${escapedUrl}`;
+			}
+
+			if (searchQuery) {
+				const urlscanUrl = `https://urlscan.io/search/#${searchQuery}`;
+				window.open(urlscanUrl, "_blank", "noopener,noreferrer");
+			}
+		}
+
+		setContextMenu(null);
+	}, [contextMenu]);
+
+	const handleSearchUrlscanDomain = useCallback(() => {
+		if (!contextMenu) return;
+
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+		const value = contextMenu.node.data.osintNode?.value as string;
+
+		if (value) {
+			const cleanValue = value.trim();
+			try {
+				// Parse the URL to extract the domain
+				// Add protocol if not present to make URL parsing work
+				const urlToParse = cleanValue.match(/^https?:\/\//)
+					? cleanValue
+					: `https://${cleanValue}`;
+				const url = new URL(urlToParse);
+				const domain = url.hostname;
+
+				if (domain) {
+					const searchQuery = `domain:${domain}`;
+					const urlscanUrl = `https://urlscan.io/search/#${searchQuery}`;
+					window.open(urlscanUrl, "_blank", "noopener,noreferrer");
+				}
+			} catch (error) {
+				console.error("Failed to parse URL for domain extraction:", error);
+				toast.error("Failed to extract domain from URL");
+			}
 		}
 
 		setContextMenu(null);
@@ -1423,7 +1486,7 @@ function AppContent() {
 				</div>
 			)}
 
-			{/* Context menu for URL nodes */}
+			{/* Context menu for URL and domain nodes */}
 			{contextMenu && (
 				<div
 					role="menuitem"
@@ -1433,14 +1496,27 @@ function AppContent() {
 					onKeyDown={() => {}}
 					tabIndex={0}
 				>
-					<button
-						type="button"
+					<ContextMenuItem
+						node={contextMenu.node}
 						onClick={handleOpenUrl}
-						className="context-menu-item"
-					>
-						<span>🔗</span>
-						<span>Open in new tab</span>
-					</button>
+						applicableNodeTypes={["url"]}
+						icon="🔗"
+						title="Open in new tab"
+					/>
+					<ContextMenuItem
+						node={contextMenu.node}
+						onClick={handleSearchUrlscan}
+						applicableNodeTypes={["url", "domain"]}
+						icon="🔍"
+						title="Search on urlscan.io"
+					/>
+					<ContextMenuItem
+						node={contextMenu.node}
+						onClick={handleSearchUrlscanDomain}
+						applicableNodeTypes={["url"]}
+						icon="🌐"
+						title="Search this domain on urlscan.io"
+					/>
 				</div>
 			)}
 

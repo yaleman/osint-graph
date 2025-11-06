@@ -1,11 +1,14 @@
 use std::net::TcpListener;
 
 use rand::Rng;
+use sea_orm::FromJsonQueryResult;
+use serde::{Deserialize, Serialize};
 
+pub mod attachment;
 pub mod data;
+pub mod error;
 pub mod node;
 pub mod nodelink;
-pub mod project;
 pub mod storage;
 
 pub struct AddrInfo {
@@ -47,16 +50,16 @@ impl AddrInfo {
 
     pub fn test() -> Self {
         // select a random port
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
-        let mut port: u16 = rng.gen_range(32768..65535);
+        let mut port: u16 = rng.random_range(32768..65535);
         loop {
             // check if we can connect to it
             println!("checking {}", port);
             if TcpListener::bind(format!("127.0.0.1:{}", port)).is_ok() {
                 break;
             }
-            port = rng.gen_range(32768..65535);
+            port = rng.random_range(32768..65535);
         }
 
         Self {
@@ -91,5 +94,41 @@ mod tests {
 
         let _ = AddrInfo::from_env();
         let _ = AddrInfo::test();
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult)]
+pub struct StringVec(pub Vec<String>);
+
+impl StringVec {
+    pub fn empty() -> Self {
+        Self(Vec::new())
+    }
+}
+
+impl Default for StringVec {
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
+pub enum Urls {
+    Login,
+    Callback,
+    Logout,
+}
+
+impl Urls {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Urls::Login => "/auth/login",
+            Urls::Callback => "/oauth2/callback",
+            Urls::Logout => "/auth/logout",
+        }
+    }
+}
+impl AsRef<str> for Urls {
+    fn as_ref(&self) -> &str {
+        self.as_str()
     }
 }

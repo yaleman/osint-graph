@@ -5,10 +5,15 @@ import App from "./App";
 
 import "./index.css";
 
-ReactDOM.createRoot(
-	// biome-ignore lint/style/noNonNullAssertion: if this doesn't work we're in trouble
-	document.getElementById("root")!,
-).render(
+const rootElement = document.getElementById("root");
+if (!rootElement) {
+	alert(
+		"Critical Error: Failed to find the root element. The application cannot start.",
+	);
+	throw new Error("Failed to find the root element");
+}
+
+ReactDOM.createRoot(rootElement).render(
 	<React.StrictMode>
 		<App />
 	</React.StrictMode>,

@@ -1,0 +1,3 @@
+[codespell]
+ignore-words = .codespell_ignore
+skip = ./target,./osint-graph-frontend/pnpm-lock.yaml,./osint-graph-frontend/node_modules/*,*dist

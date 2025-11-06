@@ -11,14 +11,22 @@ edition = "2021"
 
 
 [workspace.dependencies]
-chrono = { version = "0.4.33", default-features = false, features = [
+chrono = { version = "0.4.42", default-features = false, features = [
     "now",
     "std",
 ] }
 serde = { version = "^1.0" }
-serde_json = { version = "1.0.113" }
+serde_json = { version = "1.0.145" }
+sea-orm = { version = "1.1.17", features = [
+    "sqlx-sqlite",
+    "runtime-tokio-rustls",
+    "macros",
+    "uuid",
+    "json-array",
+] }
+sea-query = "0.32.7"
 
-sqlx = { version = "0.7.4", features = [
+sqlx = { version = "0.8.6", features = [
     "sqlite",
     "runtime-tokio",
     "chrono",
@@ -26,7 +34,13 @@ sqlx = { version = "0.7.4", features = [
     "uuid",
 ] }
 
-uuid = { version = "1.7.0" }
+utoipa = { version = "5.4.0", features = [
+    "axum_extras",
+    "uuid",
+    "url",
+    "chrono",
+] }
+uuid = { version = "1.18.1" }
 
 
 [profile.release]

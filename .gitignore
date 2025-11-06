@@ -1,3 +1,5 @@
 dist/*
 /target
 osint-graph/.DS_Store
+.DS_Store
+tarpaulin-report.html

@@ -36,6 +36,7 @@ import {
 } from "./api";
 import { ContextMenuItem } from "./components/ContextMenuItem";
 import { LoginDialog } from "./components/LoginDialog";
+import { NodeSearch } from "./components/NodeSearch";
 import { ProjectManagementDialog } from "./components/ProjectManagementDialog";
 import { ProjectMismatchDialog } from "./components/ProjectMismatchDialog";
 import { ProjectSelector } from "./components/ProjectSelector";
@@ -53,7 +54,7 @@ const DEBOUNCE_DELAY = 100; // ms
 function AppContent() {
 	const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
 	const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-	const { screenToFlowPosition } = useReactFlow();
+	const { screenToFlowPosition, setCenter, getZoom } = useReactFlow();
 	const { requireLogin } = useAuth();
 	const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
 	const [editingNode, setEditingNode] = useState<string | null>(null);
@@ -1085,6 +1086,38 @@ function AppContent() {
 		toast.success("Cancelled moving attachment");
 	}, []);
 
+	const handleNodeSelect = useCallback(
+		(nodeId: string) => {
+			const node = nodes.find((n) => n.id === nodeId);
+			if (node) {
+				// Center the view on the selected node with a smooth transition
+				const x = node.position.x + 100; // Offset to center of node (approximate)
+				const y = node.position.y + 50;
+				const zoom = getZoom();
+				setCenter(x, y, { zoom, duration: 800 });
+
+				// Briefly highlight the node by selecting it
+				setNodes((nds) =>
+					nds.map((n) => ({
+						...n,
+						selected: n.id === nodeId,
+					})),
+				);
+
+				// Deselect after a brief moment
+				setTimeout(() => {
+					setNodes((nds) =>
+						nds.map((n) => ({
+							...n,
+							selected: false,
+						})),
+					);
+				}, 2000);
+			}
+		},
+		[nodes, setCenter, getZoom, setNodes],
+	);
+
 	const formatFileSize = (bytes: number): string => {
 		if (bytes < 1024) return `${bytes} B`;
 		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -1144,6 +1177,17 @@ function AppContent() {
 
 			if (hasRemove) {
 				saveHistory();
+
+				// Delete nodes from backend when removed
+				changes.forEach((change) => {
+					if (change.type === "remove") {
+						console.debug("Deleting node from backend:", change.id);
+						deleteNode(change.id).catch((error) => {
+							console.error("Failed to delete node:", error);
+							toast.error("Failed to delete node from backend");
+						});
+					}
+				});
 			}
 
 			onNodesChange(changes);
@@ -1230,6 +1274,8 @@ function AppContent() {
 				onCreateNew={handleCreateNewProject}
 				setShowProjectManagement={setShowProjectManagement}
 			/>
+
+			<NodeSearch nodes={nodes} onNodeSelect={handleNodeSelect} />
 
 			{showMismatchDialog && (
 				<ProjectMismatchDialog

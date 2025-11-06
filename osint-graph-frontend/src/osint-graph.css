@@ -1,5 +1,5 @@
 :root {
-	--node-panel-width: 15rem;
+	--node-panel-width: 10rem;
 
 	--node-collapse-button-width: 1.8rem;
 	--default-font-weight: var(--default-font-weight);
@@ -623,29 +623,29 @@ body,
 
 /* Node panel content */
 .node-panel-content {
-	padding: 16px;
+	padding: 0.5rem;
 	overflow-y: auto;
 	flex: 1;
 }
 
 .node-panel-title {
-	margin-bottom: 12px;
+	margin-bottom: 0.5rem;
 	font-weight: bold;
-	font-size: 1.2rem;
+	font-size: 1.1rem;
 }
 
 .node-type-button {
 	display: block;
 	width: 100%;
-	padding: 10px 12px;
-	margin: 4px 0;
+	padding: 0.4rem 0.5rem;
+	margin: 0.2rem 0;
 	border: none;
 	border-radius: var(--default-border-radius);
 	color: white;
 	cursor: pointer;
 	text-align: left;
 	font-weight: 500;
-	font-size: 1.2rem;
+	font-size: 1rem;
 	transition:
 		transform 0.1s ease,
 		box-shadow 0.1s ease;
@@ -756,4 +756,89 @@ body,
 	align-items: center;
 	gap: 12px;
 	font-weight: 500;
+}
+
+/* Node Search Styles */
+.node-search-container {
+	position: fixed;
+	top: 1rem;
+	right: 1rem;
+	z-index: 1001;
+	width: 300px;
+}
+
+.node-search-input {
+	width: 100%;
+	padding: 10px 16px;
+	border: 1px solid #ccc;
+	border-radius: var(--default-border-radius);
+	font-size: 1rem;
+	background: white;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.node-search-input:focus {
+	outline: none;
+	border-color: var(--colour-primary-blue);
+	box-shadow: 0 2px 12px rgba(59, 130, 246, 0.2);
+}
+
+.node-search-results {
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	right: 0;
+	background: white;
+	border: 1px solid #ccc;
+	border-radius: var(--default-border-radius);
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	max-height: 90vh;
+	overflow-y: auto;
+}
+
+.node-search-result-item {
+	width: 100%;
+	padding: 12px 16px;
+	border: none;
+	background: white;
+	text-align: left;
+	cursor: pointer;
+	border-bottom: 1px solid #f0f0f0;
+	transition: background-color 0.15s;
+}
+
+.node-search-result-item:last-child {
+	border-bottom: none;
+}
+
+.node-search-result-item:hover {
+	background-color: #f3f4f6;
+}
+
+.node-search-result-title {
+	font-weight: 500;
+	color: #1f2937;
+	margin-bottom: 4px;
+}
+
+.node-search-result-meta {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	font-size: 0.875rem;
+	color: #6b7280;
+}
+
+.node-search-result-type {
+	padding: 2px 8px;
+	border-radius: 4px;
+	font-size: 0.75rem;
+	text-transform: capitalize;
+	font-weight: 500;
+}
+
+.node-search-result-value {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }

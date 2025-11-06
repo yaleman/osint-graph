@@ -152,7 +152,7 @@ impl OAuthClient {
             nonce: nonce.secret().to_string(),
             code_challenge: pkce_challenge.as_str().to_string(),
             redirect_uri: self.redirect_uri.url().as_str().to_string(),
-            expires_at: expires_at,
+            expires_at,
             created_at: chrono::Utc::now(),
         }
         .into_active_model()

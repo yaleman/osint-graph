@@ -146,8 +146,7 @@ pub async fn build_app(
         .route("/api/v1/project/{id}/export", get(export_project))
         .nest_service("/static", static_service.clone())
         .merge(openapi::api_route())
-        .fallback_service(static_service)
-        .layer(from_fn_with_state(shared_state.clone(), require_auth));
+        .fallback_service(static_service);
 
     let res = if enable_oauth {
         // Auth routes should NOT have the require_auth middleware
@@ -155,7 +154,7 @@ pub async fn build_app(
             .route(Urls::Login.as_ref(), get(auth::auth_login))
             .route(Urls::Callback.as_ref(), get(auth::auth_callback))
             .route(Urls::Logout.as_ref(), get(auth::auth_logout))
-            .merge(protected_routes)
+            .merge(protected_routes.layer(from_fn_with_state(shared_state.clone(), require_auth)))
     } else {
         protected_routes
     };

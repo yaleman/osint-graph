@@ -68,7 +68,7 @@ export function ProjectSelector({
 					className="btn btn-primary"
 					title="Project Settings"
 				>
-					⚙️ Settings
+					⚙️ Project Settings
 				</button>
 			</div>
 

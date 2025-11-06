@@ -161,7 +161,11 @@ export const ProjectManagementDialog: React.FC<
 				{/* Header */}
 				<div className="dialog-header">
 					<h2 className="dialog-title">Project Settings</h2>
-					<button type="button" onClick={onClose} className="btm btn-secondary">
+					<button
+						type="button"
+						onClick={onClose}
+						className="btn btn-transparent"
+					>
 						×
 					</button>
 				</div>

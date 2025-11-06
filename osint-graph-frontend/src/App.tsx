@@ -29,13 +29,16 @@ import {
 	exportProject,
 	fetchProjects,
 	listAttachments,
+	setAuthFailureCallback,
 	updateAttachment,
 	updateNode,
 	uploadAttachment,
 } from "./api";
+import { LoginDialog } from "./components/LoginDialog";
 import { ProjectManagementDialog } from "./components/ProjectManagementDialog";
 import { ProjectMismatchDialog } from "./components/ProjectMismatchDialog";
 import { ProjectSelector } from "./components/ProjectSelector";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import type { Attachment, OSINTNode, Project } from "./types";
 import { getNodeColor, hasSyncedValue, NodeTypeInfo } from "./types";
 import "./osint-graph.css";
@@ -50,6 +53,7 @@ function AppContent() {
 	const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
 	const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 	const { project } = useReactFlow();
+	const { requireLogin } = useAuth();
 	const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
 	const [editingNode, setEditingNode] = useState<string | null>(null);
 	const [editingNodeType, setEditingNodeType] = useState<string | null>(null);
@@ -93,6 +97,11 @@ function AppContent() {
 	const idMoreInfo = useId();
 	const idDisplay = useId();
 	const idValue = useId();
+
+	// Set up authentication failure callback
+	useEffect(() => {
+		setAuthFailureCallback(requireLogin);
+	}, [requireLogin]);
 
 	// Flush all pending updates immediately
 	const flushPendingUpdates = useCallback(() => {
@@ -1150,6 +1159,7 @@ function AppContent() {
 	return (
 		<div className="app-container">
 			<Toaster position="top-right" />
+			<LoginDialog />
 
 			<ProjectSelector
 				currentProject={currentProject}
@@ -1157,14 +1167,6 @@ function AppContent() {
 				onCreateNew={handleCreateNewProject}
 				setShowProjectManagement={setShowProjectManagement}
 			/>
-
-			{/* <button
-        onClick={() => setShowProjectManagement(true)}
-        className="btn btn-primary project-settings-button"
-        title="Project Settings"
-      >
-        ⚙️ Settings
-      </button> */}
 
 			{showMismatchDialog && (
 				<ProjectMismatchDialog
@@ -1194,9 +1196,9 @@ function AppContent() {
 				onNodeDoubleClick={handleNodeDoubleClick}
 				onNodeContextMenu={handleNodeContextMenu}
 				fitView
-				style={{
-					cursor: movingAttachment ? "crosshair" : "default",
-				}}
+				className={
+					movingAttachment ? "react-flow-crosshair" : "react-flow-default"
+				}
 			>
 				<Controls />
 				<MiniMap />
@@ -1218,45 +1220,15 @@ function AppContent() {
 				</button>
 
 				{/* Panel content */}
-				<div style={{ padding: "16px", overflowY: "auto", flex: 1 }}>
-					<div
-						style={{
-							marginBottom: "12px",
-							fontWeight: "bold",
-							fontSize: "16px",
-						}}
-					>
-						Add Node
-					</div>
+				<div className="node-panel-content">
+					<div className="node-panel-title">Add Node</div>
 					{nodeTypes.map((type) => (
 						<button
 							type="button"
 							key={type}
 							onClick={() => createOSINTNode(type)}
-							style={{
-								display: "block",
-								width: "100%",
-								padding: "10px 12px",
-								margin: "4px 0",
-								border: "none",
-								borderRadius: "6px",
-								background: getNodeColorCallBack(type),
-								color: "white",
-								cursor: "pointer",
-								textAlign: "left",
-								fontSize: "14px",
-								fontWeight: "500",
-								transition: "transform 0.1s ease, box-shadow 0.1s ease",
-							}}
-							onMouseEnter={(e) => {
-								e.currentTarget.style.transform = "translateY(-2px)";
-								e.currentTarget.style.boxShadow =
-									"0 4px 8px rgba(0, 0, 0, 0.2)";
-							}}
-							onMouseLeave={(e) => {
-								e.currentTarget.style.transform = "translateY(0)";
-								e.currentTarget.style.boxShadow = "none";
-							}}
+							className="node-type-button"
+							style={{ background: getNodeColorCallBack(type) }}
 						>
 							{NodeTypeInfo[type]?.label ?? type}
 						</button>
@@ -1266,266 +1238,187 @@ function AppContent() {
 
 			{editingNode && (
 				<div
-					style={{
-						position: "fixed",
-						top: "50%",
-						left: "50%",
-						transform: "translate(-50%, -50%)",
-						background: "white",
-						border: "1px solid #ccc",
-						borderRadius: "8px",
-						padding: "20px",
-						boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-						zIndex: 1001,
-						minWidth: "300px",
+					role="dialog"
+					aria-modal="true"
+					className="edit-node-backdrop"
+					onClick={(e) => {
+						// Close on backdrop click
+						if (e.target === e.currentTarget) {
+							cancelNodeEdit();
+						}
+					}}
+					onKeyDown={(e) => {
+						if (e.key === "Escape") {
+							cancelNodeEdit();
+						}
 					}}
 				>
-					<h3>Edit Node</h3>
-					<div className="modal-field">
-						<label
-							htmlFor={idDisplay}
-							style={{
-								display: "block",
-								marginBottom: "4px",
-								fontWeight: "500",
-								fontSize: "14px",
-							}}
-						>
-							Display Name
-						</label>
-						<input
-							type="text"
-							id={idDisplay}
-							value={editDisplay}
-							onChange={(e) => setEditDisplay(e.target.value)}
-							style={{
-								width: "100%",
-								padding: "8px",
-								border: "1px solid #ccc",
-								borderRadius: "4px",
-								boxSizing: "border-box",
-							}}
-							placeholder="Name shown on graph"
-							// biome-ignore lint/a11y/noAutofocus: "it's a dialogue for input"
-							autoFocus
-							onKeyDown={(e) => {
-								if (e.key === "Escape") {
-									cancelNodeEdit();
-								}
-							}}
-						/>
-					</div>
-
-					{/* Only show value field for nodes that need it (not person, organisation, image, document) */}
-					{!hasSyncedValue(editingNodeType ?? "") && (
+					<div className="edit-node-modal">
+						<h3>Edit Node</h3>
 						<div className="modal-field">
-							<label
-								htmlFor={idValue}
-								style={{
-									display: "block",
-									marginBottom: "4px",
-									fontWeight: "500",
-									fontSize: "14px",
-								}}
-							>
-								Value
+							<label htmlFor={idDisplay} className="modal-label">
+								Display Name
 							</label>
 							<input
 								type="text"
-								value={editValue}
-								id={idValue}
-								onChange={(e) => setEditValue(e.target.value)}
-								style={{
-									width: "100%",
-									padding: "8px",
-									border: "1px solid #ccc",
-									borderRadius: "4px",
-									boxSizing: "border-box",
+								id={idDisplay}
+								value={editDisplay}
+								onChange={(e) => setEditDisplay(e.target.value)}
+								className="modal-input"
+								placeholder="Name shown on graph"
+								// biome-ignore lint/a11y/noAutofocus: "it's a dialogue for input"
+								autoFocus
+								onKeyDown={(e) => {
+									if (e.key === "Escape") {
+										cancelNodeEdit();
+									}
 								}}
-								placeholder="Actual value (e.g., email, phone number)"
 							/>
 						</div>
-					)}
 
-					<div className="modal-field">
-						<label
-							htmlFor={idMoreInfo}
-							style={{
-								display: "block",
-								marginBottom: "4px",
-								fontWeight: "500",
-								fontSize: "14px",
-							}}
-						>
-							Notes
-						</label>
-						<textarea
-							value={editNotes}
-							onChange={(e) => setEditNotes(e.target.value)}
-							id={idMoreInfo}
-							style={{
-								width: "100%",
-								padding: "8px",
-								border: "1px solid #ccc",
-								borderRadius: "4px",
-								boxSizing: "border-box",
-								minHeight: "80px",
-								resize: "vertical",
-								fontFamily: "inherit",
-							}}
-							placeholder="Additional information..."
-						/>
-					</div>
-
-					{/* Attachments section - only show for saved nodes */}
-					{!pendingNodes.has(editingNode) && (
-						<div className="modal-field">
-							<div
-								style={{
-									display: "block",
-									marginBottom: "8px",
-									fontWeight: "500",
-									fontSize: "14px",
-								}}
-							>
-								Attachments
+						{/* Only show value field for nodes that need it (not person, organisation, image, document) */}
+						{!hasSyncedValue(editingNodeType ?? "") && (
+							<div className="modal-field">
+								<label htmlFor={idValue} className="modal-label">
+									Value
+								</label>
+								<input
+									type="text"
+									value={editValue}
+									id={idValue}
+									onChange={(e) => setEditValue(e.target.value)}
+									className="modal-input"
+									placeholder="Actual value (e.g., email, phone number)"
+								/>
 							</div>
+						)}
 
-							{/* List of existing attachments */}
-							{nodeAttachments.length > 0 && (
-								<div
-									style={{
-										marginBottom: "12px",
-										border: "1px solid #e5e7eb",
-										borderRadius: "4px",
-										overflow: "hidden",
-									}}
-								>
-									{nodeAttachments.map((attachment) => (
-										<div key={attachment.id} className="attachment-item">
-											<div style={{ flex: 1, minWidth: 0 }}>
-												<div className="attachment-filename">
-													{attachment.filename}
+						<div className="modal-field">
+							<label htmlFor={idMoreInfo} className="modal-label">
+								Notes
+							</label>
+							<textarea
+								value={editNotes}
+								onChange={(e) => setEditNotes(e.target.value)}
+								id={idMoreInfo}
+								className="modal-textarea"
+								placeholder="Additional information..."
+							/>
+						</div>
+
+						{/* Attachments section - only show for saved nodes */}
+						{!pendingNodes.has(editingNode) && (
+							<div className="modal-field">
+								<div className="modal-section-label">Attachments</div>
+
+								{/* List of existing attachments */}
+								{nodeAttachments.length > 0 && (
+									<div className="attachment-list-container">
+										{nodeAttachments.map((attachment) => (
+											<div key={attachment.id} className="attachment-item">
+												<div className="attachment-info">
+													<div className="attachment-filename">
+														{attachment.filename}
+													</div>
+													<div className="attachment-size">
+														{formatFileSize(attachment.size)}
+													</div>
 												</div>
-												<div
-													style={{
-														fontSize: "12px",
-														color: "#6b7280",
-													}}
-												>
-													{formatFileSize(attachment.size)}
-												</div>
-											</div>
-											<div
-												style={{
-													display: "flex",
-													gap: "8px",
-													marginLeft: "12px",
-												}}
-											>
-												{isViewableFile(
-													attachment.content_type,
-													attachment.filename,
-												) && (
+												<div className="attachment-actions">
+													{isViewableFile(
+														attachment.content_type,
+														attachment.filename,
+													) && (
+														<button
+															type="button"
+															onClick={() => handleViewAttachment(attachment)}
+															className="btn btn-success"
+															title="View in new tab"
+														>
+															👁
+														</button>
+													)}
 													<button
 														type="button"
-														onClick={() => handleViewAttachment(attachment)}
-														className="btn btn-success"
-														title="View in new tab"
+														onClick={() => handleDownloadAttachment(attachment)}
+														className="btn btn-primary"
+														title="Download"
 													>
-														👁
+														↓
 													</button>
-												)}
-												<button
-													type="button"
-													onClick={() => handleDownloadAttachment(attachment)}
-													className="btn btn-primary"
-													title="Download"
-												>
-													↓
-												</button>
-												<button
-													type="button"
-													onClick={() =>
-														handleMoveAttachment(
-															attachment.id,
-															attachment.filename,
-														)
-													}
-													className="btn btn-warning"
-													title="Move to another node"
-												>
-													📦
-												</button>
-												<button
-													type="button"
-													onClick={() =>
-														handleDeleteAttachment(
-															attachment.id,
-															attachment.filename,
-														)
-													}
-													className="btn btn-danger"
-													title="Delete"
-												>
-													×
-												</button>
+													<button
+														type="button"
+														onClick={() =>
+															handleMoveAttachment(
+																attachment.id,
+																attachment.filename,
+															)
+														}
+														className="btn btn-warning"
+														title="Move to another node"
+													>
+														📦
+													</button>
+													<button
+														type="button"
+														onClick={() =>
+															handleDeleteAttachment(
+																attachment.id,
+																attachment.filename,
+															)
+														}
+														className="btn btn-danger"
+														title="Delete"
+													>
+														×
+													</button>
+												</div>
 											</div>
-										</div>
-									))}
-								</div>
-							)}
+										))}
+									</div>
+								)}
 
-							{/* Upload button */}
-							<label
-								className="btn btn-success"
-								style={{
-									cursor: uploadingAttachment ? "wait" : "pointer",
-									opacity: uploadingAttachment ? 0.6 : 1,
-								}}
-							>
-								{uploadingAttachment ? "Uploading..." : "Upload File"}
-								<input
-									type="file"
-									onChange={handleFileUpload}
-									disabled={uploadingAttachment}
-									style={{ display: "none" }}
-								/>
-							</label>
-						</div>
-					)}
+								{/* Upload button */}
+								<label
+									className={`btn btn-success ${uploadingAttachment ? "upload-label-uploading" : "upload-label-ready"}`}
+								>
+									{uploadingAttachment ? "Uploading..." : "Upload File"}
+									<input
+										type="file"
+										onChange={handleFileUpload}
+										disabled={uploadingAttachment}
+										className="upload-input-hidden"
+									/>
+								</label>
+							</div>
+						)}
 
-					<div
-						style={{
-							display: "flex",
-							gap: "10px",
-							justifyContent: "space-between",
-						}}
-					>
-						<div style={{ display: "flex", gap: "10px" }}>
+						<div className="modal-buttons-container">
+							<div className="modal-buttons-group">
+								<button
+									type="button"
+									onClick={saveNodeEdit}
+									className="btn btn-primary"
+								>
+									Save
+								</button>
+								<button
+									type="button"
+									onClick={cancelNodeEdit}
+									className="btn btn-secondary"
+								>
+									Cancel
+								</button>
+							</div>
 							<button
 								type="button"
-								onClick={saveNodeEdit}
-								className="btn btn-primary"
+								onClick={handleDeleteNodeFromDialog}
+								className="btn btn-danger"
+								title="Delete this node"
 							>
-								Save
-							</button>
-							<button
-								type="button"
-								onClick={cancelNodeEdit}
-								className="btn btn-secondary"
-							>
-								Cancel
+								Delete
 							</button>
 						</div>
-						<button
-							type="button"
-							onClick={handleDeleteNodeFromDialog}
-							className="btn btn-danger"
-							title="Delete this node"
-						>
-							Delete
-						</button>
 					</div>
 				</div>
 			)}
@@ -1553,25 +1446,7 @@ function AppContent() {
 
 			{/* Move attachment mode indicator */}
 			{movingAttachment && (
-				<div
-					style={{
-						position: "fixed",
-						top: "20px",
-						left: "50%",
-						transform: "translateX(-50%)",
-						background: "#3b82f6",
-						color: "white",
-						padding: "12px 20px",
-						borderRadius: "8px",
-						boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-						zIndex: 1002,
-						display: "flex",
-						alignItems: "center",
-						gap: "12px",
-						fontSize: "14px",
-						fontWeight: "500",
-					}}
-				>
+				<div className="move-attachment-indicator">
 					<span>
 						📦 Moving "{movingAttachment.filename}" - Double-click a node to
 						move it there
@@ -1579,16 +1454,7 @@ function AppContent() {
 					<button
 						type="button"
 						onClick={handleCancelMoveAttachment}
-						style={{
-							background: "white",
-							color: "#3b82f6",
-							border: "none",
-							borderRadius: "4px",
-							padding: "6px 12px",
-							cursor: "pointer",
-							fontSize: "13px",
-							fontWeight: "600",
-						}}
+						className="move-attachment-cancel-button"
 					>
 						Cancel
 					</button>
@@ -1600,8 +1466,10 @@ function AppContent() {
 
 export default function App() {
 	return (
-		<ReactFlowProvider>
-			<AppContent />
-		</ReactFlowProvider>
+		<AuthProvider>
+			<ReactFlowProvider>
+				<AppContent />
+			</ReactFlowProvider>
+		</AuthProvider>
 	);
 }

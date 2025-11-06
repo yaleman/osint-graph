@@ -15,6 +15,42 @@ const NODE_URL = "/api/v1/node";
 const ATTACHMENT_URL = "/api/v1/attachment";
 const NODELINK_URL = "/api/v1/nodelink";
 
+// Authentication callback that will be set by the AuthContext
+let authFailureCallback: (() => void) | null = null;
+
+export function setAuthFailureCallback(callback: () => void) {
+	authFailureCallback = callback;
+}
+
+// Configure axios interceptor to detect authentication failures
+axios.interceptors.response.use(
+	(response) => {
+		// Check if we were redirected to a login page
+		// The response.request.responseURL contains the final URL after redirects
+		const finalUrl = response.request.responseURL as string;
+		if (
+			finalUrl &&
+			(finalUrl.includes("/admin/login") || finalUrl.endsWith("/admin/login"))
+		) {
+			// We were redirected to login, trigger auth failure
+			if (authFailureCallback) {
+				authFailureCallback();
+			}
+			return Promise.reject(new Error("Authentication required"));
+		}
+		return response;
+	},
+	(error) => {
+		// Handle 401 Unauthorized responses
+		if (error.response?.status === 401) {
+			if (authFailureCallback) {
+				authFailureCallback();
+			}
+		}
+		return Promise.reject(error);
+	},
+);
+
 export const fetchProjects = async (): Promise<Project[]> => {
 	const response = await axios.get<Project[]>(PROJECTS_URL);
 	return response.data;

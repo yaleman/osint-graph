@@ -61,3 +61,8 @@ reload:
 
 codespell:
     uvx codespell -c
+
+platform := shell("uname -m")
+
+docker_build:
+    docker buildx build --platform linux/{{platform}} -t ghcr.io/yaleman/osint-graph:latest --load .

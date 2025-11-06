@@ -3,3 +3,5 @@ dist/*
 osint-graph/.DS_Store
 .DS_Store
 tarpaulin-report.html
+osint-graph-frontend/node_modules/
+.env

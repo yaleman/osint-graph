@@ -1,11 +1,15 @@
 use std::{process::ExitCode, sync::Arc};
 
+use axum::Router;
 use axum_server::tls_rustls::RustlsConfig;
 use clap::Parser;
-use osint_graph_backend::{build_app, AppState};
+use osint_graph_backend::{build_app, cli::CliOpts, AppState};
 
-use tokio::sync::RwLock;
-use tracing::{error, info};
+use tokio::{
+    signal::unix::{signal, SignalKind},
+    sync::RwLock,
+};
+use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -40,7 +44,34 @@ async fn main() -> ExitCode {
     let app = build_app(&shared_state, db_pool, true).await;
 
     // Run our app with hyper
+    let mut hangup_waiter = match signal(SignalKind::hangup()) {
+        Ok(signal) => signal,
+        Err(err) => {
+            error!("Failed to set up SIGHUP handler: {:?}", err);
+            return ExitCode::FAILURE;
+        }
+    };
+    loop {
+        tokio::select! {
+            res = run_server(&cli, app.clone()) => {
+                return res
+            }
+            _ = hangup_waiter.recv() => {
+                warn!("Received SIGHUP, shutting down.");
+                break
+                // TODO: Implement configuration reload logic here
 
+            }
+            _ = tokio::signal::ctrl_c() => {
+                info!("Received Ctrl-C, shutting down.");
+                break
+            }
+        }
+    }
+    ExitCode::SUCCESS
+}
+
+async fn run_server(cli: &CliOpts, app: Router) -> ExitCode {
     let tls_server_config = match RustlsConfig::from_pem_file(&cli.tls_cert, &cli.tls_key)
         .await
         .inspect_err(|err| error!(error=?err, "Failed to configure TLS server"))

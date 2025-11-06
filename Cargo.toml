@@ -5,9 +5,16 @@
 members = ["osint-graph-backend", "osint-graph-shared"]
 resolver = "2"
 
+
 [workspace.package]
 version = "0.0.1"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["James Hodgkinson <james@terminaloutcomes.com>"]
+description = "A tool for graphing OSINT data"
+repository = "https://github.com/yaleman/osint-graph"
+readme = "README.md"
+keywords = ["osint", "graph", "security", "investigation"]
 
 
 [workspace.dependencies]

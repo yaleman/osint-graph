@@ -36,7 +36,7 @@ frontend-lint:
 run:
     killall osint-graph-backend || true
     cd osint-graph-frontend && vite build --emptyOutDir
-    cargo run --quiet -- --debug
+    cargo run -- --debug
 
 # Run all checks (clippy, test, fmt, frontend-lint)
 check: clippy test fmt frontend-lint

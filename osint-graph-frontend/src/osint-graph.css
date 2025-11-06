@@ -842,3 +842,14 @@ body,
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+
+.node-search-section-header {
+	padding: 8px 16px;
+	background: #f9fafb;
+	font-weight: 600;
+	font-size: 0.75rem;
+	text-transform: uppercase;
+	color: #6b7280;
+	letter-spacing: 0.05em;
+	border-bottom: 1px solid #e5e7eb;
+}

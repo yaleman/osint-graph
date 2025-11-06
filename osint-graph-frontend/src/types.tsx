@@ -49,6 +49,18 @@ export interface ProjectExport {
 	attachments: Attachment[];
 }
 
+export type SearchResultType =
+	| { Node: string } // NodeType as string
+	| "Project"
+	| "Attachment";
+
+export interface SearchResult {
+	id: string;
+	project_id: string;
+	title: string;
+	result_type: SearchResultType;
+}
+
 export const NodeTypeInfo: Record<
 	string,
 	{

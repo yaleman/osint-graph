@@ -7,6 +7,7 @@ import type {
 	OSINTNode,
 	Project,
 	ProjectExport,
+	SearchResult,
 } from "./types";
 
 const PROJECTS_URL = "/api/v1/projects";
@@ -14,6 +15,7 @@ const PROJECT_URL = "/api/v1/project";
 const NODE_URL = "/api/v1/node";
 const ATTACHMENT_URL = "/api/v1/attachment";
 const NODELINK_URL = "/api/v1/nodelink";
+const SEARCH_URL = "/api/v1/search";
 
 // Authentication callback that will be set by the AuthContext
 let authFailureCallback: (() => void) | null = null;
@@ -248,3 +250,14 @@ export function projectLis(projects: Project[]) {
 		</ul>
 	);
 }
+
+/** Search across all projects for nodes matching the query */
+export const searchGlobal = async (query: string): Promise<SearchResult[]> => {
+	if (!query.trim()) {
+		return [];
+	}
+	const response = await axios.get<SearchResult[]>(SEARCH_URL, {
+		params: { q: query },
+	});
+	return response.data;
+};

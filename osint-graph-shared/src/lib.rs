@@ -3,6 +3,7 @@ use std::net::TcpListener;
 use rand::Rng;
 use sea_orm::FromJsonQueryResult;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 pub mod attachment;
 pub mod data;
@@ -97,7 +98,8 @@ mod tests {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult, ToSchema)]
+#[schema(value_type = Vec<String>)]
 pub struct StringVec(pub Vec<String>);
 
 impl StringVec {

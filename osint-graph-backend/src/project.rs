@@ -2,7 +2,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::header::{InvalidHeaderValue, CONTENT_TYPE};
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::IntoResponse;
-use axum::{debug_handler, Json};
+use axum::Json;
 use osint_graph_shared::node::NodeType;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
@@ -12,6 +12,7 @@ use sea_orm::{
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::Utc;
 use tracing::{debug, error, info};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::entity::{attachment, node, nodelink, project};
@@ -37,6 +38,15 @@ fn clean_url_value(value: &str) -> String {
 }
 
 /// POST handler for project things
+///
+#[utoipa::path(
+    post,
+    path = "/api/v1/project",
+    request_body = project::Model,
+    responses(
+        (status = OK, description = "Created a project", body = project::Model)
+    )
+)]
 pub async fn post_project(
     State(state): State<SharedState>,
     Json(project): Json<project::Model>,
@@ -138,6 +148,14 @@ impl From<serde_json::Error> for WebError {
 }
 
 /// Pulls a project from storage.
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/project/{id}",
+    responses(
+        (status = OK, description = "One result ok", body = project::Model)
+    )
+)]
 pub async fn get_project(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
@@ -152,6 +170,13 @@ pub async fn get_project(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/projects",
+    responses(
+        (status = OK, description = "One result ok", body = Vec<project::Model>)
+    )
+)]
 pub async fn get_projects(
     State(state): State<SharedState>,
 ) -> Result<Json<Vec<project::Model>>, WebError> {
@@ -182,6 +207,13 @@ pub async fn get_node(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/project/{project_id}/nodes",
+    responses(
+        (status = OK, description = "One result ok", body = Vec<node::Model>)
+    )
+)]
 pub async fn get_nodes_by_project(
     Path(project_id): Path<Uuid>,
     State(state): State<SharedState>,
@@ -197,6 +229,7 @@ pub async fn get_nodes_by_project(
 #[utoipa::path(
     post,
     path = "/api/v1/node",
+    request_body = node::Model,
     responses(
         (status = OK, description = "One result ok", body = node::Model)
     )
@@ -244,6 +277,14 @@ pub async fn post_node(
     Ok(Json(model))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/nodelink",
+    request_body = nodelink::Model,
+    responses(
+        (status = OK, description = "One result ok", body = nodelink::Model)
+    )
+)]
 pub async fn post_nodelink(
     State(state): State<SharedState>,
     Json(nodelink): Json<nodelink::Model>,
@@ -271,6 +312,13 @@ pub async fn post_nodelink(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/project/{project_id}/nodelinks",
+    responses(
+        (status = OK, description = "One result ok", body = Vec<nodelink::Model>)
+    )
+)]
 pub async fn get_nodelinks_by_project(
     Path(project_id): Path<Uuid>,
     State(state): State<SharedState>,
@@ -283,6 +331,14 @@ pub async fn get_nodelinks_by_project(
     Ok(Json(nodelinks))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/node/{id}",
+    responses(
+        (status = OK, description = "Node deleted successfully", body = String),
+        (status = NOT_FOUND, description = "Node not found")
+    )
+)]
 pub async fn delete_node(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
@@ -302,6 +358,13 @@ pub async fn delete_node(
     }
 }
 
+#[utoipa::path(
+    put,
+    path = "/api/v1/node/{id}",
+    responses(
+        (status = OK, description = "One result ok", body = node::Model)
+    )
+)]
 pub async fn update_node(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
@@ -340,6 +403,14 @@ pub async fn update_node(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/nodelink/{id}",
+    responses(
+        (status = OK, description = "Nodelink deleted successfully", body = ()),
+        (status = NOT_FOUND, description = "Nodelink not found")
+    )
+)]
 pub async fn delete_nodelink(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
@@ -364,6 +435,14 @@ pub async fn delete_nodelink(
 }
 
 /// PUT handler to update an existing project
+#[utoipa::path(
+    put,
+    path = "/api/v1/project/{id}",
+    request_body = project::Model,
+    responses(
+        (status = OK, description = "One result ok", body = project::Model)
+    )
+)]
 pub async fn update_project(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
@@ -397,6 +476,14 @@ pub async fn update_project(
 }
 
 /// DELETE handler to delete a project and cascade to nodes/nodelinks
+#[utoipa::path(
+    delete,
+    path = "/api/v1/project/{id}",
+    responses(
+        (status = OK, description = "Project deleted successfully"),
+        (status = NOT_FOUND, description = "Project not found")
+    )
+)]
 pub async fn delete_project(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
@@ -425,7 +512,7 @@ pub async fn delete_project(
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ProjectExport {
     pub project: project::Model,
     pub nodes: Vec<node::Model>,
@@ -441,7 +528,17 @@ pub struct ExportQuery {
     pub include_attachments: bool,
 }
 
-#[debug_handler]
+#[utoipa::path(
+    get,
+    path = "/api/v1/project/{id}/export",
+    params(
+        ("id" = Uuid, Path, description = "Project ID to export"),
+        ("include_attachments" = bool, Query, description = "Whether to include attachments in the export")
+    ),
+    responses(
+        (status = OK, description = "One result ok", body = ProjectExport)
+    )
+)]
 pub async fn export_project(
     Path(id): Path<Uuid>,
     Query(query): Query<ExportQuery>,
@@ -495,4 +592,113 @@ pub async fn export_project(
             attachments,
         }))
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum SearchResultType {
+    Node(NodeType),
+    Project,
+    Attachment,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SearchResult {
+    pub id: Uuid,
+    pub project_id: Uuid,
+    pub title: String,
+
+    pub result_type: SearchResultType,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SearchQuery {
+    pub q: String,
+}
+
+/// Search across all nodes in all projects
+pub async fn search_global(
+    State(state): State<SharedState>,
+    Query(query): Query<SearchQuery>,
+) -> Result<Json<Vec<SearchResult>>, WebError> {
+    if query.q.trim().is_empty() {
+        return Ok(Json(vec![]));
+    }
+
+    let search_term = format!("%{}%", query.q.trim().to_lowercase());
+    let txn = state.read().await.conn.begin().await?;
+
+    let mut results: Vec<SearchResult> = Vec::new();
+
+    // Search in node display, value, and notes fields
+    let nodes = node::Entity::find()
+        .filter(
+            node::Column::Display
+                .like(&search_term)
+                .or(node::Column::Value.like(&search_term))
+                .or(node::Column::Notes.like(&search_term)),
+        )
+        .all(&txn)
+        .await?;
+
+    // Add node results
+    results.extend(nodes.into_iter().map(|node| SearchResult {
+        id: node.id,
+        project_id: node.project_id,
+        title: node.display,
+        result_type: SearchResultType::Node(node.node_type),
+    }));
+
+    // Search in attachment filenames
+    let attachments = attachment::Entity::find()
+        .filter(attachment::Column::Filename.like(&search_term))
+        .all(&txn)
+        .await?;
+
+    // For each attachment, get the associated node to find project_id
+    for attachment_model in attachments {
+        if let Some(node_model) = node::Entity::find_by_id(attachment_model.node_id)
+            .one(&txn)
+            .await?
+        {
+            results.push(SearchResult {
+                id: node_model.id,
+                project_id: node_model.project_id,
+                title: format!(
+                    "{} (attachment: {})",
+                    node_model.display, attachment_model.filename
+                ),
+                result_type: SearchResultType::Node(node_model.node_type),
+            });
+        }
+    }
+
+    // Search in project names, descriptions, and tags
+    let projects = project::Entity::find()
+        .filter(
+            project::Column::Name
+                .like(&search_term)
+                .or(project::Column::Description.like(&search_term))
+                .or(project::Column::Tags.like(&search_term)),
+        )
+        .all(&txn)
+        .await?;
+
+    // For projects, we need to return a representative node or create a special entry
+    // Since we need a node_id, we'll find the first node in each matching project
+    for project_model in projects {
+        if let Some(first_node) = node::Entity::find()
+            .filter(node::Column::ProjectId.eq(project_model.id))
+            .one(&txn)
+            .await?
+        {
+            results.push(SearchResult {
+                id: first_node.id,
+                project_id: project_model.id,
+                title: format!("Project: {}", project_model.name),
+                result_type: SearchResultType::Project,
+            });
+        }
+    }
+
+    Ok(Json(results))
 }

@@ -1118,6 +1118,24 @@ function AppContent() {
 		[nodes, setCenter, getZoom, setNodes],
 	);
 
+	const handleGlobalNodeSelect = useCallback(
+		async (nodeId: string, projectId: string) => {
+			try {
+				// Switch to the target project
+				await handleProjectChange(projectId);
+
+				// Wait a bit for the project to load, then center on the node
+				setTimeout(() => {
+					handleNodeSelect(nodeId);
+				}, 500);
+			} catch (error) {
+				console.error("Failed to switch to project:", error);
+				toast.error("Failed to switch to project");
+			}
+		},
+		[handleProjectChange, handleNodeSelect],
+	);
+
 	const formatFileSize = (bytes: number): string => {
 		if (bytes < 1024) return `${bytes} B`;
 		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -1263,6 +1281,11 @@ function AppContent() {
 		return <div className="loadingScreen">Initializing OSINT Graph...</div>;
 	}
 
+	// Create projects map for NodeSearch
+	const projectsMap = new Map<string, string>(
+		availableProjects.map((p) => [p.id, p.name]),
+	);
+
 	return (
 		<div className="app-container">
 			<Toaster position="top-right" />
@@ -1275,7 +1298,13 @@ function AppContent() {
 				setShowProjectManagement={setShowProjectManagement}
 			/>
 
-			<NodeSearch nodes={nodes} onNodeSelect={handleNodeSelect} />
+			<NodeSearch
+				nodes={nodes}
+				onNodeSelect={handleNodeSelect}
+				onGlobalResultSelect={handleGlobalNodeSelect}
+				currentProjectId={currentProject?.id || null}
+				projects={projectsMap}
+			/>
 
 			{showMismatchDialog && (
 				<ProjectMismatchDialog

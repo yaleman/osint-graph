@@ -18,6 +18,7 @@ use sea_orm::{
 use serde::Deserialize;
 use std::io::{Read, Write};
 use tracing::{debug, error};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
@@ -27,7 +28,15 @@ use crate::{
 };
 
 /// Upload a file attachment to a node
-/// POST /api/v1/node/{id}/attachment
+#[utoipa::path(
+    post,
+    path = "/api/v1/node/{id}/attachment",
+    responses(
+        (status = OK, description = "Attachment uploaded successfully", body = attachment::Model),
+        (status = BAD_REQUEST, description = "Invalid request"),
+        (status = NOT_FOUND, description = "Node not found")
+    )
+)]
 pub async fn upload_attachment(
     State(state): State<SharedState>,
     Path(node_id): Path<Uuid>,
@@ -148,12 +157,23 @@ pub async fn upload_attachment(
     Ok(Json(saved))
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, ToSchema)]
 pub struct UpdateAttachmentData {
     node_id: Option<Uuid>,
     data: Option<Vec<u8>>,
 }
 
+/// Update a file attachment's metadata or data
+#[utoipa::path(
+    put,
+    path = "/api/v1/attachment/{attachment_id}",
+    request_body = UpdateAttachmentData,
+    responses(
+        (status = OK, description = "Attachment updated successfully", body = attachment::Model),
+        (status = NOT_FOUND, description = "Attachment not found"),
+        (status = BAD_REQUEST, description = "Invalid request")
+    )
+)]
 pub async fn update_attachment(
     State(state): State<SharedState>,
     Path(attachment_id): Path<Uuid>,
@@ -201,10 +221,18 @@ pub async fn update_attachment(
 }
 
 /// Download a file attachment
-/// GET /api/v1/node/{node_id}/attachment/{attachment_id}
+#[utoipa::path(
+    get,
+    path = "/api/v1/attachment/{attachment_id}",
+    responses(
+        (status = OK, description = "Attachment downloaded successfully", content_type = "application/octet-stream", body = [u8]),
+        (status = NOT_FOUND, description = "Attachment not found"),
+        (status = BAD_REQUEST, description = "Attachment does not belong to node")
+    )
+)]
 pub async fn download_attachment(
     State(state): State<SharedState>,
-    Path((node_id, attachment_id)): Path<(Uuid, Uuid)>,
+    Path(attachment_id): Path<Uuid>,
 ) -> Result<Response, WebError> {
     let conn = &state.read().await.conn;
 
@@ -218,17 +246,6 @@ pub async fn download_attachment(
         })?
         .ok_or_else(|| WebError::not_found(format!("Attachment {} not found", attachment_id)))?;
 
-    // Verify attachment belongs to the node
-    if attachment.node_id != node_id {
-        return Err(WebError::new(
-            StatusCode::BAD_REQUEST,
-            format!(
-                "Attachment {} does not belong to node {}",
-                attachment_id, node_id
-            ),
-        ));
-    }
-
     // Decompress data
     let mut decoder = GzDecoder::new(&attachment.data[..]);
     let mut decompressed_data = Vec::new();
@@ -237,8 +254,9 @@ pub async fn download_attachment(
     })?;
 
     debug!(
-        "Downloading attachment {} for node {}",
-        attachment_id, node_id
+        attachment_id = attachment_id.to_string(),
+        node_id = attachment.node_id.to_string(),
+        "Downloading attachment",
     );
 
     // Return file with appropriate headers
@@ -258,6 +276,14 @@ pub async fn download_attachment(
 
 /// View a file attachment (inline display for images, PDFs, text)
 /// GET /api/v1//attachment/{attachment_id}/view
+#[utoipa::path(
+    get,
+    path = "/api/v1/attachment/{attachment_id}/view",
+    responses(
+        (status = OK, description = "Attachment retrieved successfully", content_type = "application/octet-stream", body = [u8]),
+        (status = NOT_FOUND, description = "Attachment not found")
+    )
+)]
 pub async fn view_attachment(
     headers: HeaderMap,
     State(state): State<SharedState>,
@@ -322,27 +348,43 @@ pub async fn view_attachment(
 }
 
 /// Delete a file attachment
-/// DELETE /api/v1/node/{node_id}/attachment/{attachment_id}
+#[utoipa::path(
+    delete,
+    path = "/api/v1/attachment/{attachment_id}",
+    responses(
+        (status = OK, description = "Attachment deleted successfully", body = String)
+    )
+)]
 pub async fn delete_attachment(
     State(state): State<SharedState>,
-    Path((_node_id, attachment_id)): Path<(Uuid, Uuid)>,
+    Path(attachment_id): Path<Uuid>,
 ) -> Result<String, WebError> {
     // Just attempt deletion, don't validate if it exists
-    attachment::Entity::delete_by_id(attachment_id)
+    match attachment::Entity::delete_by_id(attachment_id)
         .exec(&state.read().await.conn)
         .await
         .map_err(|e| {
             error!("Failed to delete attachment: {:?}", e);
             WebError::internal_server_error(format!("Failed to delete attachment: {}", e))
-        })?;
-
-    debug!("Deleted attachment {}", attachment_id);
-
-    Ok("Attachment deleted successfully".to_string())
+        })?
+        .rows_affected
+    {
+        0 => Err(WebError::not_found(format!(
+            "Attachment {} not found",
+            attachment_id
+        ))),
+        _ => Ok("Attachment deleted successfully".to_string()),
+    }
 }
 
 /// List all attachments for a node, does not include file data
-/// GET /api/v1/node/{node_id}/attachments
+#[utoipa::path(
+    get,
+    path = "/api/v1/node/{id}/attachments",
+    responses(
+        (status = OK, description = "Attachments retrieved successfully", body = Vec<attachment::Model>)
+    )
+)]
 pub async fn list_attachments(
     State(state): State<SharedState>,
     Path(node_id): Path<Uuid>,

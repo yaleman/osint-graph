@@ -103,7 +103,7 @@ pub(crate) async fn auth_callback(
         }
     };
 
-    trace!("trying to create store user sesssion");
+    trace!("trying to create store user session");
     // Store user subject in session
     session
         .insert("user_subject", user.subject.clone())

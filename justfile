@@ -58,3 +58,6 @@ coveralls:
 
 reload:
     cargo watch -s 'just run' --why
+
+codespell:
+    uvx codespell -c

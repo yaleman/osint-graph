@@ -67,6 +67,7 @@ export const ProjectManagementDialog: React.FC<
 			});
 			onProjectUpdate(updatedProject);
 			toast.success("Project updated successfully");
+			onClose(); // Close the dialog after successful save
 		} catch (error) {
 			console.error("Failed to update project:", error);
 			toast.error("Failed to update project");
@@ -249,7 +250,7 @@ export const ProjectManagementDialog: React.FC<
 											<button
 												type="button"
 												onClick={() => handleRemoveTag(tag)}
-												className="tag-remove-button"
+												className="btn tag-remove-button"
 											>
 												×
 											</button>
@@ -336,7 +337,7 @@ export const ProjectManagementDialog: React.FC<
 
 							<div className="import-dropzone">
 								<p className="import-dropzone-title">Coming Soon</p>
-								<p className="import-dropzone-text">
+								<p>
 									Project import functionality will be available in a future
 									update.
 								</p>

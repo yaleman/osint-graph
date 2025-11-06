@@ -1454,7 +1454,7 @@ function AppContent() {
 					<button
 						type="button"
 						onClick={handleCancelMoveAttachment}
-						className="move-attachment-cancel-button"
+						className="btn btn-secondary"
 					>
 						Cancel
 					</button>

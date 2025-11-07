@@ -57,6 +57,19 @@ body,
 	overflow: hidden;
 }
 
+.mermaid-content {
+	flex: 1;
+	overflow: auto;
+}
+
+.mermaid-container {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: #f9fafb;
+	border-radius: var(--default-border-radius);
+}
+
 .dialog-header {
 	padding: 1rem;
 	padding-top: 0;
@@ -852,4 +865,53 @@ body,
 	color: #6b7280;
 	letter-spacing: 0.05em;
 	border-bottom: 1px solid #e5e7eb;
+}
+
+/* Mermaid Fullscreen Styles */
+
+.mermaid-fullscreen-backdrop {
+	z-index: 2000;
+}
+
+.mermaid-fullscreen-container {
+	width: 100vw;
+	height: 100vh;
+	max-width: 100vw;
+	max-height: 100vh;
+	min-width: 100vw;
+	border-radius: 0;
+	margin: 0;
+}
+
+.mermaid-zoom-controls {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	background: #f3f4f6;
+	padding: 4px 8px;
+	border-radius: var(--default-border-radius);
+}
+
+.zoom-level {
+	min-width: 50px;
+	text-align: center;
+	font-weight: 500;
+	font-size: 0.875rem;
+	color: #374151;
+}
+
+.mermaid-fullscreen-container .dialog-content {
+	flex: 1;
+	padding: 0;
+	overflow: hidden;
+}
+
+.mermaid-fullscreen-container .mermaid-container {
+	background: white;
+	border-radius: 0;
+}
+
+/* Hide node panel when Mermaid viewer is active */
+body.mermaid-viewer-active .node-panel {
+	display: none;
 }

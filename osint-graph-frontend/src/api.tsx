@@ -187,6 +187,16 @@ export const exportProject = async (
 	return response.data;
 };
 
+export const exportProjectMermaid = async (
+	projectId: string,
+): Promise<string> => {
+	const response = await axios.get<string>(
+		`${PROJECT_URL}/${projectId}/export/mermaid`,
+		{ responseType: "text" as "json" }, // Trick TypeScript while telling axios to expect text
+	);
+	return response.data;
+};
+
 /** Upload a file attachment to a node */
 export const uploadAttachment = async (
 	nodeId: string,

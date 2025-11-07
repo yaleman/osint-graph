@@ -27,6 +27,7 @@ import {
 	deleteNodeLink,
 	downloadAttachment,
 	exportProject,
+	exportProjectMermaid,
 	fetchProjects,
 	listAttachments,
 	setAuthFailureCallback,
@@ -36,6 +37,7 @@ import {
 } from "./api";
 import { ContextMenuItem } from "./components/ContextMenuItem";
 import { LoginDialog } from "./components/LoginDialog";
+import { MermaidViewerDialog } from "./components/MermaidViewerDialog";
 import { NodeSearch } from "./components/NodeSearch";
 import { ProjectManagementDialog } from "./components/ProjectManagementDialog";
 import { ProjectMismatchDialog } from "./components/ProjectMismatchDialog";
@@ -67,6 +69,8 @@ function AppContent() {
 	const [showMismatchDialog, setShowMismatchDialog] = useState(false);
 	const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
 	const [showProjectManagement, setShowProjectManagement] = useState(false);
+	const [showMermaidViewer, setShowMermaidViewer] = useState(false);
+	const [mermaidCode, setMermaidCode] = useState("");
 	const [pendingNodes, setPendingNodes] = useState<Set<string>>(new Set());
 	const [contextMenu, setContextMenu] = useState<{
 		x: number;
@@ -478,6 +482,59 @@ function AppContent() {
 		initializeProject();
 	}, [currentProject, showMismatchDialog, loadProjectData]);
 
+	// Handle URL fragments for deep linking
+	useEffect(() => {
+		const handleFragmentChange = async () => {
+			const hash = window.location.hash.slice(1); // Remove the '#'
+			if (!hash) return;
+
+			const params = new URLSearchParams(hash);
+			const projectId = params.get("project");
+			const viewType = params.get("view");
+
+			if (projectId) {
+				// Load the specified project
+				try {
+					const project = await loadProjectData(projectId);
+					if (project) {
+						setCurrentProject(project);
+						localStorage.setItem(PROJECT_ID_KEY, projectId);
+
+						// Handle view type
+						if (viewType === "mermaid") {
+							const mermaidDiagram = await exportProjectMermaid(projectId);
+							setMermaidCode(mermaidDiagram);
+							setShowMermaidViewer(true);
+						}
+					}
+				} catch (error) {
+					console.error("Failed to load project from URL:", error);
+					toast.error("Failed to load project from URL");
+				}
+			}
+		};
+
+		// Handle initial load
+		handleFragmentChange();
+
+		// Listen for hash changes
+		window.addEventListener("hashchange", handleFragmentChange);
+		return () => window.removeEventListener("hashchange", handleFragmentChange);
+	}, [loadProjectData]);
+
+	// Update URL when project changes
+	useEffect(() => {
+		if (currentProject) {
+			const params = new URLSearchParams(window.location.hash.slice(1));
+			const currentProjectParam = params.get("project");
+
+			// Only update if the project ID changed
+			if (currentProjectParam !== currentProject.id) {
+				window.location.hash = `project=${currentProject.id}`;
+			}
+		}
+	}, [currentProject]);
+
 	const nodeTypes = Object.keys(NodeTypeInfo);
 
 	const handleCreateNewProject = useCallback(async () => {
@@ -497,6 +554,8 @@ function AppContent() {
 
 	const handleProjectUpdate = useCallback((updatedProject: Project) => {
 		setCurrentProject(updatedProject);
+		// Update URL hash
+		window.location.hash = `project=${updatedProject.id}`;
 	}, []);
 
 	const handleProjectDelete = useCallback(async () => {
@@ -1612,6 +1671,21 @@ function AppContent() {
 					</button>
 				</div>
 			)}
+
+			{/* Mermaid Viewer Dialog */}
+			<MermaidViewerDialog
+				isOpen={showMermaidViewer}
+				onClose={() => {
+					setShowMermaidViewer(false);
+					setMermaidCode("");
+					// Update URL to remove mermaid view parameter
+					if (currentProject) {
+						window.location.hash = `project=${currentProject.id}`;
+					}
+				}}
+				mermaidCode={mermaidCode}
+				projectName={currentProject?.name || "Project"}
+			/>
 		</div>
 	);
 }

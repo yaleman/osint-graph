@@ -1,5 +1,5 @@
 use axum::extract::{Path, Query, State};
-use axum::http::header::{InvalidHeaderValue, CONTENT_TYPE};
+use axum::http::header::{InvalidHeaderValue, CONTENT_DISPOSITION, CONTENT_TYPE};
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use axum::Json;
@@ -701,4 +701,171 @@ pub async fn search_global(
     }
 
     Ok(Json(results))
+}
+
+/// Export a project as a Mermaid class diagram
+#[utoipa::path(
+    get,
+    path = "/api/v1/project/{id}/export/mermaid",
+    responses(
+        (status = OK, description = "Mermaid diagram exported successfully", body = String, content_type = "text/vnd.mermaid")
+    )
+)]
+pub async fn export_project_mermaid(
+    Path(id): Path<Uuid>,
+    State(state): State<SharedState>,
+) -> Result<impl IntoResponse, WebError> {
+    let txn = state.read().await.conn.begin().await?;
+
+    // Fetch the project
+    let project_model = match project::Entity::find_by_id(id).one(&txn).await? {
+        Some(project) => project,
+        None => return Err(WebError::not_found(format!("Project {} not found", id))),
+    };
+
+    // Fetch nodes
+    let nodes = project_model.find_related(node::Entity).all(&txn).await?;
+
+    // Fetch nodelinks
+    let nodelinks = project_model
+        .find_related(nodelink::Entity)
+        .all(&txn)
+        .await?;
+
+    // Get all attachments for nodes in this project
+    let node_ids: Vec<Uuid> = nodes.iter().map(|n| n.id).collect();
+    let attachments = if !node_ids.is_empty() {
+        attachment::Entity::find()
+            .filter(attachment::Column::NodeId.is_in(node_ids))
+            .all(&txn)
+            .await?
+    } else {
+        vec![]
+    };
+
+    // Group attachments by node_id
+    let mut attachments_by_node: std::collections::HashMap<Uuid, Vec<attachment::Model>> =
+        std::collections::HashMap::new();
+    for attachment_model in attachments {
+        attachments_by_node
+            .entry(attachment_model.node_id)
+            .or_default()
+            .push(attachment_model);
+    }
+
+    // Build the Mermaid diagram
+    let mut diagram = String::new();
+    diagram.push_str("classDiagram\n");
+
+    // Add a title comment
+    diagram.push_str(&format!("    %% Project: {}\n", project_model.name));
+    if let Some(desc) = &project_model.description {
+        diagram.push_str(&format!("    %% Description: {}\n", desc));
+    }
+    diagram.push_str("\n");
+
+    // Sanitize strings for Mermaid (remove special characters that could break syntax)
+    fn sanitize_mermaid(s: &str) -> String {
+        s.replace('\n', " ")
+            .replace('\r', " ")
+            .replace('"', "'")
+            .replace('`', "'")
+            .replace('{', "(")
+            .replace('}', ")")
+            .replace('<', "(")
+            .replace('>', ")")
+            .chars()
+            .filter(|c| c.is_ascii() || c.is_alphanumeric() || " .,;:!?'-_()[]".contains(*c))
+            .collect::<String>()
+            .trim()
+            .to_string()
+    }
+
+    // Create a mapping from UUID to sanitized class names
+    let mut node_class_names: std::collections::HashMap<Uuid, String> =
+        std::collections::HashMap::new();
+
+    for (idx, node_model) in nodes.iter().enumerate() {
+        let class_name = format!("Node{}", idx);
+        node_class_names.insert(node_model.id, class_name.clone());
+
+        diagram.push_str(&format!("    class {} {{\n", class_name));
+
+        // Add node type
+        diagram.push_str(&format!(
+            "        +String type = \"{}\"\n",
+            sanitize_mermaid(&format!("{:?}", node_model.node_type))
+        ));
+
+        // Add display name
+        diagram.push_str(&format!(
+            "        +String display = \"{}\"\n",
+            sanitize_mermaid(&node_model.display)
+        ));
+
+        // Add value (truncate if too long)
+        let value_display = if node_model.value.len() > 50 {
+            format!("{}...", &sanitize_mermaid(&node_model.value[..50]))
+        } else {
+            sanitize_mermaid(&node_model.value)
+        };
+        diagram.push_str(&format!("        +String value = \"{}\"\n", value_display));
+
+        // Add notes if present
+        if let Some(notes) = &node_model.notes {
+            let notes_display = if notes.len() > 50 {
+                format!("{}...", &sanitize_mermaid(&notes[..50]))
+            } else {
+                sanitize_mermaid(notes)
+            };
+            diagram.push_str(&format!("        +String notes = \"{}\"\n", notes_display));
+        }
+
+        // Add attachments if present
+        if let Some(node_attachments) = attachments_by_node.get(&node_model.id) {
+            for (attach_idx, attachment_model) in node_attachments.iter().enumerate() {
+                diagram.push_str(&format!(
+                    "        +Attachment attachment{} = \"{}\"\n",
+                    attach_idx,
+                    sanitize_mermaid(&attachment_model.filename)
+                ));
+            }
+        }
+
+        diagram.push_str("    }\n\n");
+    }
+
+    // Add relationships
+    for nodelink_model in &nodelinks {
+        if let (Some(left_class), Some(right_class)) = (
+            node_class_names.get(&nodelink_model.left),
+            node_class_names.get(&nodelink_model.right),
+        ) {
+            match nodelink_model.linktype {
+                osint_graph_shared::nodelink::LinkType::Directional => {
+                    diagram.push_str(&format!("    {} --> {}\n", left_class, right_class));
+                }
+                osint_graph_shared::nodelink::LinkType::Omni => {
+                    diagram.push_str(&format!("    {} -- {}\n", left_class, right_class));
+                }
+            }
+        }
+    }
+
+    Ok((
+        [
+            (
+                CONTENT_DISPOSITION,
+                HeaderValue::from_str(&format!(
+                    "inline; filename=\"{}.mermaid\"",
+                    project_model.name
+                ))?,
+            ),
+            (
+                CONTENT_TYPE,
+                HeaderValue::from_static("text/vnd.mermaid; charset=utf-8"),
+            ),
+        ],
+        diagram,
+    ))
 }

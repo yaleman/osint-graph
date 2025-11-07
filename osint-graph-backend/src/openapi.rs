@@ -12,6 +12,7 @@ use utoipa_swagger_ui::SwaggerUi;
         crate::project::update_project,
         crate::project::delete_project,
         crate::project::export_project,
+        crate::project::export_project_mermaid,
         crate::project::get_nodes_by_project,
         crate::project::get_node,
         crate::project::post_node,

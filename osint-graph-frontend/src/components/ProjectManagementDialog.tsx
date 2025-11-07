@@ -1,9 +1,15 @@
 import type React from "react";
 import { useEffect, useId, useState } from "react";
 import toast from "react-hot-toast";
-import { deleteProject, exportProject, updateProject } from "../api";
+import {
+	deleteProject,
+	exportProject,
+	exportProjectMermaid,
+	updateProject,
+} from "../api";
 import type { Project, ProjectExport } from "../types";
 import "../osint-graph.css";
+import { MermaidViewerDialog } from "./MermaidViewerDialog";
 
 interface ProjectManagementDialogProps {
 	isOpen: boolean;
@@ -32,6 +38,10 @@ export const ProjectManagementDialog: React.FC<
 
 	// Export tab state
 	const [exportData, setExportData] = useState<ProjectExport | null>(null);
+
+	// Mermaid state
+	const [mermaidViewerOpen, setMermaidViewerOpen] = useState(false);
+	const [mermaidCode, setMermaidCode] = useState("");
 
 	const idProjectName = useId();
 	const idProjectDescription = useId();
@@ -141,6 +151,53 @@ export const ProjectManagementDialog: React.FC<
 		} catch (error) {
 			console.error("Failed to delete project:", error);
 			toast.error("Failed to delete project");
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const handleExportMermaid = async () => {
+		setLoading(true);
+		try {
+			const mermaidDiagram = await exportProjectMermaid(currentProject.id);
+
+			// Create download
+			const blob = new Blob([mermaidDiagram], {
+				type: "text/plain",
+			});
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			const timestamp = new Date()
+				.toISOString()
+				.replace(/[:.]/g, "-")
+				.split("T")[0];
+			a.download = `${currentProject.name.replace(/[^a-z0-9]/gi, "_")}_${timestamp}.mmd`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+
+			toast.success("Mermaid diagram exported successfully");
+		} catch (error) {
+			console.error("Failed to export Mermaid diagram:", error);
+			toast.error("Failed to export Mermaid diagram");
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const handleViewMermaid = async () => {
+		setLoading(true);
+		try {
+			const mermaidDiagram = await exportProjectMermaid(currentProject.id);
+			setMermaidCode(mermaidDiagram);
+			setMermaidViewerOpen(true);
+			// Update URL to include mermaid view
+			window.location.hash = `project=${currentProject.id}&view=mermaid`;
+		} catch (error) {
+			console.error("Failed to load Mermaid diagram:", error);
+			toast.error("Failed to load Mermaid diagram");
 		} finally {
 			setLoading(false);
 		}
@@ -317,14 +374,34 @@ export const ProjectManagementDialog: React.FC<
 								</div>
 							)}
 
-							<button
-								type="button"
-								onClick={handleExport}
-								disabled={loading}
-								className="btn btn-primary"
-							>
-								{loading ? "Exporting..." : "Export Project"}
-							</button>
+							<div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+								<button
+									type="button"
+									onClick={handleExport}
+									disabled={loading}
+									className="btn btn-primary"
+								>
+									{loading ? "Exporting..." : "Export as JSON"}
+								</button>
+
+								<button
+									type="button"
+									onClick={handleExportMermaid}
+									disabled={loading}
+									className="btn btn-primary"
+								>
+									{loading ? "Exporting..." : "Export as Mermaid"}
+								</button>
+
+								<button
+									type="button"
+									onClick={handleViewMermaid}
+									disabled={loading}
+									className="btn btn-primary"
+								>
+									{loading ? "Loading..." : "View as Mermaid"}
+								</button>
+							</div>
 						</div>
 					)}
 
@@ -402,6 +479,18 @@ export const ProjectManagementDialog: React.FC<
 					)}
 				</div>
 			</div>
+
+			{/* Mermaid Viewer Dialog */}
+			<MermaidViewerDialog
+				isOpen={mermaidViewerOpen}
+				onClose={() => {
+					setMermaidViewerOpen(false);
+					// Update URL to remove mermaid view parameter
+					window.location.hash = `project=${currentProject.id}`;
+				}}
+				mermaidCode={mermaidCode}
+				projectName={currentProject.name}
+			/>
 		</div>
 	);
 };

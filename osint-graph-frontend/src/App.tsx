@@ -650,10 +650,9 @@ function AppContent() {
 
 			// Automatically open edit UI for the new node
 			setEditingNode(nodeId);
+			setEditingNodeType(nodeType);
 			setEditDisplay(osintNode.display);
-			setEditValue("");
-
-			// Don't save to backend yet - wait for user to click Save
+			setEditValue(""); // Don't save to backend yet - wait for user to click Save
 		},
 		[getViewportCenterPosition, setNodes, getNodeColorCallBack, saveHistory],
 	);
@@ -1392,7 +1391,9 @@ function AppContent() {
 					}}
 				>
 					<div className="edit-node-modal">
-						<h3>Edit Node</h3>
+						<h3>
+							{pendingNodes.has(editingNode) ? "Create Node" : "Edit Node"}
+						</h3>
 						<div className="modal-field">
 							<label htmlFor={idDisplay} className="modal-label">
 								Display Name

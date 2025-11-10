@@ -732,7 +732,7 @@ async fn test_api_attachment_upload_download() {
 
     // Download attachment
     let res = server
-        .get(&format!("/api/v1/attachment/{}", attachment_id.to_string()))
+        .get(&format!("/api/v1/attachment/{}", attachment_id))
         .await;
     res.assert_status_ok();
     let downloaded_content = res.as_bytes();
@@ -909,7 +909,7 @@ async fn test_api_attachment_list_and_metadata() {
         );
 
     let res = server
-        .post(&format!("/api/v1/node/{}/attachment", node_id.to_string()))
+        .post(&format!("/api/v1/node/{}/attachment", node_id))
         .multipart(form1)
         .await;
     res.assert_status_ok();
@@ -929,7 +929,7 @@ async fn test_api_attachment_list_and_metadata() {
         );
 
     let res = server
-        .post(&format!("/api/v1/node/{}/attachment", node_id.to_string()))
+        .post(&format!("/api/v1/node/{}/attachment", node_id))
         .multipart(form2)
         .await;
     res.assert_status_ok();
@@ -940,7 +940,7 @@ async fn test_api_attachment_list_and_metadata() {
 
     // Get attachments list for the node
     let res = server
-        .get(&format!("/api/v1/node/{}/attachments", node_id.to_string()))
+        .get(&format!("/api/v1/node/{}/attachments", node_id))
         .await;
     res.assert_status_ok();
     let attachments: Vec<crate::entity::attachment::Model> = res.json();

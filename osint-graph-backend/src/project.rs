@@ -764,14 +764,12 @@ pub async fn export_project_mermaid(
     if let Some(desc) = &project_model.description {
         diagram.push_str(&format!("    %% Description: {}\n", desc));
     }
-    diagram.push_str("\n");
+    diagram.push('\n');
 
     // Sanitize strings for Mermaid (remove special characters that could break syntax)
     fn sanitize_mermaid(s: &str) -> String {
-        s.replace('\n', " ")
-            .replace('\r', " ")
-            .replace('"', "'")
-            .replace('`', "'")
+        s.replace(['\n', '\r'], " ")
+            .replace(['"', '`'], "'")
             .replace('{', "(")
             .replace('}', ")")
             .replace('<', "(")

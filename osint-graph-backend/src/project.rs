@@ -18,6 +18,8 @@ use uuid::Uuid;
 use crate::entity::{attachment, node, nodelink, project};
 use crate::SharedState;
 
+pub const MERMAID_CONTENT_TYPE: &str = "text/vnd.mermaid; charset=utf-8";
+
 /// Clean URL values by removing invisible Unicode characters
 /// Removes zero-width spaces, directional isolates, and other invisible formatting characters
 fn clean_url_value(value: &str) -> String {
@@ -781,15 +783,37 @@ pub async fn export_project_mermaid(
             .to_string()
     }
 
+    // Sanitize class names for Mermaid (stricter - only alphanumeric and underscores)
+    fn sanitize_class_name(s: &str) -> String {
+        s.chars()
+            .filter(|c| c.is_alphanumeric() || *c == '_')
+            .collect::<String>()
+    }
+
     // Create a mapping from UUID to sanitized class names
     let mut node_class_names: std::collections::HashMap<Uuid, String> =
         std::collections::HashMap::new();
 
     for (idx, node_model) in nodes.iter().enumerate() {
-        let class_name = format!("Node{}", idx);
-        node_class_names.insert(node_model.id, class_name.clone());
+        // Use display value as the class name, with fallback to NodeN if empty
+        let mut class_name = sanitize_class_name(&node_model.display);
 
-        diagram.push_str(&format!("    class {} {{\n", class_name));
+        // If the sanitized name is empty or starts with a number, prefix it
+        if class_name.is_empty() || class_name.chars().next().unwrap_or('0').is_ascii_digit() {
+            class_name = format!("Node_{}", idx);
+        }
+
+        // Ensure uniqueness by checking if already used
+        let mut final_class_name = class_name.clone();
+        let mut counter = 1;
+        while node_class_names.values().any(|v| v == &final_class_name) {
+            final_class_name = format!("{}_{}", class_name, counter);
+            counter += 1;
+        }
+
+        node_class_names.insert(node_model.id, final_class_name.clone());
+
+        diagram.push_str(&format!("    class {} {{\n", final_class_name));
 
         // Add node type
         diagram.push_str(&format!(
@@ -861,10 +885,7 @@ pub async fn export_project_mermaid(
                     project_model.name
                 ))?,
             ),
-            (
-                CONTENT_TYPE,
-                HeaderValue::from_static("text/vnd.mermaid; charset=utf-8"),
-            ),
+            (CONTENT_TYPE, HeaderValue::from_static(MERMAID_CONTENT_TYPE)),
         ],
         diagram,
     ))

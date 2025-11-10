@@ -390,7 +390,7 @@ pub async fn list_attachments(
     Path(node_id): Path<Uuid>,
 ) -> Result<Json<Vec<attachment::Model>>, WebError> {
     let attachments = attachment::Entity::find()
-        .filter(attachment::Column::NodeId.eq(node_id.to_string()))
+        .filter(attachment::Column::NodeId.eq(node_id))
         .all(&state.read().await.conn)
         .await
         .map_err(|e| {

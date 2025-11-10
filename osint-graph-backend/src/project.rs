@@ -1,8 +1,8 @@
 use axum::extract::{Path, Query, State};
-use axum::http::header::{InvalidHeaderValue, CONTENT_TYPE};
+use axum::http::header::{InvalidHeaderValue, CONTENT_DISPOSITION, CONTENT_TYPE};
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::IntoResponse;
-use axum::{debug_handler, Json};
+use axum::Json;
 use osint_graph_shared::node::NodeType;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
@@ -12,10 +12,13 @@ use sea_orm::{
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::Utc;
 use tracing::{debug, error, info};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::entity::{attachment, node, nodelink, project};
 use crate::SharedState;
+
+pub const MERMAID_CONTENT_TYPE: &str = "text/vnd.mermaid; charset=utf-8";
 
 /// Clean URL values by removing invisible Unicode characters
 /// Removes zero-width spaces, directional isolates, and other invisible formatting characters
@@ -37,6 +40,15 @@ fn clean_url_value(value: &str) -> String {
 }
 
 /// POST handler for project things
+///
+#[utoipa::path(
+    post,
+    path = "/api/v1/project",
+    request_body = project::Model,
+    responses(
+        (status = OK, description = "Created a project", body = project::Model)
+    )
+)]
 pub async fn post_project(
     State(state): State<SharedState>,
     Json(project): Json<project::Model>,
@@ -138,6 +150,14 @@ impl From<serde_json::Error> for WebError {
 }
 
 /// Pulls a project from storage.
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/project/{id}",
+    responses(
+        (status = OK, description = "One result ok", body = project::Model)
+    )
+)]
 pub async fn get_project(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
@@ -152,6 +172,13 @@ pub async fn get_project(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/projects",
+    responses(
+        (status = OK, description = "One result ok", body = Vec<project::Model>)
+    )
+)]
 pub async fn get_projects(
     State(state): State<SharedState>,
 ) -> Result<Json<Vec<project::Model>>, WebError> {
@@ -182,6 +209,13 @@ pub async fn get_node(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/project/{project_id}/nodes",
+    responses(
+        (status = OK, description = "One result ok", body = Vec<node::Model>)
+    )
+)]
 pub async fn get_nodes_by_project(
     Path(project_id): Path<Uuid>,
     State(state): State<SharedState>,
@@ -197,6 +231,7 @@ pub async fn get_nodes_by_project(
 #[utoipa::path(
     post,
     path = "/api/v1/node",
+    request_body = node::Model,
     responses(
         (status = OK, description = "One result ok", body = node::Model)
     )
@@ -244,6 +279,14 @@ pub async fn post_node(
     Ok(Json(model))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/nodelink",
+    request_body = nodelink::Model,
+    responses(
+        (status = OK, description = "One result ok", body = nodelink::Model)
+    )
+)]
 pub async fn post_nodelink(
     State(state): State<SharedState>,
     Json(nodelink): Json<nodelink::Model>,
@@ -271,6 +314,13 @@ pub async fn post_nodelink(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/project/{project_id}/nodelinks",
+    responses(
+        (status = OK, description = "One result ok", body = Vec<nodelink::Model>)
+    )
+)]
 pub async fn get_nodelinks_by_project(
     Path(project_id): Path<Uuid>,
     State(state): State<SharedState>,
@@ -283,6 +333,14 @@ pub async fn get_nodelinks_by_project(
     Ok(Json(nodelinks))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/node/{id}",
+    responses(
+        (status = OK, description = "Node deleted successfully", body = String),
+        (status = NOT_FOUND, description = "Node not found")
+    )
+)]
 pub async fn delete_node(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
@@ -302,6 +360,13 @@ pub async fn delete_node(
     }
 }
 
+#[utoipa::path(
+    put,
+    path = "/api/v1/node/{id}",
+    responses(
+        (status = OK, description = "One result ok", body = node::Model)
+    )
+)]
 pub async fn update_node(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
@@ -340,6 +405,14 @@ pub async fn update_node(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/nodelink/{id}",
+    responses(
+        (status = OK, description = "Nodelink deleted successfully", body = ()),
+        (status = NOT_FOUND, description = "Nodelink not found")
+    )
+)]
 pub async fn delete_nodelink(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
@@ -364,6 +437,14 @@ pub async fn delete_nodelink(
 }
 
 /// PUT handler to update an existing project
+#[utoipa::path(
+    put,
+    path = "/api/v1/project/{id}",
+    request_body = project::Model,
+    responses(
+        (status = OK, description = "One result ok", body = project::Model)
+    )
+)]
 pub async fn update_project(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
@@ -397,6 +478,14 @@ pub async fn update_project(
 }
 
 /// DELETE handler to delete a project and cascade to nodes/nodelinks
+#[utoipa::path(
+    delete,
+    path = "/api/v1/project/{id}",
+    responses(
+        (status = OK, description = "Project deleted successfully"),
+        (status = NOT_FOUND, description = "Project not found")
+    )
+)]
 pub async fn delete_project(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
@@ -425,7 +514,7 @@ pub async fn delete_project(
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ProjectExport {
     pub project: project::Model,
     pub nodes: Vec<node::Model>,
@@ -441,7 +530,17 @@ pub struct ExportQuery {
     pub include_attachments: bool,
 }
 
-#[debug_handler]
+#[utoipa::path(
+    get,
+    path = "/api/v1/project/{id}/export",
+    params(
+        ("id" = Uuid, Path, description = "Project ID to export"),
+        ("include_attachments" = bool, Query, description = "Whether to include attachments in the export")
+    ),
+    responses(
+        (status = OK, description = "One result ok", body = ProjectExport)
+    )
+)]
 pub async fn export_project(
     Path(id): Path<Uuid>,
     Query(query): Query<ExportQuery>,
@@ -495,4 +594,297 @@ pub async fn export_project(
             attachments,
         }))
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum SearchResultType {
+    Node(NodeType),
+    Project,
+    Attachment,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SearchResult {
+    pub id: Uuid,
+    pub project_id: Uuid,
+    pub title: String,
+
+    pub result_type: SearchResultType,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SearchQuery {
+    pub q: String,
+}
+
+/// Search across all nodes in all projects
+pub async fn search_global(
+    State(state): State<SharedState>,
+    Query(query): Query<SearchQuery>,
+) -> Result<Json<Vec<SearchResult>>, WebError> {
+    if query.q.trim().is_empty() {
+        return Ok(Json(vec![]));
+    }
+
+    let search_term = format!("%{}%", query.q.trim().to_lowercase());
+    let txn = state.read().await.conn.begin().await?;
+
+    let mut results: Vec<SearchResult> = Vec::new();
+
+    // Search in node display, value, and notes fields
+    let nodes = node::Entity::find()
+        .filter(
+            node::Column::Display
+                .like(&search_term)
+                .or(node::Column::Value.like(&search_term))
+                .or(node::Column::Notes.like(&search_term)),
+        )
+        .all(&txn)
+        .await?;
+
+    // Add node results
+    results.extend(nodes.into_iter().map(|node| SearchResult {
+        id: node.id,
+        project_id: node.project_id,
+        title: node.display,
+        result_type: SearchResultType::Node(node.node_type),
+    }));
+
+    // Search in attachment filenames
+    let attachments = attachment::Entity::find()
+        .filter(attachment::Column::Filename.like(&search_term))
+        .all(&txn)
+        .await?;
+
+    // For each attachment, get the associated node to find project_id
+    for attachment_model in attachments {
+        if let Some(node_model) = node::Entity::find_by_id(attachment_model.node_id)
+            .one(&txn)
+            .await?
+        {
+            results.push(SearchResult {
+                id: node_model.id,
+                project_id: node_model.project_id,
+                title: format!(
+                    "{} (attachment: {})",
+                    node_model.display, attachment_model.filename
+                ),
+                result_type: SearchResultType::Node(node_model.node_type),
+            });
+        }
+    }
+
+    // Search in project names, descriptions, and tags
+    let projects = project::Entity::find()
+        .filter(
+            project::Column::Name
+                .like(&search_term)
+                .or(project::Column::Description.like(&search_term))
+                .or(project::Column::Tags.like(&search_term)),
+        )
+        .all(&txn)
+        .await?;
+
+    // For projects, we need to return a representative node or create a special entry
+    // Since we need a node_id, we'll find the first node in each matching project
+    for project_model in projects {
+        if let Some(first_node) = node::Entity::find()
+            .filter(node::Column::ProjectId.eq(project_model.id))
+            .one(&txn)
+            .await?
+        {
+            results.push(SearchResult {
+                id: first_node.id,
+                project_id: project_model.id,
+                title: format!("Project: {}", project_model.name),
+                result_type: SearchResultType::Project,
+            });
+        }
+    }
+
+    Ok(Json(results))
+}
+
+/// Export a project as a Mermaid class diagram
+#[utoipa::path(
+    get,
+    path = "/api/v1/project/{id}/export/mermaid",
+    responses(
+        (status = OK, description = "Mermaid diagram exported successfully", body = String, content_type = "text/vnd.mermaid")
+    )
+)]
+pub async fn export_project_mermaid(
+    Path(id): Path<Uuid>,
+    State(state): State<SharedState>,
+) -> Result<impl IntoResponse, WebError> {
+    let txn = state.read().await.conn.begin().await?;
+
+    // Fetch the project
+    let project_model = match project::Entity::find_by_id(id).one(&txn).await? {
+        Some(project) => project,
+        None => return Err(WebError::not_found(format!("Project {} not found", id))),
+    };
+
+    // Fetch nodes
+    let nodes = project_model.find_related(node::Entity).all(&txn).await?;
+
+    // Fetch nodelinks
+    let nodelinks = project_model
+        .find_related(nodelink::Entity)
+        .all(&txn)
+        .await?;
+
+    // Get all attachments for nodes in this project
+    let node_ids: Vec<Uuid> = nodes.iter().map(|n| n.id).collect();
+    let attachments = if !node_ids.is_empty() {
+        attachment::Entity::find()
+            .filter(attachment::Column::NodeId.is_in(node_ids))
+            .all(&txn)
+            .await?
+    } else {
+        vec![]
+    };
+
+    // Group attachments by node_id
+    let mut attachments_by_node: std::collections::HashMap<Uuid, Vec<attachment::Model>> =
+        std::collections::HashMap::new();
+    for attachment_model in attachments {
+        attachments_by_node
+            .entry(attachment_model.node_id)
+            .or_default()
+            .push(attachment_model);
+    }
+
+    // Build the Mermaid diagram
+    let mut diagram = String::new();
+    diagram.push_str("classDiagram\n");
+
+    // Add a title comment
+    diagram.push_str(&format!("    %% Project: {}\n", project_model.name));
+    if let Some(desc) = &project_model.description {
+        diagram.push_str(&format!("    %% Description: {}\n", desc));
+    }
+    diagram.push('\n');
+
+    // Sanitize strings for Mermaid (remove special characters that could break syntax)
+    fn sanitize_mermaid(s: &str) -> String {
+        s.replace(['\n', '\r'], " ")
+            .replace(['"', '`'], "'")
+            .replace('{', "(")
+            .replace('}', ")")
+            .replace('<', "(")
+            .replace('>', ")")
+            .chars()
+            .filter(|c| c.is_ascii() || c.is_alphanumeric() || " .,;:!?'-_()[]".contains(*c))
+            .collect::<String>()
+            .trim()
+            .to_string()
+    }
+
+    // Sanitize class names for Mermaid (stricter - only alphanumeric and underscores)
+    fn sanitize_class_name(s: &str) -> String {
+        s.chars()
+            .filter(|c| c.is_alphanumeric() || *c == '_')
+            .collect::<String>()
+    }
+
+    // Create a mapping from UUID to sanitized class names
+    let mut node_class_names: std::collections::HashMap<Uuid, String> =
+        std::collections::HashMap::new();
+
+    for (idx, node_model) in nodes.iter().enumerate() {
+        // Use display value as the class name, with fallback to NodeN if empty
+        let mut class_name = sanitize_class_name(&node_model.display);
+
+        // If the sanitized name is empty or starts with a number, prefix it
+        if class_name.is_empty() || class_name.chars().next().unwrap_or('0').is_ascii_digit() {
+            class_name = format!("Node_{}", idx);
+        }
+
+        // Ensure uniqueness by checking if already used
+        let mut final_class_name = class_name.clone();
+        let mut counter = 1;
+        while node_class_names.values().any(|v| v == &final_class_name) {
+            final_class_name = format!("{}_{}", class_name, counter);
+            counter += 1;
+        }
+
+        node_class_names.insert(node_model.id, final_class_name.clone());
+
+        diagram.push_str(&format!("    class {} {{\n", final_class_name));
+
+        // Add node type
+        diagram.push_str(&format!(
+            "        +String type = \"{}\"\n",
+            sanitize_mermaid(&format!("{:?}", node_model.node_type))
+        ));
+
+        // Add display name
+        diagram.push_str(&format!(
+            "        +String display = \"{}\"\n",
+            sanitize_mermaid(&node_model.display)
+        ));
+
+        // Add value (truncate if too long)
+        let value_display = if node_model.value.len() > 50 {
+            format!("{}...", &sanitize_mermaid(&node_model.value[..50]))
+        } else {
+            sanitize_mermaid(&node_model.value)
+        };
+        diagram.push_str(&format!("        +String value = \"{}\"\n", value_display));
+
+        // Add notes if present
+        if let Some(notes) = &node_model.notes {
+            let notes_display = if notes.len() > 50 {
+                format!("{}...", &sanitize_mermaid(&notes[..50]))
+            } else {
+                sanitize_mermaid(notes)
+            };
+            diagram.push_str(&format!("        +String notes = \"{}\"\n", notes_display));
+        }
+
+        // Add attachments if present
+        if let Some(node_attachments) = attachments_by_node.get(&node_model.id) {
+            for (attach_idx, attachment_model) in node_attachments.iter().enumerate() {
+                diagram.push_str(&format!(
+                    "        +Attachment attachment{} = \"{}\"\n",
+                    attach_idx,
+                    sanitize_mermaid(&attachment_model.filename)
+                ));
+            }
+        }
+
+        diagram.push_str("    }\n\n");
+    }
+
+    // Add relationships
+    for nodelink_model in &nodelinks {
+        if let (Some(left_class), Some(right_class)) = (
+            node_class_names.get(&nodelink_model.left),
+            node_class_names.get(&nodelink_model.right),
+        ) {
+            match nodelink_model.linktype {
+                osint_graph_shared::nodelink::LinkType::Directional => {
+                    diagram.push_str(&format!("    {} --> {}\n", left_class, right_class));
+                }
+                osint_graph_shared::nodelink::LinkType::Omni => {
+                    diagram.push_str(&format!("    {} -- {}\n", left_class, right_class));
+                }
+            }
+        }
+    }
+
+    Ok((
+        [
+            (
+                CONTENT_DISPOSITION,
+                HeaderValue::from_str(&format!(
+                    "inline; filename=\"{}.mermaid\"",
+                    project_model.name
+                ))?,
+            ),
+            (CONTENT_TYPE, HeaderValue::from_static(MERMAID_CONTENT_TYPE)),
+        ],
+        diagram,
+    ))
 }

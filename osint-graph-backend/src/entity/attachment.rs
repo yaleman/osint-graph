@@ -1,10 +1,11 @@
 use chrono::Utc;
 use sea_orm::{entity::prelude::*, FromQueryResult, JoinType, QuerySelect, SelectModel, Selector};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::entity::project;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize, ToSchema)]
 #[sea_orm(table_name = "attachment")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]

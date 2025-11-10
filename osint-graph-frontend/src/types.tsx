@@ -49,6 +49,18 @@ export interface ProjectExport {
 	attachments: Attachment[];
 }
 
+export type SearchResultType =
+	| { Node: string } // NodeType as string
+	| "Project"
+	| "Attachment";
+
+export interface SearchResult {
+	id: string;
+	project_id: string;
+	title: string;
+	result_type: SearchResultType;
+}
+
 export const NodeTypeInfo: Record<
 	string,
 	{
@@ -64,7 +76,12 @@ export const NodeTypeInfo: Record<
 		color: "#3b82f6",
 		syncedvalue: true,
 	},
-	domain: { label: "Domain", defaultDisplay: "Domain", color: "#f59e0b" },
+	domain: {
+		label: "Domain",
+		defaultDisplay: "",
+		color: "#f59e0b",
+		syncedvalue: true,
+	},
 	ip: { label: "IP Address", defaultDisplay: "Address", color: "#ef4444" },
 	phone: { label: "Phone", defaultDisplay: "Number", color: "#8b5cf6" },
 	email: { label: "Email", defaultDisplay: "Address", color: "#ec4899" },

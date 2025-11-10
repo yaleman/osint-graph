@@ -27,6 +27,7 @@ import {
 	deleteNodeLink,
 	downloadAttachment,
 	exportProject,
+	exportProjectMermaid,
 	fetchProjects,
 	listAttachments,
 	setAuthFailureCallback,
@@ -34,7 +35,10 @@ import {
 	updateNode,
 	uploadAttachment,
 } from "./api";
+import { ContextMenuItem } from "./components/ContextMenuItem";
 import { LoginDialog } from "./components/LoginDialog";
+import { MermaidViewerDialog } from "./components/MermaidViewerDialog";
+import { NodeSearch } from "./components/NodeSearch";
 import { ProjectManagementDialog } from "./components/ProjectManagementDialog";
 import { ProjectMismatchDialog } from "./components/ProjectMismatchDialog";
 import { ProjectSelector } from "./components/ProjectSelector";
@@ -52,7 +56,7 @@ const DEBOUNCE_DELAY = 100; // ms
 function AppContent() {
 	const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
 	const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-	const { project } = useReactFlow();
+	const { screenToFlowPosition, setCenter, getZoom } = useReactFlow();
 	const { requireLogin } = useAuth();
 	const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
 	const [editingNode, setEditingNode] = useState<string | null>(null);
@@ -65,6 +69,8 @@ function AppContent() {
 	const [showMismatchDialog, setShowMismatchDialog] = useState(false);
 	const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
 	const [showProjectManagement, setShowProjectManagement] = useState(false);
+	const [showMermaidViewer, setShowMermaidViewer] = useState(false);
+	const [mermaidCode, setMermaidCode] = useState("");
 	const [pendingNodes, setPendingNodes] = useState<Set<string>>(new Set());
 	const [contextMenu, setContextMenu] = useState<{
 		x: number;
@@ -476,6 +482,59 @@ function AppContent() {
 		initializeProject();
 	}, [currentProject, showMismatchDialog, loadProjectData]);
 
+	// Handle URL fragments for deep linking
+	useEffect(() => {
+		const handleFragmentChange = async () => {
+			const hash = window.location.hash.slice(1); // Remove the '#'
+			if (!hash) return;
+
+			const params = new URLSearchParams(hash);
+			const projectId = params.get("project");
+			const viewType = params.get("view");
+
+			if (projectId) {
+				// Load the specified project
+				try {
+					const project = await loadProjectData(projectId);
+					if (project) {
+						setCurrentProject(project);
+						localStorage.setItem(PROJECT_ID_KEY, projectId);
+
+						// Handle view type
+						if (viewType === "mermaid") {
+							const mermaidDiagram = await exportProjectMermaid(projectId);
+							setMermaidCode(mermaidDiagram);
+							setShowMermaidViewer(true);
+						}
+					}
+				} catch (error) {
+					console.error("Failed to load project from URL:", error);
+					toast.error("Failed to load project from URL");
+				}
+			}
+		};
+
+		// Handle initial load
+		handleFragmentChange();
+
+		// Listen for hash changes
+		window.addEventListener("hashchange", handleFragmentChange);
+		return () => window.removeEventListener("hashchange", handleFragmentChange);
+	}, [loadProjectData]);
+
+	// Update URL when project changes
+	useEffect(() => {
+		if (currentProject) {
+			const params = new URLSearchParams(window.location.hash.slice(1));
+			const currentProjectParam = params.get("project");
+
+			// Only update if the project ID changed
+			if (currentProjectParam !== currentProject.id) {
+				window.location.hash = `project=${currentProject.id}`;
+			}
+		}
+	}, [currentProject]);
+
 	const nodeTypes = Object.keys(NodeTypeInfo);
 
 	const handleCreateNewProject = useCallback(async () => {
@@ -495,6 +554,8 @@ function AppContent() {
 
 	const handleProjectUpdate = useCallback((updatedProject: Project) => {
 		setCurrentProject(updatedProject);
+		// Update URL hash
+		window.location.hash = `project=${updatedProject.id}`;
 	}, []);
 
 	const handleProjectDelete = useCallback(async () => {
@@ -574,7 +635,8 @@ function AppContent() {
 		const centerY = reactFlowBounds.height / 2;
 
 		// Convert screen coordinates to flow coordinates
-		const position = project({ x: centerX, y: centerY });
+		// const position = project({ x: centerX, y: centerY });
+		const position = screenToFlowPosition({ x: centerX, y: centerY });
 
 		// Add small random offset to prevent exact stacking
 		const offsetX = (Math.random() - 0.5) * 40; // ±20px
@@ -584,7 +646,7 @@ function AppContent() {
 			x: Math.round(position.x + offsetX),
 			y: Math.round(position.y + offsetY),
 		};
-	}, [project]);
+	}, [screenToFlowPosition]);
 
 	const createOSINTNode = useCallback(
 		async (nodeType: string) => {
@@ -613,7 +675,7 @@ function AppContent() {
 				id: nodeId,
 				project_id: projectId,
 				node_type: nodeType,
-				display: `New ${NodeTypeInfo[nodeType]?.label ?? nodeType}`,
+				display: "",
 				value: "",
 				updated: new Date().toISOString(),
 				pos_x: Math.round(x),
@@ -647,10 +709,9 @@ function AppContent() {
 
 			// Automatically open edit UI for the new node
 			setEditingNode(nodeId);
+			setEditingNodeType(nodeType);
 			setEditDisplay(osintNode.display);
-			setEditValue("");
-
-			// Don't save to backend yet - wait for user to click Save
+			setEditValue(""); // Don't save to backend yet - wait for user to click Save
 		},
 		[getViewportCenterPosition, setNodes, getNodeColorCallBack, saveHistory],
 	);
@@ -719,8 +780,8 @@ function AppContent() {
 			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 			const nodeType = node.data.nodeType as string;
 
-			// Only show context menu for URL nodes
-			if (nodeType === "url") {
+			// Show context menu for URL and domain nodes
+			if (nodeType === "url" || nodeType === "domain") {
 				setContextMenu({
 					x: event.clientX,
 					y: event.clientY,
@@ -744,6 +805,67 @@ function AppContent() {
 				? cleanUrl
 				: `https://${cleanUrl}`;
 			window.open(fullUrl, "_blank", "noopener,noreferrer");
+		}
+
+		setContextMenu(null);
+	}, [contextMenu]);
+
+	const handleSearchUrlscan = useCallback(() => {
+		if (!contextMenu) return;
+
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+		const nodeType = contextMenu.node.data.nodeType as string;
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+		const value = contextMenu.node.data.osintNode?.value as string;
+
+		if (value) {
+			const cleanValue = value.trim();
+			let searchQuery = "";
+
+			if (nodeType === "domain") {
+				// For domains, use domain: search
+				searchQuery = `domain:${cleanValue}`;
+			} else if (nodeType === "url") {
+				// For URLs, use page.url.keyword: search with backslash escaping
+				const escapedUrl = cleanValue.replace(/[:/]/g, (match) => `\\${match}`);
+				searchQuery = `page.url.keyword:${escapedUrl}`;
+			}
+
+			if (searchQuery) {
+				const urlscanUrl = `https://urlscan.io/search/#${searchQuery}`;
+				window.open(urlscanUrl, "_blank", "noopener,noreferrer");
+			}
+		}
+
+		setContextMenu(null);
+	}, [contextMenu]);
+
+	const handleSearchUrlscanDomain = useCallback(() => {
+		if (!contextMenu) return;
+
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+		const value = contextMenu.node.data.osintNode?.value as string;
+
+		if (value) {
+			const cleanValue = value.trim();
+			try {
+				// Parse the URL to extract the domain
+				// Add protocol if not present to make URL parsing work
+				const urlToParse = cleanValue.match(/^https?:\/\//)
+					? cleanValue
+					: `https://${cleanValue}`;
+				const url = new URL(urlToParse);
+				const domain = url.hostname;
+
+				if (domain) {
+					const searchQuery = `domain:${domain}`;
+					const urlscanUrl = `https://urlscan.io/search/#${searchQuery}`;
+					window.open(urlscanUrl, "_blank", "noopener,noreferrer");
+				}
+			} catch (error) {
+				console.error("Failed to parse URL for domain extraction:", error);
+				toast.error("Failed to extract domain from URL");
+			}
 		}
 
 		setContextMenu(null);
@@ -1022,6 +1144,56 @@ function AppContent() {
 		toast.success("Cancelled moving attachment");
 	}, []);
 
+	const handleNodeSelect = useCallback(
+		(nodeId: string) => {
+			const node = nodes.find((n) => n.id === nodeId);
+			if (node) {
+				// Center the view on the selected node with a smooth transition
+				const x = node.position.x + 100; // Offset to center of node (approximate)
+				const y = node.position.y + 50;
+				const zoom = getZoom();
+				setCenter(x, y, { zoom, duration: 800 });
+
+				// Briefly highlight the node by selecting it
+				setNodes((nds) =>
+					nds.map((n) => ({
+						...n,
+						selected: n.id === nodeId,
+					})),
+				);
+
+				// Deselect after a brief moment
+				setTimeout(() => {
+					setNodes((nds) =>
+						nds.map((n) => ({
+							...n,
+							selected: false,
+						})),
+					);
+				}, 2000);
+			}
+		},
+		[nodes, setCenter, getZoom, setNodes],
+	);
+
+	const handleGlobalNodeSelect = useCallback(
+		async (nodeId: string, projectId: string) => {
+			try {
+				// Switch to the target project
+				await handleProjectChange(projectId);
+
+				// Wait a bit for the project to load, then center on the node
+				setTimeout(() => {
+					handleNodeSelect(nodeId);
+				}, 500);
+			} catch (error) {
+				console.error("Failed to switch to project:", error);
+				toast.error("Failed to switch to project");
+			}
+		},
+		[handleProjectChange, handleNodeSelect],
+	);
+
 	const formatFileSize = (bytes: number): string => {
 		if (bytes < 1024) return `${bytes} B`;
 		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -1081,6 +1253,17 @@ function AppContent() {
 
 			if (hasRemove) {
 				saveHistory();
+
+				// Delete nodes from backend when removed
+				changes.forEach((change) => {
+					if (change.type === "remove") {
+						console.debug("Deleting node from backend:", change.id);
+						deleteNode(change.id).catch((error) => {
+							console.error("Failed to delete node:", error);
+							toast.error("Failed to delete node from backend");
+						});
+					}
+				});
 			}
 
 			onNodesChange(changes);
@@ -1156,6 +1339,11 @@ function AppContent() {
 		return <div className="loadingScreen">Initializing OSINT Graph...</div>;
 	}
 
+	// Create projects map for NodeSearch
+	const projectsMap = new Map<string, string>(
+		availableProjects.map((p) => [p.id, p.name]),
+	);
+
 	return (
 		<div className="app-container">
 			<Toaster position="top-right" />
@@ -1166,6 +1354,14 @@ function AppContent() {
 				onProjectChange={handleProjectChange}
 				onCreateNew={handleCreateNewProject}
 				setShowProjectManagement={setShowProjectManagement}
+			/>
+
+			<NodeSearch
+				nodes={nodes}
+				onNodeSelect={handleNodeSelect}
+				onGlobalResultSelect={handleGlobalNodeSelect}
+				currentProjectId={currentProject?.id || null}
+				projects={projectsMap}
 			/>
 
 			{showMismatchDialog && (
@@ -1254,7 +1450,9 @@ function AppContent() {
 					}}
 				>
 					<div className="edit-node-modal">
-						<h3>Edit Node</h3>
+						<h3>
+							{pendingNodes.has(editingNode) ? "Create Node" : "Edit Node"}
+						</h3>
 						<div className="modal-field">
 							<label htmlFor={idDisplay} className="modal-label">
 								Display Name
@@ -1423,7 +1621,7 @@ function AppContent() {
 				</div>
 			)}
 
-			{/* Context menu for URL nodes */}
+			{/* Context menu for URL and domain nodes */}
 			{contextMenu && (
 				<div
 					role="menuitem"
@@ -1433,14 +1631,27 @@ function AppContent() {
 					onKeyDown={() => {}}
 					tabIndex={0}
 				>
-					<button
-						type="button"
+					<ContextMenuItem
+						node={contextMenu.node}
 						onClick={handleOpenUrl}
-						className="context-menu-item"
-					>
-						<span>🔗</span>
-						<span>Open in new tab</span>
-					</button>
+						applicableNodeTypes={["url"]}
+						icon="🔗"
+						title="Open in new tab"
+					/>
+					<ContextMenuItem
+						node={contextMenu.node}
+						onClick={handleSearchUrlscan}
+						applicableNodeTypes={["url", "domain"]}
+						icon="🔍"
+						title="Search on urlscan.io"
+					/>
+					<ContextMenuItem
+						node={contextMenu.node}
+						onClick={handleSearchUrlscanDomain}
+						applicableNodeTypes={["url"]}
+						icon="🌐"
+						title="Search this domain on urlscan.io"
+					/>
 				</div>
 			)}
 
@@ -1460,6 +1671,21 @@ function AppContent() {
 					</button>
 				</div>
 			)}
+
+			{/* Mermaid Viewer Dialog */}
+			<MermaidViewerDialog
+				isOpen={showMermaidViewer}
+				onClose={() => {
+					setShowMermaidViewer(false);
+					setMermaidCode("");
+					// Update URL to remove mermaid view parameter
+					if (currentProject) {
+						window.location.hash = `project=${currentProject.id}`;
+					}
+				}}
+				mermaidCode={mermaidCode}
+				projectName={currentProject?.name || "Project"}
+			/>
 		</div>
 	);
 }

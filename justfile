@@ -1,3 +1,8 @@
+set positional-arguments
+
+platform := shell("uname -m")
+
+[private]
 default:
     just --list
 
@@ -42,27 +47,34 @@ run:
 check: clippy test fmt frontend-lint
 
 
-set positional-arguments
-
-@coverage_inner *args='':
-    cargo tarpaulin --quiet --workspace --exclude-files=src/main.rs $@
 
 # run coverage checks
 coverage:
     just coverage_inner --out=Html
     @echo "Coverage report should be at file://$(pwd)/tarpaulin-report.html"
 
+# run coverage and submit to coveralls.io
 coveralls:
     just coverage_inner --out=Html --coveralls $COVERALLS_REPO_TOKEN
     @echo "Coverage report should be at https://coveralls.io/github/yaleman/osint-graph?branch=$(git branch --show-current)"
 
+# only used for coverage commands
+[private]
+@coverage_inner *args='':
+    cargo tarpaulin --quiet --workspace --exclude-files=src/main.rs $@
+
+# Run in reload mode
 reload:
     cargo watch -s 'just run' --why
 
+# Check spelling
 codespell:
     uvx codespell -c
 
-platform := shell("uname -m")
-
+# Build the local container
 docker_build:
     docker buildx build --platform linux/{{platform}} -t ghcr.io/yaleman/osint-graph:latest --load .
+
+# Runs the OpenAPI spec check script
+openapi_spec:
+    ./check_openapi_spec.sh

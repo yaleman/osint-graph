@@ -62,6 +62,9 @@ pub struct CliOpts {
         help = "OIDC Discovery URL"
     )]
     pub oidc_discovery_url: String,
+
+    #[clap(long, help = "Export the OpenAPI json file and exit")]
+    pub export_openapi: bool,
 }
 
 impl CliOpts {

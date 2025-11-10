@@ -12,9 +12,21 @@ use tokio::{
 use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+fn export_openapi() {
+    use utoipa::OpenApi;
+    let openapi = osint_graph_backend::openapi::ApiDoc::openapi();
+    let json = serde_json::to_string_pretty(&openapi).expect("Failed to serialize OpenAPI");
+    println!("{}", json);
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     let cli = osint_graph_backend::cli::CliOpts::parse();
+
+    if cli.export_openapi {
+        export_openapi();
+        return ExitCode::SUCCESS;
+    }
 
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
@@ -54,7 +66,9 @@ async fn main() -> ExitCode {
     loop {
         tokio::select! {
             res = run_server(&cli, app.clone()) => {
-                return res
+                if let Some(res) = res {
+                    return res;
+                }
             }
             _ = hangup_waiter.recv() => {
                 warn!("Received SIGHUP, shutting down.");
@@ -71,13 +85,13 @@ async fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-async fn run_server(cli: &CliOpts, app: Router) -> ExitCode {
+async fn run_server(cli: &CliOpts, app: Router) -> Option<ExitCode> {
     let tls_server_config = match RustlsConfig::from_pem_file(&cli.tls_cert, &cli.tls_key)
         .await
         .inspect_err(|err| error!(error=?err, "Failed to configure TLS server"))
     {
         Ok(val) => val,
-        Err(_) => return ExitCode::FAILURE,
+        Err(_) => return Some(ExitCode::FAILURE),
     };
     info!("Starting server on {}", cli.frontend_url);
     axum_server::bind_rustls(
@@ -87,5 +101,5 @@ async fn run_server(cli: &CliOpts, app: Router) -> ExitCode {
     .serve(app.into_make_service())
     .await
     .unwrap();
-    ExitCode::SUCCESS
+    None
 }

@@ -61,7 +61,7 @@ coveralls:
 # only used for coverage commands
 [private]
 @coverage_inner *args='':
-    cargo tarpaulin --quiet --workspace --exclude-files=src/main.rs $@
+    cargo tarpaulin  --workspace --exclude-files=src/main.rs $@
 
 # Run in reload mode
 reload:

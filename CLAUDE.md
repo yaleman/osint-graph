@@ -152,7 +152,7 @@ just check
 just clippy          # Rust linting
 just test           # Run tests
 just fmt            # Format code
-just frontend-lint  # Frontend ESLint
+just frontend-lint  # Frontend Biome linting
 ```
 
 ### Make Tasks
@@ -191,7 +191,7 @@ cargo tarpaulin --packages osint-graph-shared
 
 - **Backend**: Uses `cargo test` with axum-test for HTTP testing
 - **Coverage**: `cargo tarpaulin` generates HTML reports (currently 86.45% coverage)
-- **Frontend**: ESLint for linting, TypeScript for type checking
+- **Frontend**: Biome for linting and formatting, TypeScript for type checking
 - **Comprehensive test suite**: 16+ unit tests for NodeUpdateList synchronization logic
 
 ## Key Files

@@ -1,4 +1,4 @@
-use std::{process::ExitCode, sync::Arc};
+use std::{net::SocketAddr, process::ExitCode, sync::Arc};
 
 use axum::Router;
 use axum_server::tls_rustls::RustlsConfig;
@@ -95,7 +95,9 @@ async fn run_server(cli: &CliOpts, app: Router) -> Option<ExitCode> {
     };
     info!("Starting server on {}", cli.frontend_url);
     axum_server::bind_rustls(
-        cli.listener_address.parse().expect("Invalid address"),
+        cli.listener_address
+            .parse::<SocketAddr>()
+            .expect("Invalid address"),
         tls_server_config,
     )
     .serve(app.into_make_service())

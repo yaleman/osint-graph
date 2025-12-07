@@ -19,7 +19,7 @@ axum = { version = "0.8.6", features = [
     "multipart",
     "tracing",
 ] }
-axum-server = { version = "0.7.2", features = ["tls-rustls"] }
+axum-server = { version = "0.8.0", features = ["tls-rustls"] }
 chrono = { workspace = true, features = ["serde"] }
 clap = { version = "4.5.51", features = ["derive", "env"] }
 flate2 = "1.1.5"

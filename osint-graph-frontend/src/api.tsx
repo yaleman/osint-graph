@@ -19,9 +19,81 @@ const SEARCH_URL = "/api/v1/search";
 
 // Authentication callback that will be set by the AuthContext
 let authFailureCallback: (() => void) | null = null;
+let queueRequestCallback:
+	| ((config: import("axios").AxiosRequestConfig, action: string) => void)
+	| null = null;
 
 export function setAuthFailureCallback(callback: () => void) {
 	authFailureCallback = callback;
+}
+
+export function setQueueRequestCallback(
+	callback: (
+		config: import("axios").AxiosRequestConfig,
+		action: string,
+	) => void,
+) {
+	queueRequestCallback = callback;
+}
+
+// Generate human-readable description for a request
+function describeRequest(config: import("axios").AxiosRequestConfig): string {
+	const method = (config.method || "GET").toUpperCase();
+	const url = config.url || "";
+
+	// Pattern matching for common operations
+	if (
+		method === "POST" &&
+		url.includes("/api/v1/node") &&
+		!url.includes("/attachment")
+	) {
+		return "Creating new node";
+	}
+	if (method === "PUT" && url.match(/\/api\/v1\/node\/[^/]+$/)) {
+		return "Updating node";
+	}
+	if (method === "DELETE" && url.match(/\/api\/v1\/node\/[^/]+$/)) {
+		return "Deleting node";
+	}
+	if (method === "POST" && url.includes("/attachment")) {
+		return "Uploading file attachment";
+	}
+	if (method === "DELETE" && url.includes("/attachment/")) {
+		return "Deleting file attachment";
+	}
+	if (method === "GET" && url.includes("/export")) {
+		return "Exporting project";
+	}
+	if (method === "POST" && url.includes("/api/v1/project")) {
+		return "Creating new project";
+	}
+	if (method === "PUT" && url.match(/\/api\/v1\/project\/[^/]+$/)) {
+		return "Updating project";
+	}
+	if (method === "DELETE" && url.match(/\/api\/v1\/project\/[^/]+$/)) {
+		return "Deleting project";
+	}
+	if (method === "POST" && url.includes("/api/v1/nodelink")) {
+		return "Creating node link";
+	}
+	if (method === "DELETE" && url.includes("/api/v1/nodelink/")) {
+		return "Deleting node link";
+	}
+	if (method === "GET" && url.includes("/nodes")) {
+		return "Loading nodes";
+	}
+	if (method === "GET" && url.includes("/nodelinks")) {
+		return "Loading node links";
+	}
+	if (method === "GET" && url.includes("/attachments")) {
+		return "Loading attachments";
+	}
+	if (method === "GET" && url.includes("/api/v1/search")) {
+		return "Searching";
+	}
+
+	// Generic fallback
+	return `${method} request to ${url.replace(/^\/api\/v1\//, "")}`;
 }
 
 // Configure axios interceptor to detect authentication failures
@@ -34,10 +106,19 @@ axios.interceptors.response.use(
 			finalUrl &&
 			(finalUrl.includes("/admin/login") || finalUrl.endsWith("/admin/login"))
 		) {
-			// We were redirected to login, trigger auth failure
+			// We were redirected to login - queue this request for retry
+			const userAction = describeRequest(response.config);
+
+			// Queue the request if callback is set
+			if (queueRequestCallback) {
+				queueRequestCallback(response.config, userAction);
+			}
+
+			// Trigger auth failure dialog
 			if (authFailureCallback) {
 				authFailureCallback();
 			}
+
 			return Promise.reject(new Error("Authentication required"));
 		}
 		return response;
@@ -45,6 +126,16 @@ axios.interceptors.response.use(
 	(error) => {
 		// Handle 401 Unauthorized responses
 		if (error.response?.status === 401) {
+			// Queue this request for retry
+			if (error.config) {
+				const userAction = describeRequest(error.config);
+
+				if (queueRequestCallback) {
+					queueRequestCallback(error.config, userAction);
+				}
+			}
+
+			// Trigger auth failure dialog
 			if (authFailureCallback) {
 				authFailureCallback();
 			}

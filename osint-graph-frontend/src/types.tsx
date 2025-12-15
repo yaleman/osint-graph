@@ -1,4 +1,6 @@
 // types.ts
+import type { AxiosRequestConfig } from "axios";
+
 export interface Project {
 	id: string;
 	name: string;
@@ -60,6 +62,16 @@ export interface SearchResult {
 	title: string;
 	result_type: SearchResultType;
 }
+
+export interface PendingRequest {
+	id: string; // Unique identifier
+	config: AxiosRequestConfig; // Full axios config for retry
+	timestamp: Date; // When request was queued
+	userAction: string; // Human-readable description
+	attempt: number; // Retry attempt counter
+}
+
+export type RequestStatus = "pending" | "retrying" | "success" | "failed";
 
 export const NodeTypeInfo: Record<
 	string,

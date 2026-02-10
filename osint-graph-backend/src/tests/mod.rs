@@ -913,6 +913,97 @@ async fn test_api_node_foreign_key_constraint() {
 }
 
 #[tokio::test]
+async fn test_api_nodelink_cascade_delete_when_node_deleted() {
+    let server = setup_test_server().await;
+
+    let project_id = Uuid::new_v4();
+    let project = project::Model {
+        id: project_id,
+        name: "NodeLink FK Cascade Test".to_string(),
+        user: Uuid::new_v4(),
+        creationdate: chrono::Utc::now(),
+        last_updated: None,
+        description: None,
+        tags: StringVec::default(),
+    };
+    server
+        .post("/api/v1/project")
+        .json(&project)
+        .await
+        .assert_status_ok();
+
+    let left_node_id = Uuid::new_v4();
+    let right_node_id = Uuid::new_v4();
+    let left_node = node::Model {
+        project_id,
+        id: left_node_id,
+        node_type: NodeType::Person,
+        display: "Left Node".to_string(),
+        value: "left".to_string(),
+        updated: chrono::Utc::now(),
+        notes: None,
+        pos_x: None,
+        pos_y: None,
+    };
+    let right_node = node::Model {
+        project_id,
+        id: right_node_id,
+        node_type: NodeType::Domain,
+        display: "right.example".to_string(),
+        value: "right.example".to_string(),
+        updated: chrono::Utc::now(),
+        notes: None,
+        pos_x: None,
+        pos_y: None,
+    };
+
+    server
+        .post("/api/v1/node")
+        .json(&left_node)
+        .await
+        .assert_status_ok();
+    server
+        .post("/api/v1/node")
+        .json(&right_node)
+        .await
+        .assert_status_ok();
+
+    let link_id = Uuid::new_v4();
+    let link = crate::entity::nodelink::Model {
+        id: link_id,
+        left: left_node_id,
+        right: right_node_id,
+        project_id,
+        linktype: osint_graph_shared::nodelink::LinkType::Directional,
+    };
+    server
+        .post("/api/v1/nodelink")
+        .json(&link)
+        .await
+        .assert_status_ok();
+
+    let links_res = server
+        .get(&format!("/api/v1/project/{}/nodelinks", project_id))
+        .await;
+    links_res.assert_status_ok();
+    let links: Vec<crate::entity::nodelink::Model> = links_res.json();
+    assert_eq!(links.len(), 1);
+    assert_eq!(links[0].id, link_id);
+
+    let delete_res = server
+        .delete(&format!("/api/v1/node/{}", left_node_id))
+        .await;
+    delete_res.assert_status_ok();
+
+    let links_res = server
+        .get(&format!("/api/v1/project/{}/nodelinks", project_id))
+        .await;
+    links_res.assert_status_ok();
+    let links: Vec<crate::entity::nodelink::Model> = links_res.json();
+    assert!(links.is_empty());
+}
+
+#[tokio::test]
 async fn test_api_update_project() {
     let server = setup_test_server().await;
 

@@ -4,12 +4,12 @@ This list tracks remaining work that is not already shipped.
 
 ## P0 - Complete Project Import End-to-End
 
-- [ ] Backend: add `POST /api/v1/project/import` with `mode=new|overwrite|merge`.
-- [ ] Validate import payloads against `ProjectExport` structure with clear error responses.
-- [ ] Implement ID remapping logic for nodes, links, and attachments during import.
-- [ ] Frontend: replace import tab "Coming Soon" with JSON file select/drop UI.
-- [ ] Add import mode selection with explicit overwrite confirmation.
-- [ ] After successful import, reload graph state and show import summary counts.
+- [x] Backend: add `POST /api/v1/project/import` with `mode=new|overwrite|merge`.
+- [x] Validate import payloads against `ProjectExport` structure with clear error responses.
+- [x] Implement ID remapping logic for nodes, links, and attachments during import.
+- [x] Frontend: replace import tab "Coming Soon" with JSON file select/drop UI.
+- [x] Add import mode selection with explicit overwrite confirmation.
+- [x] After successful import, reload graph state and show import summary counts.
 
 ## P1 - UX and Accessibility Cleanup
 

@@ -1,4 +1,6 @@
-use axum::extract::{Path, Query, State};
+use std::collections::{HashMap, HashSet};
+
+use axum::extract::{rejection::JsonRejection, Path, Query, State};
 use axum::http::header::{InvalidHeaderValue, CONTENT_DISPOSITION, CONTENT_TYPE};
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::IntoResponse;
@@ -524,10 +526,122 @@ pub struct ProjectExport {
     pub attachments: Vec<attachment::Model>,
 }
 
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ImportMode {
+    #[default]
+    New,
+    Overwrite,
+    Merge,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ImportQuery {
+    #[serde(default)]
+    pub mode: ImportMode,
+    pub target_project_id: Option<Uuid>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct ProjectImportResult {
+    pub project: project::Model,
+    pub mode: ImportMode,
+    pub imported_nodes: usize,
+    pub imported_nodelinks: usize,
+    pub imported_attachments: usize,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ExportQuery {
     #[serde(default)]
     pub include_attachments: bool,
+}
+
+fn validate_import_payload(payload: &ProjectExport) -> Result<(), WebError> {
+    let source_project_id = payload.project.id;
+
+    let mut node_ids = HashSet::new();
+    for imported_node in &payload.nodes {
+        if imported_node.project_id != source_project_id {
+            return Err(WebError::new(
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "Invalid import payload: node {} has project_id {} but payload project id is {}",
+                    imported_node.id, imported_node.project_id, source_project_id
+                ),
+            ));
+        }
+
+        if !node_ids.insert(imported_node.id) {
+            return Err(WebError::new(
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "Invalid import payload: duplicate node id {} in payload",
+                    imported_node.id
+                ),
+            ));
+        }
+    }
+
+    let mut nodelink_ids = HashSet::new();
+    for imported_nodelink in &payload.nodelinks {
+        if imported_nodelink.project_id != source_project_id {
+            return Err(WebError::new(
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "Invalid import payload: link {} has project_id {} but payload project id is {}",
+                    imported_nodelink.id, imported_nodelink.project_id, source_project_id
+                ),
+            ));
+        }
+
+        if !node_ids.contains(&imported_nodelink.left)
+            || !node_ids.contains(&imported_nodelink.right)
+        {
+            return Err(WebError::new(
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "Invalid import payload: link {} references missing node(s) {} -> {}",
+                    imported_nodelink.id, imported_nodelink.left, imported_nodelink.right
+                ),
+            ));
+        }
+
+        if !nodelink_ids.insert(imported_nodelink.id) {
+            return Err(WebError::new(
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "Invalid import payload: duplicate nodelink id {} in payload",
+                    imported_nodelink.id
+                ),
+            ));
+        }
+    }
+
+    let mut attachment_ids = HashSet::new();
+    for imported_attachment in &payload.attachments {
+        if !node_ids.contains(&imported_attachment.node_id) {
+            return Err(WebError::new(
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "Invalid import payload: attachment {} references missing node {}",
+                    imported_attachment.id, imported_attachment.node_id
+                ),
+            ));
+        }
+
+        if !attachment_ids.insert(imported_attachment.id) {
+            return Err(WebError::new(
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "Invalid import payload: duplicate attachment id {} in payload",
+                    imported_attachment.id
+                ),
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 #[utoipa::path(
@@ -594,6 +708,173 @@ pub async fn export_project(
             attachments,
         }))
     }
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/project/import",
+    params(
+        ("mode" = ImportMode, Query, description = "Import mode: new, overwrite, or merge"),
+        ("target_project_id" = Option<Uuid>, Query, description = "Target project for overwrite/merge; defaults to imported project id")
+    ),
+    request_body = ProjectExport,
+    responses(
+        (status = OK, description = "Project imported successfully", body = ProjectImportResult),
+        (status = BAD_REQUEST, description = "Invalid import payload"),
+        (status = NOT_FOUND, description = "Target project not found for overwrite/merge")
+    )
+)]
+pub async fn import_project(
+    Query(query): Query<ImportQuery>,
+    State(state): State<SharedState>,
+    payload: Result<Json<ProjectExport>, JsonRejection>,
+) -> Result<Json<ProjectImportResult>, WebError> {
+    let Json(import_payload) = payload.map_err(|err| {
+        WebError::new(
+            StatusCode::BAD_REQUEST,
+            format!("Invalid import payload: {}", err.body_text()),
+        )
+    })?;
+    validate_import_payload(&import_payload)?;
+
+    let conn = state.read().await.conn.clone();
+    let txn = conn.begin().await?;
+
+    let source_project_id = import_payload.project.id;
+    let target_project_id = match query.mode {
+        ImportMode::New => Uuid::new_v4(),
+        ImportMode::Overwrite | ImportMode::Merge => {
+            query.target_project_id.unwrap_or(source_project_id)
+        }
+    };
+
+    let ProjectExport {
+        project: source_project,
+        nodes: source_nodes,
+        nodelinks: source_nodelinks,
+        attachments: source_attachments,
+        ..
+    } = import_payload;
+
+    let mut target_project = match query.mode {
+        ImportMode::New => {
+            let mut new_project = source_project;
+            new_project.id = target_project_id;
+            new_project.last_updated = Some(Utc::now());
+            project::ActiveModel::from(new_project).insert(&txn).await?
+        }
+        ImportMode::Overwrite => {
+            let existing_project = project::Entity::find_by_id(target_project_id)
+                .one(&txn)
+                .await?
+                .ok_or_else(|| {
+                    WebError::not_found(format!(
+                        "Target project {} not found for overwrite import",
+                        target_project_id
+                    ))
+                })?;
+
+            // Remove project data before replacing contents.
+            node::Entity::delete_many()
+                .filter(node::Column::ProjectId.eq(target_project_id))
+                .exec(&txn)
+                .await?;
+
+            let mut updated_project = existing_project.into_active_model();
+            updated_project.name = Set(source_project.name);
+            updated_project.user = Set(source_project.user);
+            updated_project.creationdate = Set(source_project.creationdate);
+            updated_project.description = Set(source_project.description);
+            updated_project.tags = Set(source_project.tags);
+            updated_project.last_updated = Set(Some(Utc::now()));
+            updated_project.update(&txn).await?.try_into_model()?
+        }
+        ImportMode::Merge => {
+            let existing_project = project::Entity::find_by_id(target_project_id)
+                .one(&txn)
+                .await?
+                .ok_or_else(|| {
+                    WebError::not_found(format!(
+                        "Target project {} not found for merge import",
+                        target_project_id
+                    ))
+                })?;
+            let mut updated_project = existing_project.into_active_model();
+            updated_project.last_updated = Set(Some(Utc::now()));
+            updated_project.update(&txn).await?.try_into_model()?
+        }
+    };
+
+    let node_id_map: HashMap<Uuid, Uuid> = source_nodes
+        .iter()
+        .map(|source_node| (source_node.id, Uuid::new_v4()))
+        .collect();
+    let nodelink_id_map: HashMap<Uuid, Uuid> = source_nodelinks
+        .iter()
+        .map(|source_link| (source_link.id, Uuid::new_v4()))
+        .collect();
+    let attachment_id_map: HashMap<Uuid, Uuid> = source_attachments
+        .iter()
+        .map(|source_attachment| (source_attachment.id, Uuid::new_v4()))
+        .collect();
+
+    let imported_nodes_count = source_nodes.len();
+    for mut imported_node in source_nodes {
+        imported_node.id = *node_id_map.get(&imported_node.id).ok_or_else(|| {
+            WebError::internal_server_error("Failed to remap node ID during import")
+        })?;
+        imported_node.project_id = target_project_id;
+        node::ActiveModel::from(imported_node).insert(&txn).await?;
+    }
+
+    let imported_nodelinks_count = source_nodelinks.len();
+    for mut imported_nodelink in source_nodelinks {
+        imported_nodelink.id = *nodelink_id_map.get(&imported_nodelink.id).ok_or_else(|| {
+            WebError::internal_server_error("Failed to remap nodelink ID during import")
+        })?;
+        imported_nodelink.project_id = target_project_id;
+        imported_nodelink.left = *node_id_map.get(&imported_nodelink.left).ok_or_else(|| {
+            WebError::internal_server_error("Failed to remap nodelink left node ID during import")
+        })?;
+        imported_nodelink.right = *node_id_map.get(&imported_nodelink.right).ok_or_else(|| {
+            WebError::internal_server_error("Failed to remap nodelink right node ID during import")
+        })?;
+        nodelink::ActiveModel::from(imported_nodelink)
+            .insert(&txn)
+            .await?;
+    }
+
+    let imported_attachments_count = source_attachments.len();
+    for mut imported_attachment in source_attachments {
+        imported_attachment.id =
+            *attachment_id_map
+                .get(&imported_attachment.id)
+                .ok_or_else(|| {
+                    WebError::internal_server_error("Failed to remap attachment ID during import")
+                })?;
+        imported_attachment.node_id =
+            *node_id_map
+                .get(&imported_attachment.node_id)
+                .ok_or_else(|| {
+                    WebError::internal_server_error(
+                        "Failed to remap attachment node ID during import",
+                    )
+                })?;
+        attachment::ActiveModel::from(imported_attachment)
+            .insert(&txn)
+            .await?;
+    }
+
+    target_project.last_updated = Some(Utc::now());
+    txn.commit().await?;
+
+    Ok(Json(ProjectImportResult {
+        project: target_project,
+        mode: query.mode,
+        imported_nodes: imported_nodes_count,
+        imported_nodelinks: imported_nodelinks_count,
+        imported_attachments: imported_attachments_count,
+    }))
 }
 
 #[derive(Debug, Serialize, Deserialize)]

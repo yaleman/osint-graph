@@ -51,6 +51,16 @@ export interface ProjectExport {
 	attachments: Attachment[];
 }
 
+export type ImportMode = "new" | "overwrite" | "merge";
+
+export interface ProjectImportResult {
+	project: Project;
+	mode: ImportMode;
+	imported_nodes: number;
+	imported_nodelinks: number;
+	imported_attachments: number;
+}
+
 export type SearchResultType =
 	| { Node: string } // NodeType as string
 	| "Project"

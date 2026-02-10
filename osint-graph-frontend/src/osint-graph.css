@@ -300,11 +300,28 @@ body,
 	padding: 40px;
 	text-align: center;
 	color: #6b7280;
+	margin: 12px 0;
+}
+
+.import-dropzone-active {
+	border-color: var(--colour-primary-blue);
+	background-color: #eff6ff;
 }
 
 .import-dropzone-title {
 	margin-bottom: 10px;
 	font-weight: var(--default-font-weight);
+}
+
+.import-file-input {
+	display: none;
+}
+
+.import-overwrite-confirm {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	color: #7f1d1d;
 }
 
 /* Delete Tab */

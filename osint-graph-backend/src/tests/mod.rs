@@ -1,5 +1,5 @@
 use crate::entity::{node, project};
-use crate::project::{ProjectExport, MERMAID_CONTENT_TYPE};
+use crate::project::{ImportMode, ProjectExport, ProjectImportResult, MERMAID_CONTENT_TYPE};
 use crate::{build_app, AppState};
 use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
 use axum_test::*;
@@ -322,6 +322,325 @@ async fn test_api_projects_crud() {
 
     let exported: ProjectExport = res.json();
     assert_eq!(exported.project.id, retrieved_project.id);
+}
+
+#[tokio::test]
+async fn test_api_import_project_mode_new_remaps_ids() {
+    let server = setup_test_server().await;
+
+    let source_project_id = Uuid::new_v4();
+    let source_project = project::Model {
+        id: source_project_id,
+        name: "Source Import Project".to_string(),
+        user: Uuid::new_v4(),
+        creationdate: chrono::Utc::now(),
+        last_updated: None,
+        description: Some("Project to import in new mode".to_string()),
+        tags: StringVec(vec!["import".to_string(), "new".to_string()]),
+    };
+    server
+        .post("/api/v1/project")
+        .json(&source_project)
+        .await
+        .assert_status_ok();
+
+    let source_node_left_id = Uuid::new_v4();
+    let source_node_right_id = Uuid::new_v4();
+    let source_node_left = node::Model {
+        project_id: source_project_id,
+        id: source_node_left_id,
+        node_type: NodeType::Person,
+        display: "Alice".to_string(),
+        value: "alice@example.com".to_string(),
+        updated: chrono::Utc::now(),
+        notes: Some("source left".to_string()),
+        pos_x: Some(10),
+        pos_y: Some(20),
+    };
+    let source_node_right = node::Model {
+        project_id: source_project_id,
+        id: source_node_right_id,
+        node_type: NodeType::Domain,
+        display: "example.com".to_string(),
+        value: "example.com".to_string(),
+        updated: chrono::Utc::now(),
+        notes: Some("source right".to_string()),
+        pos_x: Some(30),
+        pos_y: Some(40),
+    };
+    server
+        .post("/api/v1/node")
+        .json(&source_node_left)
+        .await
+        .assert_status_ok();
+    server
+        .post("/api/v1/node")
+        .json(&source_node_right)
+        .await
+        .assert_status_ok();
+
+    let source_nodelink_id = Uuid::new_v4();
+    let source_nodelink = crate::entity::nodelink::Model {
+        id: source_nodelink_id,
+        left: source_node_left_id,
+        right: source_node_right_id,
+        project_id: source_project_id,
+        linktype: osint_graph_shared::nodelink::LinkType::Directional,
+    };
+    server
+        .post("/api/v1/nodelink")
+        .json(&source_nodelink)
+        .await
+        .assert_status_ok();
+
+    // Add attachment to source node so attachment remapping is exercised.
+    let source_attachment_data = b"import-new-attachment";
+    let form = axum_test::multipart::MultipartForm::new().add_part(
+        "file",
+        axum_test::multipart::Part::bytes(source_attachment_data.to_vec())
+            .file_name("new-mode.txt")
+            .mime_type("text/plain"),
+    );
+    let res = server
+        .post(&format!("/api/v1/node/{}/attachment", source_node_left_id))
+        .multipart(form)
+        .await;
+    res.assert_status_ok();
+    let source_attachment: crate::entity::attachment::Model = res.json();
+
+    // Export source project and import as a new project.
+    let export_res = server
+        .get(&format!(
+            "/api/v1/project/{}/export?include_attachments=true",
+            source_project_id
+        ))
+        .await;
+    export_res.assert_status_ok();
+    let source_export: ProjectExport = export_res.json();
+
+    let import_res = server
+        .post("/api/v1/project/import?mode=new")
+        .json(&source_export)
+        .await;
+    import_res.assert_status_ok();
+    let import_result: ProjectImportResult = import_res.json();
+    assert_eq!(import_result.mode, ImportMode::New);
+    assert_ne!(import_result.project.id, source_project_id);
+    assert_eq!(import_result.imported_nodes, source_export.nodes.len());
+    assert_eq!(
+        import_result.imported_nodelinks,
+        source_export.nodelinks.len()
+    );
+    assert_eq!(
+        import_result.imported_attachments,
+        source_export.attachments.len()
+    );
+
+    let imported_export_res = server
+        .get(&format!(
+            "/api/v1/project/{}/export?include_attachments=true",
+            import_result.project.id
+        ))
+        .await;
+    imported_export_res.assert_status_ok();
+    let imported_export: ProjectExport = imported_export_res.json();
+
+    assert_eq!(imported_export.nodes.len(), source_export.nodes.len());
+    assert_eq!(
+        imported_export.nodelinks.len(),
+        source_export.nodelinks.len()
+    );
+    assert_eq!(
+        imported_export.attachments.len(),
+        source_export.attachments.len()
+    );
+
+    let imported_node_ids: std::collections::HashSet<Uuid> =
+        imported_export.nodes.iter().map(|n| n.id).collect();
+    assert!(!imported_node_ids.contains(&source_node_left_id));
+    assert!(!imported_node_ids.contains(&source_node_right_id));
+    assert!(imported_export
+        .nodes
+        .iter()
+        .all(|n| n.project_id == import_result.project.id));
+
+    let imported_link = imported_export.nodelinks.first().unwrap();
+    assert_ne!(imported_link.id, source_nodelink_id);
+    assert!(imported_node_ids.contains(&imported_link.left));
+    assert!(imported_node_ids.contains(&imported_link.right));
+
+    let imported_attachment = imported_export.attachments.first().unwrap();
+    assert_ne!(imported_attachment.id, source_attachment.id);
+    assert!(imported_node_ids.contains(&imported_attachment.node_id));
+}
+
+#[tokio::test]
+async fn test_api_import_project_modes_merge_and_overwrite() {
+    let server = setup_test_server().await;
+
+    // Target project with existing data.
+    let target_project_id = Uuid::new_v4();
+    let target_project = project::Model {
+        id: target_project_id,
+        name: "Target Project".to_string(),
+        user: Uuid::new_v4(),
+        creationdate: chrono::Utc::now(),
+        last_updated: None,
+        description: Some("target".to_string()),
+        tags: StringVec(vec!["target".to_string()]),
+    };
+    server
+        .post("/api/v1/project")
+        .json(&target_project)
+        .await
+        .assert_status_ok();
+    let target_existing_node_id = Uuid::new_v4();
+    let target_existing_node = node::Model {
+        project_id: target_project_id,
+        id: target_existing_node_id,
+        node_type: NodeType::Email,
+        display: "existing@target.local".to_string(),
+        value: "existing@target.local".to_string(),
+        updated: chrono::Utc::now(),
+        notes: None,
+        pos_x: Some(1),
+        pos_y: Some(2),
+    };
+    server
+        .post("/api/v1/node")
+        .json(&target_existing_node)
+        .await
+        .assert_status_ok();
+
+    // Source project to import.
+    let source_project_id = Uuid::new_v4();
+    let source_project = project::Model {
+        id: source_project_id,
+        name: "Imported Source Project".to_string(),
+        user: Uuid::new_v4(),
+        creationdate: chrono::Utc::now(),
+        last_updated: None,
+        description: Some("source".to_string()),
+        tags: StringVec(vec!["source".to_string()]),
+    };
+    server
+        .post("/api/v1/project")
+        .json(&source_project)
+        .await
+        .assert_status_ok();
+    let source_node_a_id = Uuid::new_v4();
+    let source_node_b_id = Uuid::new_v4();
+    let source_node_a = node::Model {
+        project_id: source_project_id,
+        id: source_node_a_id,
+        node_type: NodeType::Person,
+        display: "Merge A".to_string(),
+        value: "merge-a".to_string(),
+        updated: chrono::Utc::now(),
+        notes: None,
+        pos_x: Some(5),
+        pos_y: Some(5),
+    };
+    let source_node_b = node::Model {
+        project_id: source_project_id,
+        id: source_node_b_id,
+        node_type: NodeType::Document,
+        display: "Merge B".to_string(),
+        value: "merge-b".to_string(),
+        updated: chrono::Utc::now(),
+        notes: None,
+        pos_x: Some(6),
+        pos_y: Some(6),
+    };
+    server
+        .post("/api/v1/node")
+        .json(&source_node_a)
+        .await
+        .assert_status_ok();
+    server
+        .post("/api/v1/node")
+        .json(&source_node_b)
+        .await
+        .assert_status_ok();
+    let source_link = crate::entity::nodelink::Model {
+        id: Uuid::new_v4(),
+        left: source_node_a_id,
+        right: source_node_b_id,
+        project_id: source_project_id,
+        linktype: osint_graph_shared::nodelink::LinkType::Omni,
+    };
+    server
+        .post("/api/v1/nodelink")
+        .json(&source_link)
+        .await
+        .assert_status_ok();
+
+    let source_export_res = server
+        .get(&format!(
+            "/api/v1/project/{}/export?include_attachments=true",
+            source_project_id
+        ))
+        .await;
+    source_export_res.assert_status_ok();
+    let source_export: ProjectExport = source_export_res.json();
+
+    // Merge into target keeps existing data and adds remapped imports.
+    let merge_res = server
+        .post(&format!(
+            "/api/v1/project/import?mode=merge&target_project_id={}",
+            target_project_id
+        ))
+        .json(&source_export)
+        .await;
+    merge_res.assert_status_ok();
+    let merge_result: ProjectImportResult = merge_res.json();
+    assert_eq!(merge_result.mode, ImportMode::Merge);
+    assert_eq!(merge_result.project.id, target_project_id);
+
+    let merged_nodes_res = server
+        .get(&format!("/api/v1/project/{}/nodes", target_project_id))
+        .await;
+    merged_nodes_res.assert_status_ok();
+    let merged_nodes: Vec<node::Model> = merged_nodes_res.json();
+    assert_eq!(merged_nodes.len(), 3);
+    assert!(merged_nodes.iter().any(|n| n.id == target_existing_node_id));
+
+    // Overwrite into target clears old data and replaces with remapped imported data.
+    let overwrite_res = server
+        .post(&format!(
+            "/api/v1/project/import?mode=overwrite&target_project_id={}",
+            target_project_id
+        ))
+        .json(&source_export)
+        .await;
+    overwrite_res.assert_status_ok();
+    let overwrite_result: ProjectImportResult = overwrite_res.json();
+    assert_eq!(overwrite_result.mode, ImportMode::Overwrite);
+    assert_eq!(overwrite_result.project.id, target_project_id);
+
+    let overwritten_export_res = server
+        .get(&format!(
+            "/api/v1/project/{}/export?include_attachments=true",
+            target_project_id
+        ))
+        .await;
+    overwritten_export_res.assert_status_ok();
+    let overwritten_export: ProjectExport = overwritten_export_res.json();
+
+    assert_eq!(overwritten_export.project.name, source_project.name);
+    assert_eq!(overwritten_export.nodes.len(), source_export.nodes.len());
+    assert_eq!(
+        overwritten_export.nodelinks.len(),
+        source_export.nodelinks.len()
+    );
+    assert!(!overwritten_export
+        .nodes
+        .iter()
+        .any(|n| n.id == target_existing_node_id));
+    assert!(!overwritten_export
+        .nodes
+        .iter()
+        .any(|n| n.id == source_node_a_id || n.id == source_node_b_id));
 }
 
 #[tokio::test]

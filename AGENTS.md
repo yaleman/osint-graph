@@ -221,6 +221,7 @@ Backend serves:
 - API endpoints:
   - `GET/POST /api/v1/projects` - Project management
   - `GET/POST/PUT/DELETE /api/v1/project/{id}` - Individual project operations
+  - `POST /api/v1/project/import?mode=new|overwrite|merge` - Import project data with ID remapping
   - `GET/POST/PUT/DELETE /api/v1/node/{id}` - Node CRUD operations
   - `POST /api/v1/node/{id}/attachment` - File upload
   - `GET /api/v1/node/{id}/attachments` - List attachments
@@ -261,6 +262,9 @@ Backend serves:
   - View current project name
   - Switch between projects
   - Create new projects
+- **Project Import**: JSON import in Project Settings with `new`, `merge`, and `overwrite` modes
+- **Overwrite Safety**: Explicit confirmation checkbox required before overwrite imports
+- **Import Result Handling**: After import, graph reloads and a toast shows imported node/link/attachment counts
 - **Toast Notifications**: User-friendly error and success messages via react-hot-toast
 - **Data Integrity**: SQLite foreign key constraints prevent orphaned nodes
 - **Backend Validation**: Node operations validate project exists before saving

@@ -44,7 +44,12 @@ import { ProjectManagementDialog } from "./components/ProjectManagementDialog";
 import { ProjectMismatchDialog } from "./components/ProjectMismatchDialog";
 import { ProjectSelector } from "./components/ProjectSelector";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import type { Attachment, OSINTNode, Project } from "./types";
+import type {
+	Attachment,
+	OSINTNode,
+	Project,
+	ProjectImportResult,
+} from "./types";
 import { getNodeColor, hasSyncedValue, NodeTypeInfo } from "./types";
 import "./osint-graph.css";
 
@@ -592,6 +597,19 @@ function AppContent() {
 			}, 100);
 		}
 	}, [setNodes, setEdges]);
+
+	const handleProjectImport = useCallback(
+		async (result: ProjectImportResult) => {
+			const reloadedProject = await loadProjectData(result.project.id);
+			localStorage.setItem(PROJECT_ID_KEY, result.project.id);
+			setCurrentProject(reloadedProject);
+			setShowProjectManagement(false);
+			toast.success(
+				`Import complete: ${result.imported_nodes} nodes, ${result.imported_nodelinks} links, ${result.imported_attachments} attachments`,
+			);
+		},
+		[loadProjectData],
+	);
 
 	const handleProjectChange = useCallback(
 		async (projectId: string) => {
@@ -1381,6 +1399,7 @@ function AppContent() {
 					currentProject={currentProject}
 					onProjectUpdate={handleProjectUpdate}
 					onProjectDelete={handleProjectDelete}
+					onProjectImport={handleProjectImport}
 				/>
 			)}
 

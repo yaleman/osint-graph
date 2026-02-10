@@ -29,8 +29,8 @@ use axum::{
 use osint_graph_shared::{error::OsintError, Urls};
 use project::{
     delete_node, delete_nodelink, delete_project, export_project_mermaid, get_node,
-    get_nodelinks_by_project, get_nodes_by_project, get_project, get_projects, post_node,
-    post_nodelink, post_project, search_global, update_project,
+    get_nodelinks_by_project, get_nodes_by_project, get_project, get_projects, import_project,
+    post_node, post_nodelink, post_project, search_global, update_project,
 };
 use sea_orm::DatabaseConnection;
 use sqlx::{Pool, Sqlite};
@@ -145,6 +145,7 @@ pub async fn build_app(
             get(get_nodelinks_by_project),
         )
         .route("/api/v1/project", post(post_project))
+        .route("/api/v1/project/import", post(import_project))
         .route(
             "/api/v1/project/{id}",
             get(get_project).put(update_project).delete(delete_project),

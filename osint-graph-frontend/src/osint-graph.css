@@ -286,6 +286,12 @@ body,
 	margin-bottom: 20px;
 }
 
+.export-actions {
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+
 /* Import Tab */
 
 .import-dropzone {
@@ -999,6 +1005,50 @@ body,
 	background: #f3f4f6;
 	padding: 4px 8px;
 	border-radius: var(--default-border-radius);
+}
+
+.mermaid-header-controls {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+}
+
+.mermaid-pan-surface {
+	cursor: grab;
+	overflow: hidden;
+	position: relative;
+}
+
+.mermaid-pan-surface-dragging {
+	cursor: grabbing;
+}
+
+.mermaid-pan-container {
+	transform-origin: center center;
+	min-height: 100%;
+	width: max-content;
+	padding: 20px;
+	margin: auto;
+}
+
+.mermaid-rendered-svg {
+	max-width: none;
+	height: auto;
+}
+
+.mermaid-render-error {
+	color: #b91c1c;
+	padding: 20px;
+	text-align: left;
+}
+
+.mermaid-render-error-title {
+	margin: 0 0 8px 0;
+}
+
+.mermaid-render-error-body {
+	margin: 0 0 16px 0;
+	white-space: pre-wrap;
 }
 
 .zoom-level {

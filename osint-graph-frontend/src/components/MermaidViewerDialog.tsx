@@ -46,9 +46,8 @@ export const MermaidViewerDialog: React.FC<MermaidViewerDialogProps> = ({
 			const svgElement = tempDiv.querySelector("svg");
 
 			if (svgElement && containerRef.current) {
+				svgElement.classList.add("mermaid-rendered-svg");
 				containerRef.current.appendChild(svgElement);
-				svgElement.style.maxWidth = "none";
-				svgElement.style.height = "auto";
 			}
 		} catch (error) {
 			console.error("Error rendering Mermaid diagram:", error);
@@ -60,26 +59,29 @@ export const MermaidViewerDialog: React.FC<MermaidViewerDialogProps> = ({
 
 				// Create error container
 				const errorDiv = document.createElement("div");
-				errorDiv.style.color = "red";
-				errorDiv.style.padding = "20px";
+				errorDiv.className = "mermaid-render-error";
 
 				// Create error title
 				const errorTitle = document.createElement("h3");
+				errorTitle.className = "mermaid-render-error-title";
 				errorTitle.textContent = "Error rendering diagram";
 				errorDiv.appendChild(errorTitle);
 
 				// Create error message
 				const errorPre = document.createElement("pre");
+				errorPre.className = "mermaid-render-error-body";
 				errorPre.textContent = String(error);
 				errorDiv.appendChild(errorPre);
 
 				// Create code title
 				const codeTitle = document.createElement("h4");
+				codeTitle.className = "mermaid-render-error-title";
 				codeTitle.textContent = "Mermaid Code:";
 				errorDiv.appendChild(codeTitle);
 
 				// Create code display
 				const codePre = document.createElement("pre");
+				codePre.className = "mermaid-render-error-body";
 				codePre.textContent = mermaidCode;
 				errorDiv.appendChild(codePre);
 
@@ -149,6 +151,14 @@ export const MermaidViewerDialog: React.FC<MermaidViewerDialogProps> = ({
 		}
 	}, [isOpen, mermaidLoaded, renderDiagram]);
 
+	useEffect(() => {
+		if (!containerRef.current) return;
+		containerRef.current.style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`;
+		containerRef.current.style.transition = isDragging
+			? "none"
+			: "transform 0.1s ease-out";
+	}, [pan, zoom, isDragging]);
+
 	// Hide the node panel when the dialog is open
 	useEffect(() => {
 		if (isOpen) {
@@ -179,7 +189,7 @@ export const MermaidViewerDialog: React.FC<MermaidViewerDialogProps> = ({
 				{/* Header */}
 				<div className="dialog-header">
 					<h2 className="dialog-title">Mermaid Diagram: {projectName}</h2>
-					<div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+					<div className="mermaid-header-controls">
 						{/* Zoom Controls */}
 						<div className="mermaid-zoom-controls">
 							<button
@@ -221,12 +231,9 @@ export const MermaidViewerDialog: React.FC<MermaidViewerDialogProps> = ({
 				{/* Content */}
 				<div
 					role="dialog"
-					className="dialog-content mermaid-content"
-					style={{
-						cursor: isDragging ? "grabbing" : "grab",
-						overflow: "hidden",
-						position: "relative",
-					}}
+					className={`dialog-content mermaid-content mermaid-pan-surface ${
+						isDragging ? "mermaid-pan-surface-dragging" : ""
+					}`}
 					onMouseDown={handleMouseDown}
 					onMouseMove={handleMouseMove}
 					onMouseUp={handleMouseUp}
@@ -236,16 +243,7 @@ export const MermaidViewerDialog: React.FC<MermaidViewerDialogProps> = ({
 				>
 					<div
 						ref={containerRef}
-						className="mermaid-container"
-						style={{
-							transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-							transformOrigin: "center center",
-							transition: isDragging ? "none" : "transform 0.1s ease-out",
-							minHeight: "100%",
-							width: "max-content",
-							padding: "20px",
-							margin: "auto",
-						}}
+						className="mermaid-container mermaid-pan-container"
 					/>
 				</div>
 			</div>

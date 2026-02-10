@@ -303,7 +303,8 @@ Backend serves:
 ## Development Best Practices
 
 - When making changes, always validate that a change to the front end is reflected in the backend too, and vice versa
-- never ever use inline styles, use css classes for all styling
+- NEVER use inline styles in HTML/JSX. Reusable CSS classes MUST be used for styling.
+- If there is no practical alternative to a `<style>` tag, you MUST discuss it with the user before proceeding.
 - database migrations are in @osint-graph-backend/src/migration/
 - database entities eare in @osint-graph-backend/src/entity/
 - use relative file paths when working on files in the repository

@@ -33,6 +33,7 @@ The backend uses **SeaORM** as the ORM layer with SQLite:
 - **Entities**: Type-safe database models in `src/entity/` (project, node, nodelink, attachment)
 - **Operations**: Database operations use `ConnectionTrait` for query execution
 - **Foreign Keys**: Automatic cascade delete/update for referential integrity
+- **NodeLink Integrity**: `node_link.left` and `node_link.right` have foreign key references to `node.id`
 - **Connection**: `DatabaseConnection` type replaces direct sqlx usage
 
 ## Node System

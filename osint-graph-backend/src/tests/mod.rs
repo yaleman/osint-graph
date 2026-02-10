@@ -644,6 +644,156 @@ async fn test_api_import_project_modes_merge_and_overwrite() {
 }
 
 #[tokio::test]
+async fn test_api_import_project_rejects_node_project_id_mismatch() {
+    let server = setup_test_server().await;
+
+    let source_project_id = Uuid::new_v4();
+    let source_project = project::Model {
+        id: source_project_id,
+        name: "Source Import Mismatch Node".to_string(),
+        user: Uuid::new_v4(),
+        creationdate: chrono::Utc::now(),
+        last_updated: None,
+        description: Some("source".to_string()),
+        tags: StringVec(vec!["source".to_string()]),
+    };
+    server
+        .post("/api/v1/project")
+        .json(&source_project)
+        .await
+        .assert_status_ok();
+
+    let source_node_id = Uuid::new_v4();
+    let source_node = node::Model {
+        project_id: source_project_id,
+        id: source_node_id,
+        node_type: NodeType::Person,
+        display: "Mismatch Node".to_string(),
+        value: "mismatch-node".to_string(),
+        updated: chrono::Utc::now(),
+        notes: None,
+        pos_x: Some(1),
+        pos_y: Some(1),
+    };
+    server
+        .post("/api/v1/node")
+        .json(&source_node)
+        .await
+        .assert_status_ok();
+
+    let source_export_res = server
+        .get(&format!(
+            "/api/v1/project/{}/export?include_attachments=true",
+            source_project_id
+        ))
+        .await;
+    source_export_res.assert_status_ok();
+    let mut source_export: ProjectExport = source_export_res.json();
+
+    source_export.nodes[0].project_id = Uuid::new_v4();
+
+    let res = server
+        .post("/api/v1/project/import?mode=new")
+        .json(&source_export)
+        .expect_failure()
+        .await;
+    assert_eq!(res.status_code(), 400);
+    let body = res.text();
+    assert!(body.contains("Invalid import payload: node"));
+    assert!(body.contains("has project_id"));
+}
+
+#[tokio::test]
+async fn test_api_import_project_rejects_nodelink_project_id_mismatch() {
+    let server = setup_test_server().await;
+
+    let source_project_id = Uuid::new_v4();
+    let source_project = project::Model {
+        id: source_project_id,
+        name: "Source Import Mismatch Nodelink".to_string(),
+        user: Uuid::new_v4(),
+        creationdate: chrono::Utc::now(),
+        last_updated: None,
+        description: Some("source".to_string()),
+        tags: StringVec(vec!["source".to_string()]),
+    };
+    server
+        .post("/api/v1/project")
+        .json(&source_project)
+        .await
+        .assert_status_ok();
+
+    let source_node_left_id = Uuid::new_v4();
+    let source_node_right_id = Uuid::new_v4();
+    let source_node_left = node::Model {
+        project_id: source_project_id,
+        id: source_node_left_id,
+        node_type: NodeType::Email,
+        display: "left@example.com".to_string(),
+        value: "left@example.com".to_string(),
+        updated: chrono::Utc::now(),
+        notes: None,
+        pos_x: Some(2),
+        pos_y: Some(2),
+    };
+    let source_node_right = node::Model {
+        project_id: source_project_id,
+        id: source_node_right_id,
+        node_type: NodeType::Domain,
+        display: "right.example".to_string(),
+        value: "right.example".to_string(),
+        updated: chrono::Utc::now(),
+        notes: None,
+        pos_x: Some(3),
+        pos_y: Some(3),
+    };
+    server
+        .post("/api/v1/node")
+        .json(&source_node_left)
+        .await
+        .assert_status_ok();
+    server
+        .post("/api/v1/node")
+        .json(&source_node_right)
+        .await
+        .assert_status_ok();
+
+    let source_link = crate::entity::nodelink::Model {
+        id: Uuid::new_v4(),
+        left: source_node_left_id,
+        right: source_node_right_id,
+        project_id: source_project_id,
+        linktype: osint_graph_shared::nodelink::LinkType::Directional,
+    };
+    server
+        .post("/api/v1/nodelink")
+        .json(&source_link)
+        .await
+        .assert_status_ok();
+
+    let source_export_res = server
+        .get(&format!(
+            "/api/v1/project/{}/export?include_attachments=true",
+            source_project_id
+        ))
+        .await;
+    source_export_res.assert_status_ok();
+    let mut source_export: ProjectExport = source_export_res.json();
+
+    source_export.nodelinks[0].project_id = Uuid::new_v4();
+
+    let res = server
+        .post("/api/v1/project/import?mode=new")
+        .json(&source_export)
+        .expect_failure()
+        .await;
+    assert_eq!(res.status_code(), 400);
+    let body = res.text();
+    assert!(body.contains("Invalid import payload: link"));
+    assert!(body.contains("has project_id"));
+}
+
+#[tokio::test]
 async fn test_api_nodes_crud() {
     let server = setup_test_server().await;
 

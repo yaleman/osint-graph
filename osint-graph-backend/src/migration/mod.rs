@@ -4,6 +4,7 @@ mod m20240101_000001_create_tables;
 mod m20250105_000001_insert_default_inbox_project;
 mod m20251106_000001_drop_attachments_column_nodes;
 mod m20251106_000002_create_sessions;
+mod m20260210_000001_enforce_nodelink_node_foreign_keys;
 
 pub struct Migrator;
 
@@ -15,6 +16,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250105_000001_insert_default_inbox_project::Migration),
             Box::new(m20251106_000001_drop_attachments_column_nodes::Migration),
             Box::new(m20251106_000002_create_sessions::Migration),
+            Box::new(m20260210_000001_enforce_nodelink_node_foreign_keys::Migration),
         ]
     }
 }

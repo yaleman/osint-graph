@@ -26,9 +26,9 @@ This list tracks remaining work that is not already shipped.
 
 ## P2 - Runtime and Auth Hardening
 
-- [ ] Implement OIDC discovery retry task when initial provider discovery fails.
-- [ ] Implement SIGHUP reload behavior or remove the placeholder path with explicit documentation.
-- [ ] Resolve dead-code allowances in auth middleware where possible.
+- [x] Implement OIDC discovery retry task when initial provider discovery fails.
+- [x] Implement SIGHUP reload behavior or remove the placeholder path with explicit documentation.
+- [x] Resolve dead-code allowances in auth middleware where possible.
 
 ## P2 - Testing and Documentation Hygiene
 
@@ -36,10 +36,3 @@ This list tracks remaining work that is not already shipped.
 - [ ] Add integration coverage for import modes and export/import round-trip behavior.
 - [ ] Keep endpoint docs aligned with implemented routes (for example attachment endpoints).
 - [ ] Run `just check` clean before closing each milestone.
-
-## Recently Completed (Do Not Re-Track)
-
-- [x] Attachment CRUD endpoints and frontend integration
-- [x] Attachment list/view/download/delete UX in node editor
-- [x] Project export with optional attachment inclusion
-- [x] Mermaid export and in-app preview flow

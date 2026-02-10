@@ -1,7 +1,7 @@
 //! OIDC/OAuth2 client with PKCE support
 pub mod middleware;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use openidconnect::{
     core::{CoreClient, CoreProviderMetadata, CoreResponseType},
@@ -11,9 +11,11 @@ use openidconnect::{
 use osint_graph_shared::error::OsintError;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, IntoActiveModel};
 use tokio::sync::RwLock;
-use tracing::{debug, error};
+use tracing::{debug, error, info, warn};
 
 use crate::entity::pkce_state;
+
+const OIDC_DISCOVERY_RETRY_INTERVAL: Duration = Duration::from_secs(30);
 
 async fn run_discovery(
     issuer_url: &IssuerUrl,
@@ -45,6 +47,41 @@ async fn run_discovery(
     .await
 }
 
+fn spawn_discovery_retry_task(
+    provider_metadata: Arc<RwLock<Option<CoreProviderMetadata>>>,
+    issuer_url: IssuerUrl,
+    http_client: reqwest::Client,
+) {
+    let _retry_task = tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(OIDC_DISCOVERY_RETRY_INTERVAL).await;
+
+            if provider_metadata.read().await.is_some() {
+                debug!("OIDC provider metadata already present, stopping retry task");
+                break;
+            }
+
+            match run_discovery(&issuer_url, http_client.clone()).await {
+                Ok(metadata) => {
+                    provider_metadata.write().await.replace(metadata);
+                    info!(
+                        retry_interval_secs = OIDC_DISCOVERY_RETRY_INTERVAL.as_secs(),
+                        "OIDC discovery retry succeeded"
+                    );
+                    break;
+                }
+                Err(err) => {
+                    warn!(
+                        error = ?err,
+                        retry_interval_secs = OIDC_DISCOVERY_RETRY_INTERVAL.as_secs(),
+                        "OIDC discovery retry failed"
+                    );
+                }
+            }
+        }
+    });
+}
+
 /// OAuth client for OIDC authentication with PKCE
 pub struct OAuthClient {
     provider_metadata: Arc<RwLock<Option<CoreProviderMetadata>>>,
@@ -72,8 +109,17 @@ impl OAuthClient {
             Ok(pm) => Arc::new(RwLock::new(Some(pm))),
             Err(err) => {
                 error!(error=%err, "Failed to run OIDC discovery");
-                // TODO: this should spawn a task to retry discovery every 30 seconds
-                Arc::new(RwLock::new(None))
+                let provider_metadata = Arc::new(RwLock::new(None));
+                warn!(
+                    retry_interval_secs = OIDC_DISCOVERY_RETRY_INTERVAL.as_secs(),
+                    "Starting background OIDC discovery retry task"
+                );
+                spawn_discovery_retry_task(
+                    provider_metadata.clone(),
+                    issuer_url.clone(),
+                    http_client.clone(),
+                );
+                provider_metadata
             }
         };
         let redirect_url = RedirectUrl::new(redirect_uri.to_string())

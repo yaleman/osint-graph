@@ -275,6 +275,8 @@ Backend serves:
 - UUID generation via `uuid` crate
 - Color-coded nodes for visual type identification
 - Database migrations run automatically on startup
+- On startup, OIDC provider discovery failures are retried in the background every 30 seconds
+- `SIGHUP` performs graceful shutdown; runtime configuration reload is not supported
 
 ## Code Quality Requirements
 

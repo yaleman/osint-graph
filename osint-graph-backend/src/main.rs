@@ -71,10 +71,8 @@ async fn main() -> ExitCode {
                 }
             }
             _ = hangup_waiter.recv() => {
-                warn!("Received SIGHUP, shutting down.");
+                warn!("Received SIGHUP, shutting down. Runtime config reload is not supported; restart to apply configuration changes.");
                 break
-                // TODO: Implement configuration reload logic here
-
             }
             _ = tokio::signal::ctrl_c() => {
                 info!("Received Ctrl-C, shutting down.");

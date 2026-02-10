@@ -13,7 +13,7 @@ fi
 
 WORKDIR="$(mktemp -d)"
 echo "Trying to pull openapi.json to ${WORKDIR}"
-cargo run -- --export-openapi > "${WORKDIR}/openapi.json" || echo "Failed to export schema"
+just openapi_schema > "${WORKDIR}/openapi.json" || echo "Failed to export schema"
 
 if [ ! -f "${WORKDIR}/openapi.json" ]; then
     echo "Failed to download openapi.json"

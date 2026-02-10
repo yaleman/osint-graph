@@ -7,3 +7,4 @@ osint-graph-frontend/node_modules/
 .env
 .npm-cache
 .envrc
+.pnpm-store

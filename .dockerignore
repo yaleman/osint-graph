@@ -1,2 +1,5 @@
 target
 .github
+osint-graph-frontend/node_modules
+osint-graph-frontend/dist
+node_modules

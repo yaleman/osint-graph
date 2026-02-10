@@ -31,6 +31,7 @@ import {
 	fetchProjects,
 	listAttachments,
 	setAuthFailureCallback,
+	setQueueRequestCallback,
 	updateAttachment,
 	updateNode,
 	uploadAttachment,
@@ -57,7 +58,7 @@ function AppContent() {
 	const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
 	const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 	const { screenToFlowPosition, setCenter, getZoom } = useReactFlow();
-	const { requireLogin } = useAuth();
+	const { requireLogin, queueRequest } = useAuth();
 	const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
 	const [editingNode, setEditingNode] = useState<string | null>(null);
 	const [editingNodeType, setEditingNodeType] = useState<string | null>(null);
@@ -107,7 +108,8 @@ function AppContent() {
 	// Set up authentication failure callback
 	useEffect(() => {
 		setAuthFailureCallback(requireLogin);
-	}, [requireLogin]);
+		setQueueRequestCallback(queueRequest);
+	}, [requireLogin, queueRequest]);
 
 	// Flush all pending updates immediately
 	const flushPendingUpdates = useCallback(() => {

@@ -9,7 +9,7 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 RUN pnpm install --frozen-lockfile
 
 COPY osint-graph-frontend/ ./
-RUN pnpm run build
+RUN pnpm exec vite build --emptyOutDir
 
 # Backend build stage
 FROM rust:1.90.0-slim-trixie AS builder
@@ -60,5 +60,3 @@ ENV OSINT_GRAPH_DB_PATH="/data/osint-graph.sqlite3"
 
 USER nonroot
 ENTRYPOINT ["./osint-graph"]
-
-

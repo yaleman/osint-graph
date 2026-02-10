@@ -5,3 +5,6 @@ osint-graph/.DS_Store
 tarpaulin-report.html
 osint-graph-frontend/node_modules/
 .env
+.npm-cache
+.envrc
+.pnpm-store

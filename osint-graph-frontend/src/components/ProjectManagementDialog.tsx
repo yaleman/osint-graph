@@ -374,7 +374,7 @@ export const ProjectManagementDialog: React.FC<
 								</div>
 							)}
 
-							<div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+							<div className="export-actions">
 								<button
 									type="button"
 									onClick={handleExport}

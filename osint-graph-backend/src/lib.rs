@@ -88,6 +88,13 @@ impl AppState {
     }
 }
 
+/// Health check endpoint - returns 200 if authenticated
+async fn health_check() -> StatusCode {
+    // If this endpoint is reached, require_auth middleware passed
+    // So user is authenticated
+    StatusCode::OK
+}
+
 pub async fn build_app(
     shared_state: &SharedState,
     db_pool: Pool<Sqlite>,
@@ -110,6 +117,7 @@ pub async fn build_app(
 
     // Build our application by composing routes
     let protected_routes = Router::new()
+        .route("/api/v1/health", get(health_check))
         .route("/api/v1/node", post(post_node))
         .route(
             "/api/v1/node/{id}",

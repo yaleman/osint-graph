@@ -20,7 +20,7 @@ fmt:
 
 # Run the backend
 backend:
-	cargo run  --quiet --bin osint-graph
+	cargo run --quiet --bin osint-graph
 
 # Build the frontend
 frontend:
@@ -41,7 +41,7 @@ frontend-lint:
 run:
     killall osint-graph-backend || true
     cd osint-graph-frontend && vite build --emptyOutDir
-    cargo run -- --debug
+    cargo run --quiet -- --debug
 
 # Run all checks (clippy, test, fmt, frontend-lint)
 check: clippy test fmt frontend-lint
@@ -78,3 +78,7 @@ docker_build:
 # Runs the OpenAPI spec check script
 openapi_spec:
     ./check_openapi_spec.sh
+
+
+openapi_schema:
+    cargo run --quiet -- --export-openapi

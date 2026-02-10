@@ -461,7 +461,7 @@ pub async fn update_project(
     {
         Some(db_project) => {
             // Update the project ID to match the path parameter
-            debug!("Updating project {}: {:?}", id, project);
+            info!("Updating project {}: {:?}", id, project);
             let mut db_project = db_project.into_active_model();
             db_project.description = Set(project.description);
             db_project.name = Set(project.name);

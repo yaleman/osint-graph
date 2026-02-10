@@ -1,6 +1,6 @@
-# CLAUDE.md
+# Agent Instructions
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to agents when working with code in this repository.
 
 ## Project Overview
 
@@ -82,6 +82,8 @@ Each node can have multiple file attachments stored in the database with automat
 - **Size Limit**: 100MB per file upload
 
 ### API Endpoints
+
+The OpenAPI schema is available on the CLI by running `just openapi_schema`, or at `/api/v1/openapi.json`.
 
 - `POST /api/v1/node/{id}/attachment` - Upload file (multipart/form-data)
 - `GET /api/v1/node/{node_id}/attachment/{attachment_id}` - Download file
@@ -178,7 +180,7 @@ just lint
 
 ```bash
 # Run tests
-cargo test
+just test
 
 # Coverage analysis with tarpaulin
 cargo tarpaulin --out Html --output-dir target/coverage
@@ -287,7 +289,7 @@ Backend serves:
 
 - **Git commits are MANDATORY when tasks are completed** - Every completed task MUST be committed
 - **You MUST git commit when a user's task is complete** - This is non-negotiable
-- **Update this CLAUDE.md file any time system features/design are changed**
+- **Update this file any time system features/design are changed**
 - Use TodoWrite tool for complex multi-step tasks to track progress
 
 ### Commit Guidelines
@@ -295,7 +297,7 @@ Backend serves:
 - Write clear, descriptive commit messages
 - Include what was implemented, not just "update code"
 - Mention key features, improvements, or fixes
-- Do not mention that Claude generated the code
+- Do not mention that you generated the code
 - Always commit when a user's task is marked as complete
 
 ## Development Best Practices

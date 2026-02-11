@@ -5,7 +5,6 @@ use sea_orm::FromJsonQueryResult;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-pub mod attachment;
 pub mod data;
 pub mod error;
 pub mod node;

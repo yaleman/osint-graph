@@ -349,7 +349,7 @@ pub async fn download_attachment(
 }
 
 /// View a file attachment (inline display for images, PDFs, text)
-/// GET /api/v1//attachment/{attachment_id}/view
+/// GET /api/v1/attachment/{attachment_id}/view
 #[utoipa::path(
     get,
     path = "/api/v1/attachment/{attachment_id}/view",

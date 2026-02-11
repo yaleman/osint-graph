@@ -87,9 +87,9 @@ Each node can have multiple file attachments stored in the database with automat
 The OpenAPI schema is available on the CLI by running `just openapi_schema`, or at `/api/v1/openapi.json`.
 
 - `POST /api/v1/node/{id}/attachment` - Upload file (multipart/form-data)
-- `GET /api/v1/node/{node_id}/attachment/{attachment_id}` - Download file
-- `GET /api/v1/node/{node_id}/attachment/{attachment_id}/view` - View file inline
-- `DELETE /api/v1/node/{node_id}/attachment/{attachment_id}` - Delete attachment
+- `GET /api/v1/attachment/{attachment_id}` - Download file
+- `GET /api/v1/attachment/{attachment_id}/view` - View file inline
+- `DELETE /api/v1/attachment/{attachment_id}` - Delete attachment
 - `GET /api/v1/node/{id}/attachments` - List all attachments for node
 
 ### Attachment Model
@@ -227,9 +227,9 @@ Backend serves:
   - `GET/POST/PUT/DELETE /api/v1/node/{id}` - Node CRUD operations
   - `POST /api/v1/node/{id}/attachment` - File upload
   - `GET /api/v1/node/{id}/attachments` - List attachments
-  - `GET /api/v1/node/{node_id}/attachment/{attachment_id}` - Download file
-  - `GET /api/v1/node/{node_id}/attachment/{attachment_id}/view` - View file inline
-  - `DELETE /api/v1/node/{node_id}/attachment/{attachment_id}` - Delete file
+  - `GET /api/v1/attachment/{attachment_id}` - Download file
+  - `GET /api/v1/attachment/{attachment_id}/view` - View file inline
+  - `DELETE /api/v1/attachment/{attachment_id}` - Delete file
   - `GET/POST/DELETE /api/v1/nodelink` - Node link operations
   - `GET /api/v1/project/{id}/export` - Export project data
 - Uses `Arc<RwLock<AppState>>` for thread-safe shared state

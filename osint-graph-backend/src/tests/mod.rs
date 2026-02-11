@@ -5,6 +5,7 @@ use axum::http::header::{ACCEPT_ENCODING, CONTENT_DISPOSITION, CONTENT_TYPE};
 use axum_test::*;
 use osint_graph_shared::node::NodeType;
 use osint_graph_shared::StringVec;
+use serde_json::Value;
 use std::sync::{Arc, Once};
 use tokio::sync::RwLock;
 use tracing::{debug, info};
@@ -121,6 +122,33 @@ async fn test_api_project_node_save_load() {
         .expect_failure()
         .await;
     assert_eq!(res.status_code(), 404);
+}
+
+#[tokio::test]
+async fn test_openapi_attachment_paths_match_routes() {
+    let server = setup_test_server().await;
+
+    let res = server.get("/api/v1/openapi.json").await;
+    res.assert_status_ok();
+
+    let doc: Value = res.json();
+    let paths = doc
+        .get("paths")
+        .and_then(Value::as_object)
+        .expect("openapi paths should be present");
+
+    let attachment_path = paths
+        .get("/api/v1/attachment/{attachment_id}")
+        .and_then(Value::as_object)
+        .expect("attachment path should exist in OpenAPI");
+    assert!(attachment_path.contains_key("get"));
+    assert!(attachment_path.contains_key("put"));
+    assert!(attachment_path.contains_key("delete"));
+
+    assert!(paths.contains_key("/api/v1/attachment/{attachment_id}/view"));
+    assert!(paths.contains_key("/api/v1/node/{id}/attachments"));
+    assert!(!paths.contains_key("/api/v1/node/{node_id}/attachment/{attachment_id}"));
+    assert!(!paths.contains_key("/api/v1/node/{node_id}/attachment/{attachment_id}/view"));
 }
 
 #[tokio::test]

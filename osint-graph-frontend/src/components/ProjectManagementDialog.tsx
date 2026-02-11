@@ -65,6 +65,7 @@ export const ProjectManagementDialog: React.FC<
 	const [importMode, setImportMode] = useState<ImportMode>("new");
 	const [importDragActive, setImportDragActive] = useState(false);
 	const [overwriteConfirmed, setOverwriteConfirmed] = useState(false);
+	const longActionInFlightRef = useRef(false);
 
 	// Mermaid state
 	const [mermaidViewerOpen, setMermaidViewerOpen] = useState(false);
@@ -97,6 +98,20 @@ export const ProjectManagementDialog: React.FC<
 	}, [currentProject]);
 
 	if (!isOpen || !currentProject) return null;
+
+	const beginLongAction = (): boolean => {
+		if (longActionInFlightRef.current) {
+			return false;
+		}
+		longActionInFlightRef.current = true;
+		setLoading(true);
+		return true;
+	};
+
+	const endLongAction = () => {
+		longActionInFlightRef.current = false;
+		setLoading(false);
+	};
 
 	const handleSaveGeneral = async () => {
 		if (!projectName.trim()) {
@@ -137,7 +152,9 @@ export const ProjectManagementDialog: React.FC<
 	};
 
 	const handleExport = async () => {
-		setLoading(true);
+		if (!beginLongAction()) {
+			return;
+		}
 		try {
 			const data = await exportProject(currentProject.id, true);
 			setExportData(data);
@@ -164,7 +181,7 @@ export const ProjectManagementDialog: React.FC<
 			console.error("Failed to export project:", error);
 			toast.error("Failed to export project");
 		} finally {
-			setLoading(false);
+			endLongAction();
 		}
 	};
 
@@ -182,7 +199,9 @@ export const ProjectManagementDialog: React.FC<
 			return;
 		}
 
-		setLoading(true);
+		if (!beginLongAction()) {
+			return;
+		}
 		try {
 			await deleteProject(currentProject.id);
 			onProjectDelete();
@@ -191,12 +210,14 @@ export const ProjectManagementDialog: React.FC<
 			console.error("Failed to delete project:", error);
 			toast.error("Failed to delete project");
 		} finally {
-			setLoading(false);
+			endLongAction();
 		}
 	};
 
 	const handleExportMermaid = async () => {
-		setLoading(true);
+		if (!beginLongAction()) {
+			return;
+		}
 		try {
 			const mermaidDiagram = await exportProjectMermaid(currentProject.id);
 
@@ -222,12 +243,14 @@ export const ProjectManagementDialog: React.FC<
 			console.error("Failed to export Mermaid diagram:", error);
 			toast.error("Failed to export Mermaid diagram");
 		} finally {
-			setLoading(false);
+			endLongAction();
 		}
 	};
 
 	const handleViewMermaid = async () => {
-		setLoading(true);
+		if (!beginLongAction()) {
+			return;
+		}
 		try {
 			const mermaidDiagram = await exportProjectMermaid(currentProject.id);
 			setMermaidCode(mermaidDiagram);
@@ -238,7 +261,7 @@ export const ProjectManagementDialog: React.FC<
 			console.error("Failed to load Mermaid diagram:", error);
 			toast.error("Failed to load Mermaid diagram");
 		} finally {
-			setLoading(false);
+			endLongAction();
 		}
 	};
 
@@ -311,7 +334,9 @@ export const ProjectManagementDialog: React.FC<
 			return;
 		}
 
-		setLoading(true);
+		if (!beginLongAction()) {
+			return;
+		}
 		try {
 			const targetProjectId =
 				importMode === "new" ? undefined : currentProject.id;
@@ -328,7 +353,7 @@ export const ProjectManagementDialog: React.FC<
 			console.error("Failed to import project:", error);
 			toast.error("Failed to import project");
 		} finally {
-			setLoading(false);
+			endLongAction();
 		}
 	};
 
@@ -452,6 +477,7 @@ export const ProjectManagementDialog: React.FC<
 								aria-controls={`${idTabPanelPrefix}-${tab.id}`}
 								tabIndex={isActive ? 0 : -1}
 								className={`dialog-tab ${isActive ? "active" : ""}`}
+								disabled={loading}
 								ref={(el) => {
 									tabRefs.current[tab.id] = el;
 								}}

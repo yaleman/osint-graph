@@ -1318,6 +1318,62 @@ async fn test_api_attachment_upload_download() {
 }
 
 #[tokio::test]
+async fn test_api_attachment_upload_rejects_oversized_file() {
+    let server = setup_test_server().await;
+
+    let project_id = Uuid::new_v4();
+    let project = project::Model {
+        id: project_id,
+        name: "Attachment Size Limit Test".to_string(),
+        user: Uuid::new_v4(),
+        creationdate: chrono::Utc::now(),
+        last_updated: None,
+        description: None,
+        tags: StringVec::default(),
+    };
+    server
+        .post("/api/v1/project")
+        .json(&project)
+        .await
+        .assert_status_ok();
+
+    let node_id = Uuid::new_v4();
+    let node = node::Model {
+        project_id,
+        id: node_id,
+        node_type: NodeType::Document,
+        display: "Large File Node".to_string(),
+        value: "large-file".to_string(),
+        updated: chrono::Utc::now(),
+        notes: None,
+        pos_x: None,
+        pos_y: None,
+    };
+    server
+        .post("/api/v1/node")
+        .json(&node)
+        .await
+        .assert_status_ok();
+
+    let oversized = vec![0u8; crate::attachment::MAX_ATTACHMENT_UPLOAD_BYTES + 1];
+    let form = axum_test::multipart::MultipartForm::new().add_part(
+        "file",
+        axum_test::multipart::Part::bytes(oversized)
+            .file_name("too-large.bin")
+            .mime_type("application/octet-stream"),
+    );
+
+    let res = server
+        .post(&format!("/api/v1/node/{}/attachment", node_id))
+        .multipart(form)
+        .expect_failure()
+        .await;
+    assert_eq!(res.status_code(), 413);
+    let body = res.text();
+    assert!(body.contains(crate::attachment::ATTACHMENT_TOO_LARGE_ERROR));
+}
+
+#[tokio::test]
 async fn test_api_attachment_download_large_payload() {
     let server = setup_test_server().await;
 

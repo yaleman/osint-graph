@@ -16,6 +16,7 @@ pub mod tls;
 
 use attachment::{
     delete_attachment, download_attachment, list_attachments, upload_attachment, view_attachment,
+    MAX_ATTACHMENT_MULTIPART_REQUEST_BYTES,
 };
 use axum::{
     body::Body,
@@ -125,7 +126,9 @@ pub async fn build_app(
         )
         .route(
             "/api/v1/node/{id}/attachment",
-            post(upload_attachment).layer(DefaultBodyLimit::max(100 * 1024 * 1024)), // 100MB limit
+            post(upload_attachment).layer(DefaultBodyLimit::max(
+                MAX_ATTACHMENT_MULTIPART_REQUEST_BYTES,
+            )),
         )
         .route("/api/v1/node/{id}/attachments", get(list_attachments))
         .route(

@@ -9,12 +9,7 @@ This list tracks remaining work that is not already shipped.
 - [ ] Remove inline styles in frontend dialogs and move styling to CSS classes.
 - [ ] Ensure long-running actions (export/import/delete) disable duplicate submissions.
 
-## P1 - Attachment Performance and Safety
-
-- [ ] Confirm attachment size limits and error messages are consistent across API and UI.
-
 ## P2 - Testing and Documentation Hygiene
 
-- [ ] Add missing parser tests noted in shared data modules.
 - [ ] Keep endpoint docs aligned with implemented routes (for example attachment endpoints).
 - [ ] Run `just check` clean before closing each milestone.

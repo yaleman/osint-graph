@@ -19,6 +19,38 @@ const ATTACHMENT_URL = "/api/v1/attachment";
 const NODELINK_URL = "/api/v1/nodelink";
 const SEARCH_URL = "/api/v1/search";
 
+export const ATTACHMENT_MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+export const ATTACHMENT_MAX_UPLOAD_MB =
+	ATTACHMENT_MAX_UPLOAD_BYTES / (1024 * 1024);
+export const ATTACHMENT_MAX_UPLOAD_ERROR =
+	"Attachment exceeds maximum size of 100 MB";
+
+type ApiErrorResponse = {
+	error?: string;
+};
+
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+	if (axios.isAxiosError(error)) {
+		const responseData = error.response?.data;
+		if (
+			responseData &&
+			typeof responseData === "object" &&
+			"error" in responseData
+		) {
+			const message = (responseData as ApiErrorResponse).error;
+			if (typeof message === "string" && message.trim().length > 0) {
+				return message;
+			}
+		}
+
+		if (error.response?.status === 413) {
+			return ATTACHMENT_MAX_UPLOAD_ERROR;
+		}
+	}
+
+	return fallback;
+}
+
 // Authentication callback that will be set by the AuthContext
 let authFailureCallback: (() => void) | null = null;
 let queueRequestCallback:

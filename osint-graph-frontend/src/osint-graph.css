@@ -873,6 +873,12 @@ body,
 	display: none;
 }
 
+.upload-limit-text {
+	margin-top: 8px;
+	font-size: 0.85rem;
+	color: #6b7280;
+}
+
 /* Modal button groups */
 .modal-buttons-container {
 	display: flex;

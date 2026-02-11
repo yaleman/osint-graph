@@ -1,6 +1,9 @@
 use axum::{
     body::Body,
-    extract::{Multipart, Path, State},
+    extract::{
+        multipart::{MultipartError, MultipartRejection},
+        Multipart, Path, State,
+    },
     http::{
         header::{ACCEPT_ENCODING, CONTENT_DISPOSITION, CONTENT_ENCODING, CONTENT_TYPE, COOKIE},
         HeaderMap, HeaderValue, StatusCode,
@@ -30,6 +33,37 @@ use crate::{
 };
 
 const ATTACHMENT_STREAM_CHUNK_SIZE: usize = 16 * 1024;
+pub const MAX_ATTACHMENT_UPLOAD_MB: usize = 100;
+pub const MAX_ATTACHMENT_UPLOAD_BYTES: usize = MAX_ATTACHMENT_UPLOAD_MB * 1024 * 1024;
+pub const MAX_ATTACHMENT_MULTIPART_REQUEST_BYTES: usize =
+    MAX_ATTACHMENT_UPLOAD_BYTES + (1024 * 1024);
+pub const ATTACHMENT_TOO_LARGE_ERROR: &str = "Attachment exceeds maximum size of 100 MB";
+
+fn attachment_too_large_error() -> WebError {
+    WebError::new(StatusCode::PAYLOAD_TOO_LARGE, ATTACHMENT_TOO_LARGE_ERROR)
+}
+
+fn map_multipart_rejection(rejection: MultipartRejection) -> WebError {
+    if rejection.status() == StatusCode::PAYLOAD_TOO_LARGE {
+        return attachment_too_large_error();
+    }
+
+    WebError::new(
+        StatusCode::BAD_REQUEST,
+        format!("Invalid multipart upload: {}", rejection.body_text()),
+    )
+}
+
+fn map_multipart_error(context: &str, error: MultipartError) -> WebError {
+    if error.status() == StatusCode::PAYLOAD_TOO_LARGE {
+        return attachment_too_large_error();
+    }
+
+    WebError::new(
+        StatusCode::BAD_REQUEST,
+        format!("{}: {}", context, error.body_text()),
+    )
+}
 
 fn stream_gzip_decompressed_body(compressed_data: Vec<u8>) -> Result<Body, WebError> {
     // Preflight read so malformed gzip payloads still return a 500 before response streaming starts.
@@ -79,15 +113,17 @@ fn stream_gzip_decompressed_body(compressed_data: Vec<u8>) -> Result<Body, WebEr
     responses(
         (status = OK, description = "Attachment uploaded successfully", body = attachment::Model),
         (status = BAD_REQUEST, description = "Invalid request"),
+        (status = PAYLOAD_TOO_LARGE, description = "Attachment exceeds maximum size"),
         (status = NOT_FOUND, description = "Node not found")
     )
 )]
 pub async fn upload_attachment(
     State(state): State<SharedState>,
     Path(node_id): Path<Uuid>,
-    mut multipart: Multipart,
+    multipart: Result<Multipart, MultipartRejection>,
 ) -> Result<Json<attachment::Model>, WebError> {
     let conn = &state.read().await.conn;
+    let mut multipart = multipart.map_err(map_multipart_rejection)?;
 
     debug!("Starting file upload for node {}", node_id);
 
@@ -98,10 +134,7 @@ pub async fn upload_attachment(
 
     while let Some(field) = multipart.next_field().await.map_err(|e| {
         error!("Failed to read multipart field: {:?}", e);
-        WebError::new(
-            StatusCode::BAD_REQUEST,
-            format!("Failed to read multipart field: {}", e),
-        )
+        map_multipart_error("Failed to read multipart field", e)
     })? {
         let field_name = field.name().unwrap_or("").to_string();
         debug!("Processing field: {}", field_name);
@@ -117,10 +150,7 @@ pub async fn upload_attachment(
 
                 data = Some(field.bytes().await.map_err(|e| {
                     error!("Failed to read file data: {:?}", e);
-                    WebError::new(
-                        StatusCode::BAD_REQUEST,
-                        format!("Failed to read file data: {}", e),
-                    )
+                    map_multipart_error("Failed to read file data", e)
                 })?);
 
                 debug!(
@@ -151,6 +181,10 @@ pub async fn upload_attachment(
             )
         })?
         .to_vec();
+
+    if file_data.len() > MAX_ATTACHMENT_UPLOAD_BYTES {
+        return Err(attachment_too_large_error());
+    }
 
     // Verify the node exists before creating the attachment
     let node_exists = node::Entity::find_by_id(node_id)

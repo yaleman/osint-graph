@@ -19,6 +19,9 @@ import "reactflow/dist/style.css";
 import toast, { Toaster } from "react-hot-toast";
 import { v4 as uuidv4 } from "uuid";
 import {
+	ATTACHMENT_MAX_UPLOAD_BYTES,
+	ATTACHMENT_MAX_UPLOAD_ERROR,
+	ATTACHMENT_MAX_UPLOAD_MB,
 	createNode,
 	createNodeLink,
 	createProject,
@@ -29,6 +32,7 @@ import {
 	exportProject,
 	exportProjectMermaid,
 	fetchProjects,
+	getApiErrorMessage,
 	listAttachments,
 	setAuthFailureCallback,
 	setQueueRequestCallback,
@@ -1080,6 +1084,13 @@ function AppContent() {
 				toast.error("No file selected for upload");
 				return;
 			}
+
+			if (file.size > ATTACHMENT_MAX_UPLOAD_BYTES) {
+				toast.error(ATTACHMENT_MAX_UPLOAD_ERROR);
+				event.target.value = "";
+				return;
+			}
+
 			setUploadingAttachment(true);
 
 			try {
@@ -1090,7 +1101,7 @@ function AppContent() {
 				toast.success(`Uploaded ${file.name}`);
 			} catch (error) {
 				console.error("Failed to upload attachment:", error);
-				toast.error("Failed to upload file");
+				toast.error(getApiErrorMessage(error, "Failed to upload file"));
 			} finally {
 				setUploadingAttachment(false);
 				// Reset input so the same file can be uploaded again
@@ -1609,6 +1620,9 @@ function AppContent() {
 										className="upload-input-hidden"
 									/>
 								</label>
+								<div className="upload-limit-text">
+									Maximum file size: {ATTACHMENT_MAX_UPLOAD_MB} MB
+								</div>
 							</div>
 						)}
 

@@ -109,7 +109,7 @@ pub struct Model {
 ### Features
 
 - **Compression**: All files automatically compressed with gzip before storage
-- **Decompression**: Transparent decompression on download/view
+- **Decompression**: Transparent decompression on download/view with chunked streaming responses
 - **Content-Type Preservation**: Original MIME types maintained
 - **Inline Viewing**: Images, PDFs, and text files can be viewed in browser
 - **Download**: All files can be downloaded with proper Content-Disposition headers

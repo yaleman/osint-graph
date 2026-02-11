@@ -1,7 +1,7 @@
 use crate::entity::{node, project};
 use crate::project::{ImportMode, ProjectExport, ProjectImportResult, MERMAID_CONTENT_TYPE};
 use crate::{build_app, AppState};
-use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
+use axum::http::header::{ACCEPT_ENCODING, CONTENT_DISPOSITION, CONTENT_TYPE};
 use axum_test::*;
 use osint_graph_shared::node::NodeType;
 use osint_graph_shared::StringVec;
@@ -1315,6 +1315,145 @@ async fn test_api_attachment_upload_download() {
         .expect_failure()
         .await;
     assert_eq!(res.status_code(), 404);
+}
+
+#[tokio::test]
+async fn test_api_attachment_download_large_payload() {
+    let server = setup_test_server().await;
+
+    let project_id = Uuid::new_v4();
+    let project = project::Model {
+        id: project_id,
+        name: "Attachment Large Download Test".to_string(),
+        user: Uuid::new_v4(),
+        creationdate: chrono::Utc::now(),
+        last_updated: None,
+        description: None,
+        tags: StringVec::default(),
+    };
+    server
+        .post("/api/v1/project")
+        .json(&project)
+        .await
+        .assert_status_ok();
+
+    let node_id = Uuid::new_v4();
+    let node = node::Model {
+        project_id,
+        id: node_id,
+        node_type: NodeType::Document,
+        display: "Large Test Document".to_string(),
+        value: "large.bin".to_string(),
+        updated: chrono::Utc::now(),
+        notes: None,
+        pos_x: None,
+        pos_y: None,
+    };
+    server
+        .post("/api/v1/node")
+        .json(&node)
+        .await
+        .assert_status_ok();
+
+    // 3 MiB payload to exercise chunked streaming path.
+    let large_content: Vec<u8> = (0u8..=255).cycle().take(3 * 1024 * 1024).collect();
+
+    let form = axum_test::multipart::MultipartForm::new().add_part(
+        "file",
+        axum_test::multipart::Part::bytes(large_content.clone())
+            .file_name("large.bin")
+            .mime_type("application/octet-stream"),
+    );
+    let upload_res = server
+        .post(&format!("/api/v1/node/{}/attachment", node_id))
+        .multipart(form)
+        .await;
+    upload_res.assert_status_ok();
+    let attachment: crate::entity::attachment::Model = upload_res.json();
+
+    let download_res = server
+        .get(&format!("/api/v1/attachment/{}", attachment.id))
+        .await;
+    download_res.assert_status_ok();
+    let downloaded = download_res.as_bytes();
+    assert_eq!(downloaded.as_ref(), large_content.as_slice());
+}
+
+#[tokio::test]
+async fn test_api_attachment_decompression_failures() {
+    let server = setup_test_server().await;
+
+    let project_id = Uuid::new_v4();
+    let project = project::Model {
+        id: project_id,
+        name: "Attachment Corrupt Data Test".to_string(),
+        user: Uuid::new_v4(),
+        creationdate: chrono::Utc::now(),
+        last_updated: None,
+        description: None,
+        tags: StringVec::default(),
+    };
+    server
+        .post("/api/v1/project")
+        .json(&project)
+        .await
+        .assert_status_ok();
+
+    let node_id = Uuid::new_v4();
+    let node = node::Model {
+        project_id,
+        id: node_id,
+        node_type: NodeType::Document,
+        display: "Corrupt Data Node".to_string(),
+        value: "corrupt.bin".to_string(),
+        updated: chrono::Utc::now(),
+        notes: None,
+        pos_x: None,
+        pos_y: None,
+    };
+    server
+        .post("/api/v1/node")
+        .json(&node)
+        .await
+        .assert_status_ok();
+
+    // Start with a valid attachment and then mutate DB payload to invalid (non-gzip) bytes.
+    let form = axum_test::multipart::MultipartForm::new().add_part(
+        "file",
+        axum_test::multipart::Part::bytes(b"valid".to_vec())
+            .file_name("corrupt.bin")
+            .mime_type("application/octet-stream"),
+    );
+    let upload_res = server
+        .post(&format!("/api/v1/node/{}/attachment", node_id))
+        .multipart(form)
+        .await;
+    upload_res.assert_status_ok();
+    let attachment: crate::entity::attachment::Model = upload_res.json();
+
+    let patch_res = server
+        .patch(&format!("/api/v1/attachment/{}", attachment.id))
+        .json(&serde_json::json!({ "data": [1, 2, 3, 4, 5, 6] }))
+        .await;
+    patch_res.assert_status_ok();
+
+    // Download path should fail decompression before streaming starts.
+    let download_res = server
+        .get(&format!("/api/v1/attachment/{}", attachment.id))
+        .expect_failure()
+        .await;
+    assert_eq!(download_res.status_code(), 500);
+    assert!(download_res
+        .text()
+        .contains("Failed to decompress attachment data"));
+
+    // Inline view decompression path should also return 500 on invalid gzip.
+    let view_res = server
+        .get(&format!("/api/v1/attachment/{}/view", attachment.id))
+        .add_header(ACCEPT_ENCODING, "gzip")
+        .expect_failure()
+        .await;
+    assert_eq!(view_res.status_code(), 500);
 }
 
 #[tokio::test]

@@ -55,6 +55,8 @@ body,
 	flex-direction: column;
 	box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 	overflow: hidden;
+	position: relative;
+	z-index: 1000;
 }
 
 .mermaid-content {
@@ -96,6 +98,9 @@ body,
 .dialog-tab {
 	padding: 10px 20px;
 	cursor: pointer;
+	background: transparent;
+	border: none;
+	font: inherit;
 	border-bottom: 0.2rem solid transparent;
 	color: #6b7280;
 	font-weight: 400;
@@ -106,6 +111,15 @@ body,
 	border-bottom-color: var(--colour-primary-blue);
 	color: var(--colour-primary-blue);
 	font-weight: 600;
+}
+
+.dialog-tab:focus-visible {
+	outline: 2px solid var(--colour-primary-blue);
+	outline-offset: -2px;
+}
+
+.dialog-tabpanel {
+	padding-top: 0.25rem;
 }
 
 .dialog-content {

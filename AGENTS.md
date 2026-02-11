@@ -267,6 +267,7 @@ Backend serves:
 - **Project Import**: JSON import in Project Settings with `new`, `merge`, and `overwrite` modes
 - **Overwrite Safety**: Explicit confirmation checkbox required before overwrite imports
 - **Import Result Handling**: After import, graph reloads and a toast shows imported node/link/attachment counts
+- **Accessible Tabs**: Project Settings tabs use ARIA `tab`/`tabpanel` semantics with arrow-key and Home/End keyboard navigation
 - **Toast Notifications**: User-friendly error and success messages via react-hot-toast
 - **Data Integrity**: SQLite foreign key constraints prevent orphaned nodes
 - **Backend Validation**: Node operations validate project exists before saving

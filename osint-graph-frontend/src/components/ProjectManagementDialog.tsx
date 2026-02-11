@@ -1,5 +1,5 @@
 import type React from "react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
 	deleteProject,
@@ -27,6 +27,12 @@ interface ProjectManagementDialogProps {
 }
 
 type TabType = "general" | "export" | "import" | "delete";
+const PROJECT_SETTINGS_TABS: ReadonlyArray<{ id: TabType; label: string }> = [
+	{ id: "general", label: "General" },
+	{ id: "export", label: "Export" },
+	{ id: "import", label: "Import" },
+	{ id: "delete", label: "Delete" },
+];
 
 export const ProjectManagementDialog: React.FC<
 	ProjectManagementDialogProps
@@ -71,6 +77,15 @@ export const ProjectManagementDialog: React.FC<
 	const idImportFile = useId();
 	const idImportMode = useId();
 	const idOverwriteConfirm = useId();
+	const idDialogTitle = useId();
+	const idTabPrefix = useId();
+	const idTabPanelPrefix = useId();
+	const tabRefs = useRef<Record<TabType, HTMLButtonElement | null>>({
+		general: null,
+		export: null,
+		import: null,
+		delete: null,
+	});
 
 	// Initialize form with current project data
 	useEffect(() => {
@@ -317,22 +332,99 @@ export const ProjectManagementDialog: React.FC<
 		}
 	};
 
+	const focusTab = (tab: TabType) => {
+		tabRefs.current[tab]?.focus();
+	};
+
+	const activateTabByOffset = (currentTab: TabType, offset: number) => {
+		const currentIndex = PROJECT_SETTINGS_TABS.findIndex(
+			(tab) => tab.id === currentTab,
+		);
+		if (currentIndex === -1) {
+			return;
+		}
+
+		const nextIndex =
+			(currentIndex + offset + PROJECT_SETTINGS_TABS.length) %
+			PROJECT_SETTINGS_TABS.length;
+		const nextTab = PROJECT_SETTINGS_TABS[nextIndex];
+		if (!nextTab) {
+			return;
+		}
+
+		setActiveTab(nextTab.id);
+		focusTab(nextTab.id);
+	};
+
+	const activateEdgeTab = (edge: "first" | "last") => {
+		const nextTab =
+			edge === "first"
+				? PROJECT_SETTINGS_TABS[0]
+				: PROJECT_SETTINGS_TABS[PROJECT_SETTINGS_TABS.length - 1];
+		if (!nextTab) {
+			return;
+		}
+		setActiveTab(nextTab.id);
+		focusTab(nextTab.id);
+	};
+
+	const handleTabKeyDown = (
+		event: React.KeyboardEvent<HTMLButtonElement>,
+		currentTab: TabType,
+	) => {
+		switch (event.key) {
+			case "ArrowRight":
+			case "ArrowDown":
+				event.preventDefault();
+				activateTabByOffset(currentTab, 1);
+				break;
+			case "ArrowLeft":
+			case "ArrowUp":
+				event.preventDefault();
+				activateTabByOffset(currentTab, -1);
+				break;
+			case "Home":
+				event.preventDefault();
+				activateEdgeTab("first");
+				break;
+			case "End":
+				event.preventDefault();
+				activateEdgeTab("last");
+				break;
+			default:
+				break;
+		}
+	};
+
+	const handleDialogKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (
+		event,
+	) => {
+		if (event.key === "Escape") {
+			event.preventDefault();
+			onClose();
+		}
+	};
+
 	return (
-		<div
-			role="dialog"
-			className="dialog-backdrop"
-			onClick={onClose}
-			onKeyDown={() => {}}
-		>
+		<div className="dialog-backdrop">
+			<button
+				type="button"
+				className="click-away-backdrop"
+				onClick={onClose}
+				aria-label="Close project settings dialog"
+			/>
 			<div
 				role="dialog"
+				aria-modal="true"
+				aria-labelledby={idDialogTitle}
 				className="dialog-container"
-				onKeyDown={() => {}}
-				onClick={(e) => e.stopPropagation()}
+				onKeyDown={handleDialogKeyDown}
 			>
 				{/* Header */}
 				<div className="dialog-header">
-					<h2 className="dialog-title">Project Settings</h2>
+					<h2 id={idDialogTitle} className="dialog-title">
+						Project Settings
+					</h2>
 					<button
 						type="button"
 						onClick={onClose}
@@ -343,46 +435,45 @@ export const ProjectManagementDialog: React.FC<
 				</div>
 
 				{/* Tabs */}
-				<div className="dialog-tabs">
-					<div
-						role="tablist"
-						className={`dialog-tab ${activeTab === "general" ? "active" : ""}`}
-						onClick={() => setActiveTab("general")}
-						onKeyDown={() => {}} // TODO because there's no easy keyboard interaction
-					>
-						General
-					</div>
-					<div
-						role="tablist"
-						className={`dialog-tab ${activeTab === "export" ? "active" : ""}`}
-						onClick={() => setActiveTab("export")}
-						onKeyDown={() => {}} // TODO because there's no easy keyboard interaction
-					>
-						Export
-					</div>
-					<div
-						role="tablist"
-						className={`dialog-tab ${activeTab === "import" ? "active" : ""}`}
-						onClick={() => setActiveTab("import")}
-						onKeyDown={() => {}} // TODO because there's no easy keyboard interaction
-					>
-						Import
-					</div>
-					<div
-						role="tablist"
-						className={`dialog-tab ${activeTab === "delete" ? "active" : ""}`}
-						onClick={() => setActiveTab("delete")}
-						onKeyDown={() => {}} // TODO because there's no easy keyboard interaction
-					>
-						Delete
-					</div>
+				<div
+					className="dialog-tabs"
+					role="tablist"
+					aria-label="Project settings tabs"
+				>
+					{PROJECT_SETTINGS_TABS.map((tab) => {
+						const isActive = activeTab === tab.id;
+						return (
+							<button
+								key={tab.id}
+								id={`${idTabPrefix}-${tab.id}`}
+								type="button"
+								role="tab"
+								aria-selected={isActive}
+								aria-controls={`${idTabPanelPrefix}-${tab.id}`}
+								tabIndex={isActive ? 0 : -1}
+								className={`dialog-tab ${isActive ? "active" : ""}`}
+								ref={(el) => {
+									tabRefs.current[tab.id] = el;
+								}}
+								onClick={() => setActiveTab(tab.id)}
+								onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
+							>
+								{tab.label}
+							</button>
+						);
+					})}
 				</div>
 
 				{/* Tab Content */}
 				<div className="dialog-content">
 					{/* General Tab */}
 					{activeTab === "general" && (
-						<div>
+						<div
+							role="tabpanel"
+							id={`${idTabPanelPrefix}-general`}
+							aria-labelledby={`${idTabPrefix}-general`}
+							className="dialog-tabpanel"
+						>
 							<div className="form-group">
 								<label className="form-label" htmlFor={idProjectName}>
 									Project Name *
@@ -466,7 +557,12 @@ export const ProjectManagementDialog: React.FC<
 
 					{/* Export Tab */}
 					{activeTab === "export" && (
-						<div>
+						<div
+							role="tabpanel"
+							id={`${idTabPanelPrefix}-export`}
+							aria-labelledby={`${idTabPrefix}-export`}
+							className="dialog-tabpanel"
+						>
 							<p className="export-description">
 								Export your project data including all nodes, links, and
 								metadata as a JSON file.
@@ -521,7 +617,12 @@ export const ProjectManagementDialog: React.FC<
 
 					{/* Import Tab */}
 					{activeTab === "import" && (
-						<div>
+						<div
+							role="tabpanel"
+							id={`${idTabPanelPrefix}-import`}
+							aria-labelledby={`${idTabPrefix}-import`}
+							className="dialog-tabpanel"
+						>
 							<p className="export-description">
 								Import a project from a JSON file.
 							</p>
@@ -638,7 +739,12 @@ export const ProjectManagementDialog: React.FC<
 
 					{/* Delete Tab */}
 					{activeTab === "delete" && (
-						<div>
+						<div
+							role="tabpanel"
+							id={`${idTabPanelPrefix}-delete`}
+							aria-labelledby={`${idTabPrefix}-delete`}
+							className="dialog-tabpanel"
+						>
 							{currentProject.id === "00000000-0000-0000-0000-000000000000" ? (
 								<div className="delete-warning">
 									<p className="delete-warning-title">

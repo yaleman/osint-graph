@@ -269,6 +269,7 @@ Backend serves:
 - **Import Result Handling**: After import, graph reloads and a toast shows imported node/link/attachment counts
 - **Accessible Tabs**: Project Settings tabs use ARIA `tab`/`tabpanel` semantics with arrow-key and Home/End keyboard navigation
 - **Duplicate Submission Guard**: Long-running project actions (export/import/delete and Mermaid export/view) are protected against duplicate triggers while in flight
+- **Reusable UI Styling**: Project dialogs/search/selector UI use CSS classes for styling and avoid JSX inline styles
 - **Toast Notifications**: User-friendly error and success messages via react-hot-toast
 - **Data Integrity**: SQLite foreign key constraints prevent orphaned nodes
 - **Backend Validation**: Node operations validate project exists before saving

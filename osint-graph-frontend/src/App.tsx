@@ -54,7 +54,12 @@ import type {
 	Project,
 	ProjectImportResult,
 } from "./types";
-import { getNodeColor, hasSyncedValue, NodeTypeInfo } from "./types";
+import {
+	getNodeColor,
+	getNodeColorClass,
+	hasSyncedValue,
+	NodeTypeInfo,
+} from "./types";
 import "./osint-graph.css";
 
 const initialNodes: Node[] = [];
@@ -99,6 +104,7 @@ function AppContent() {
 	// Refs for debouncing node updates
 	const pendingUpdatesRef = useRef<Map<string, number>>(new Map());
 	const latestNodeDataRef = useRef<Map<string, OSINTNode>>(new Map());
+	const contextMenuRef = useRef<HTMLDivElement | null>(null);
 
 	// History state for undo/redo (max 10 levels)
 	const [history, setHistory] = useState<{
@@ -905,6 +911,14 @@ function AppContent() {
 		return undefined;
 	}, [contextMenu]);
 
+	useEffect(() => {
+		if (!contextMenu || !contextMenuRef.current) {
+			return;
+		}
+		contextMenuRef.current.style.top = `${contextMenu.y}px`;
+		contextMenuRef.current.style.left = `${contextMenu.x}px`;
+	}, [contextMenu]);
+
 	const cancelNodeEdit = useCallback(() => {
 		if (!editingNode) return;
 
@@ -1455,8 +1469,7 @@ function AppContent() {
 							type="button"
 							key={type}
 							onClick={() => createOSINTNode(type)}
-							className="node-type-button"
-							style={{ background: getNodeColorCallBack(type) }}
+							className={`node-type-button ${getNodeColorClass(type)}`}
 						>
 							{NodeTypeInfo[type]?.label ?? type}
 						</button>
@@ -1659,11 +1672,15 @@ function AppContent() {
 			{/* Context menu for URL and domain nodes */}
 			{contextMenu && (
 				<div
-					role="menuitem"
+					role="menu"
+					ref={contextMenuRef}
 					className="context-menu"
-					style={{ top: contextMenu.y, left: contextMenu.x }}
 					onClick={(e) => e.stopPropagation()}
-					onKeyDown={() => {}}
+					onKeyDown={(event) => {
+						if (event.key === "Escape") {
+							setContextMenu(null);
+						}
+					}}
 					tabIndex={0}
 				>
 					<ContextMenuItem

@@ -18,13 +18,13 @@ keywords = ["osint", "graph", "security", "investigation"]
 
 
 [workspace.dependencies]
-chrono = { version = "0.4.42", default-features = false, features = [
+chrono = { version = "0.4.44", default-features = false, features = [
     "now",
     "std",
 ] }
 serde = { version = "^1.0" }
-serde_json = { version = "1.0.145" }
-sea-orm = { version = "1.1.17", features = [
+serde_json = { version = "1.0.149" }
+sea-orm = { version = "1.1.20", features = [
     "sqlx-sqlite",
     "runtime-tokio-rustls",
     "macros",
@@ -47,7 +47,7 @@ utoipa = { version = "5.4.0", features = [
     "url",
     "chrono",
 ] }
-uuid = { version = "1.18.1" }
+uuid = { version = "1.23.0" }
 
 
 [profile.release]

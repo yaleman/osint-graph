@@ -3,10 +3,12 @@ import axios, { type AxiosResponse } from "axios";
 import { v4 as uuidv4 } from "uuid";
 import type {
 	Attachment,
+	ImportMode,
 	NodeLink,
 	OSINTNode,
 	Project,
 	ProjectExport,
+	ProjectImportResult,
 	SearchResult,
 } from "./types";
 
@@ -16,6 +18,38 @@ const NODE_URL = "/api/v1/node";
 const ATTACHMENT_URL = "/api/v1/attachment";
 const NODELINK_URL = "/api/v1/nodelink";
 const SEARCH_URL = "/api/v1/search";
+
+export const ATTACHMENT_MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+export const ATTACHMENT_MAX_UPLOAD_MB =
+	ATTACHMENT_MAX_UPLOAD_BYTES / (1024 * 1024);
+export const ATTACHMENT_MAX_UPLOAD_ERROR =
+	"Attachment exceeds maximum size of 100 MB";
+
+type ApiErrorResponse = {
+	error?: string;
+};
+
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+	if (axios.isAxiosError(error)) {
+		const responseData = error.response?.data;
+		if (
+			responseData &&
+			typeof responseData === "object" &&
+			"error" in responseData
+		) {
+			const message = (responseData as ApiErrorResponse).error;
+			if (typeof message === "string" && message.trim().length > 0) {
+				return message;
+			}
+		}
+
+		if (error.response?.status === 413) {
+			return ATTACHMENT_MAX_UPLOAD_ERROR;
+		}
+	}
+
+	return fallback;
+}
 
 // Authentication callback that will be set by the AuthContext
 let authFailureCallback: (() => void) | null = null;
@@ -63,6 +97,9 @@ function describeRequest(config: import("axios").AxiosRequestConfig): string {
 	}
 	if (method === "GET" && url.includes("/export")) {
 		return "Exporting project";
+	}
+	if (method === "POST" && url.includes("/api/v1/project/import")) {
+		return "Importing project";
 	}
 	if (method === "POST" && url.includes("/api/v1/project")) {
 		return "Creating new project";
@@ -273,6 +310,24 @@ export const exportProject = async (
 		(includeAttachments ?? false) ? { include_attachments: "true" } : {};
 	const response = await axios.get<ProjectExport>(
 		`${PROJECT_URL}/${projectId}/export`,
+		{ params },
+	);
+	return response.data;
+};
+
+export const importProject = async (
+	projectExport: ProjectExport,
+	mode: ImportMode,
+	targetProjectId?: string,
+): Promise<ProjectImportResult> => {
+	const params: Record<string, string> = { mode };
+	if (targetProjectId) {
+		params.target_project_id = targetProjectId;
+	}
+
+	const response = await axios.post<ProjectImportResult>(
+		`${PROJECT_URL}/import`,
+		projectExport,
 		{ params },
 	);
 	return response.data;

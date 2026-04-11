@@ -162,6 +162,7 @@ impl TryFrom<String> for NodeType {
 mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
+    use std::str::FromStr;
 
     #[test]
     fn test_node_position_creation() {
@@ -373,5 +374,46 @@ mod tests {
         assert_eq!(newer_than_list2.len(), 2); // id2 (updated) and id3 (new)
         assert_eq!(newer_than_list2.get(&id2), Some(&time3));
         assert_eq!(newer_than_list2.get(&id3), Some(&time2));
+    }
+
+    #[test]
+    fn test_node_type_try_from_valid_variants() {
+        let variants = [
+            ("person", NodeType::Person),
+            ("domain", NodeType::Domain),
+            ("ip", NodeType::Ip),
+            ("phone", NodeType::Phone),
+            ("email", NodeType::Email),
+            ("url", NodeType::Url),
+            ("image", NodeType::Image),
+            ("location", NodeType::Location),
+            ("organisation", NodeType::Organisation),
+            ("document", NodeType::Document),
+            ("currency", NodeType::Currency),
+        ];
+
+        for (raw, expected) in variants {
+            assert_eq!(NodeType::try_from(raw), Ok(expected));
+            assert_eq!(NodeType::from_str(raw), Ok(expected));
+            assert_eq!(NodeType::try_from(raw.to_string()), Ok(expected));
+            assert_eq!(expected.as_ref(), raw);
+            assert_eq!(expected.to_string(), raw.to_string());
+        }
+    }
+
+    #[test]
+    fn test_node_type_try_from_invalid_variant() {
+        let err = NodeType::try_from("not-a-node-type").expect_err("expected invalid node type");
+        assert_eq!(err, "Unknown NodeType: not-a-node-type");
+    }
+
+    #[test]
+    fn test_node_type_serde_round_trip_uses_lowercase_values() {
+        let serialized =
+            serde_json::to_string(&NodeType::Organisation).expect("serialize node type");
+        assert_eq!(serialized, "\"organisation\"");
+
+        let parsed: NodeType = serde_json::from_str("\"organisation\"").expect("parse node type");
+        assert_eq!(parsed, NodeType::Organisation);
     }
 }

@@ -41,6 +41,11 @@ export function ProjectSelector({
 		}
 	}, [isOpen]);
 
+	const selectProject = (projectId: string) => {
+		onProjectChange(projectId);
+		setIsOpen(false);
+	};
+
 	return (
 		<>
 			{/* Backdrop to capture clicks outside the dropdown */}
@@ -57,10 +62,8 @@ export function ProjectSelector({
 					aria-label="Close project selector"
 				/>
 			)}
-			<div
-				style={{ position: "fixed", top: "10px", left: "10px", zIndex: 1000 }}
-			>
-				<div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+			<div className="project-selector-container">
+				<div className="project-selector-actions">
 					<button
 						type="button"
 						onClick={() => setIsOpen(!isOpen)}
@@ -104,24 +107,24 @@ export function ProjectSelector({
 								{projects.map((project, index) => (
 									<div
 										role="menuitem"
-										tabIndex={index}
+										tabIndex={index === 0 ? 0 : -1}
 										key={project.id}
-										onKeyDown={() => {}}
-										onClick={() => {
-											onProjectChange(project.id);
-											setIsOpen(false);
-										}}
-										className={`project-selector-base ${currentProject?.id === project.id ? "project-selector-selected" : ""}`}
-										onMouseEnter={(e) => {
-											if (currentProject?.id !== project.id) {
-												e.currentTarget.style.background = "#f9fafb";
+										onKeyDown={(event) => {
+											if (event.key === "Escape") {
+												setIsOpen(false);
+												return;
+											}
+											if (event.key === "Enter" || event.key === " ") {
+												event.preventDefault();
+												selectProject(project.id);
 											}
 										}}
-										onMouseLeave={(e) => {
-											if (currentProject?.id !== project.id) {
-												e.currentTarget.style.background = "white";
-											}
-										}}
+										onClick={() => selectProject(project.id)}
+										className={`project-selector-base ${
+											currentProject?.id === project.id
+												? "project-selector-selected"
+												: "project-selector-unselected"
+										}`}
 									>
 										<div>{project.name}</div>
 										<div className="project-selector-subhead">{project.id}</div>

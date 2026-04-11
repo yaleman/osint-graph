@@ -15,7 +15,6 @@ use crate::SharedState;
 pub struct AuthUser {
     pub subject: String,
     pub email: String,
-    #[allow(dead_code)] // TODO: decide if this is used
     pub display_name: Option<String>,
 }
 

@@ -25,11 +25,33 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Project,
+    #[sea_orm(
+        belongs_to = "super::node::Entity",
+        from = "Column::Left",
+        to = "super::node::Column::Id",
+        on_update = "Cascade",
+        on_delete = "Cascade"
+    )]
+    LeftNode,
+    #[sea_orm(
+        belongs_to = "super::node::Entity",
+        from = "Column::Right",
+        to = "super::node::Column::Id",
+        on_update = "Cascade",
+        on_delete = "Cascade"
+    )]
+    RightNode,
 }
 
 impl Related<super::project::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Project.def()
+    }
+}
+
+impl Related<super::node::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::LeftNode.def()
     }
 }
 

@@ -51,6 +51,16 @@ export interface ProjectExport {
 	attachments: Attachment[];
 }
 
+export type ImportMode = "new" | "overwrite" | "merge";
+
+export interface ProjectImportResult {
+	project: Project;
+	mode: ImportMode;
+	imported_nodes: number;
+	imported_nodelinks: number;
+	imported_attachments: number;
+}
+
 export type SearchResultType =
 	| { Node: string } // NodeType as string
 	| "Project"
@@ -134,3 +144,20 @@ export const getNodeColor = (nodeType: string): string => {
 	const typeInfo = NodeTypeInfo[nodeType] ?? { color: "#6b7280" };
 	return typeInfo.color;
 };
+
+const NODE_TYPE_COLOR_CLASSES: Record<string, string> = {
+	person: "node-color-person",
+	domain: "node-color-domain",
+	ip: "node-color-ip",
+	phone: "node-color-phone",
+	email: "node-color-email",
+	url: "node-color-url",
+	image: "node-color-image",
+	location: "node-color-location",
+	organisation: "node-color-organisation",
+	document: "node-color-document",
+	currency: "node-color-currency",
+};
+
+export const getNodeColorClass = (nodeType: string): string =>
+	NODE_TYPE_COLOR_CLASSES[nodeType] ?? "node-color-unknown";

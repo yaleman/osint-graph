@@ -1,22 +1,27 @@
 use axum::{
     body::Body,
-    extract::{Multipart, Path, State},
+    extract::{
+        multipart::{MultipartError, MultipartRejection},
+        Multipart, Path, State,
+    },
     http::{
         header::{ACCEPT_ENCODING, CONTENT_DISPOSITION, CONTENT_ENCODING, CONTENT_TYPE, COOKIE},
         HeaderMap, HeaderValue, StatusCode,
     },
-    response::{IntoResponse, Response},
+    response::Response,
     Json,
 };
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
+use futures::stream;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter,
     TryIntoModel,
 };
 use serde::Deserialize;
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Write};
+use tokio::sync::mpsc;
 use tracing::{debug, error};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -27,6 +32,80 @@ use crate::{
     SharedState,
 };
 
+const ATTACHMENT_STREAM_CHUNK_SIZE: usize = 16 * 1024;
+pub const MAX_ATTACHMENT_UPLOAD_MB: usize = 100;
+pub const MAX_ATTACHMENT_UPLOAD_BYTES: usize = MAX_ATTACHMENT_UPLOAD_MB * 1024 * 1024;
+pub const MAX_ATTACHMENT_MULTIPART_REQUEST_BYTES: usize =
+    MAX_ATTACHMENT_UPLOAD_BYTES + (1024 * 1024);
+pub const ATTACHMENT_TOO_LARGE_ERROR: &str = "Attachment exceeds maximum size of 100 MB";
+
+fn attachment_too_large_error() -> WebError {
+    WebError::new(StatusCode::PAYLOAD_TOO_LARGE, ATTACHMENT_TOO_LARGE_ERROR)
+}
+
+fn map_multipart_rejection(rejection: MultipartRejection) -> WebError {
+    if rejection.status() == StatusCode::PAYLOAD_TOO_LARGE {
+        return attachment_too_large_error();
+    }
+
+    WebError::new(
+        StatusCode::BAD_REQUEST,
+        format!("Invalid multipart upload: {}", rejection.body_text()),
+    )
+}
+
+fn map_multipart_error(context: &str, error: MultipartError) -> WebError {
+    if error.status() == StatusCode::PAYLOAD_TOO_LARGE {
+        return attachment_too_large_error();
+    }
+
+    WebError::new(
+        StatusCode::BAD_REQUEST,
+        format!("{}: {}", context, error.body_text()),
+    )
+}
+
+fn stream_gzip_decompressed_body(compressed_data: Vec<u8>) -> Result<Body, WebError> {
+    // Preflight read so malformed gzip payloads still return a 500 before response streaming starts.
+    let mut decoder = GzDecoder::new(Cursor::new(compressed_data));
+    let mut first_chunk = vec![0; ATTACHMENT_STREAM_CHUNK_SIZE];
+    let first_read = decoder.read(&mut first_chunk).map_err(|e| {
+        WebError::internal_server_error(format!("Failed to decompress attachment data: {}", e))
+    })?;
+    first_chunk.truncate(first_read);
+
+    let (tx, rx) = mpsc::channel::<Result<Vec<u8>, std::io::Error>>(8);
+    tokio::task::spawn_blocking(move || {
+        if !first_chunk.is_empty() && tx.blocking_send(Ok(first_chunk)).is_err() {
+            return;
+        }
+
+        let mut chunk = vec![0; ATTACHMENT_STREAM_CHUNK_SIZE];
+        loop {
+            match decoder.read(&mut chunk) {
+                Ok(0) => break,
+                Ok(bytes_read) => {
+                    if tx.blocking_send(Ok(chunk[..bytes_read].to_vec())).is_err() {
+                        break;
+                    }
+                }
+                Err(err) => {
+                    let _ = tx.blocking_send(Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!("Failed to decompress attachment data: {}", err),
+                    )));
+                    break;
+                }
+            }
+        }
+    });
+
+    let body_stream = stream::unfold(rx, |mut rx| async {
+        rx.recv().await.map(|item| (item, rx))
+    });
+    Ok(Body::from_stream(body_stream))
+}
+
 /// Upload a file attachment to a node
 #[utoipa::path(
     post,
@@ -34,15 +113,17 @@ use crate::{
     responses(
         (status = OK, description = "Attachment uploaded successfully", body = attachment::Model),
         (status = BAD_REQUEST, description = "Invalid request"),
+        (status = PAYLOAD_TOO_LARGE, description = "Attachment exceeds maximum size"),
         (status = NOT_FOUND, description = "Node not found")
     )
 )]
 pub async fn upload_attachment(
     State(state): State<SharedState>,
     Path(node_id): Path<Uuid>,
-    mut multipart: Multipart,
+    multipart: Result<Multipart, MultipartRejection>,
 ) -> Result<Json<attachment::Model>, WebError> {
     let conn = &state.read().await.conn;
+    let mut multipart = multipart.map_err(map_multipart_rejection)?;
 
     debug!("Starting file upload for node {}", node_id);
 
@@ -53,10 +134,7 @@ pub async fn upload_attachment(
 
     while let Some(field) = multipart.next_field().await.map_err(|e| {
         error!("Failed to read multipart field: {:?}", e);
-        WebError::new(
-            StatusCode::BAD_REQUEST,
-            format!("Failed to read multipart field: {}", e),
-        )
+        map_multipart_error("Failed to read multipart field", e)
     })? {
         let field_name = field.name().unwrap_or("").to_string();
         debug!("Processing field: {}", field_name);
@@ -72,10 +150,7 @@ pub async fn upload_attachment(
 
                 data = Some(field.bytes().await.map_err(|e| {
                     error!("Failed to read file data: {:?}", e);
-                    WebError::new(
-                        StatusCode::BAD_REQUEST,
-                        format!("Failed to read file data: {}", e),
-                    )
+                    map_multipart_error("Failed to read file data", e)
                 })?);
 
                 debug!(
@@ -106,6 +181,10 @@ pub async fn upload_attachment(
             )
         })?
         .to_vec();
+
+    if file_data.len() > MAX_ATTACHMENT_UPLOAD_BYTES {
+        return Err(attachment_too_large_error());
+    }
 
     // Verify the node exists before creating the attachment
     let node_exists = node::Entity::find_by_id(node_id)
@@ -246,12 +325,7 @@ pub async fn download_attachment(
         })?
         .ok_or_else(|| WebError::not_found(format!("Attachment {} not found", attachment_id)))?;
 
-    // Decompress data
-    let mut decoder = GzDecoder::new(&attachment.data[..]);
-    let mut decompressed_data = Vec::new();
-    decoder.read_to_end(&mut decompressed_data).map_err(|e| {
-        WebError::internal_server_error(format!("Failed to decompress attachment data: {}", e))
-    })?;
+    let body = stream_gzip_decompressed_body(attachment.data)?;
 
     debug!(
         attachment_id = attachment_id.to_string(),
@@ -260,22 +334,22 @@ pub async fn download_attachment(
     );
 
     // Return file with appropriate headers
-    Ok((
-        StatusCode::OK,
-        [
-            ("Content-Type", attachment.content_type.as_str()),
-            (
-                "Content-Disposition",
-                &format!("attachment; filename=\"{}\"", attachment.filename),
-            ),
-        ],
-        decompressed_data,
-    )
-        .into_response())
+    let mut res = Response::new(body);
+    *res.status_mut() = StatusCode::OK;
+    res.headers_mut().insert(
+        CONTENT_TYPE,
+        HeaderValue::from_str(attachment.content_type.as_str())?,
+    );
+    res.headers_mut().insert(
+        CONTENT_DISPOSITION,
+        HeaderValue::from_str(&format!("attachment; filename=\"{}\"", attachment.filename))?,
+    );
+
+    Ok(res)
 }
 
 /// View a file attachment (inline display for images, PDFs, text)
-/// GET /api/v1//attachment/{attachment_id}/view
+/// GET /api/v1/attachment/{attachment_id}/view
 #[utoipa::path(
     get,
     path = "/api/v1/attachment/{attachment_id}/view",
@@ -325,15 +399,12 @@ pub async fn view_attachment(
         ),
         (COOKIE, HeaderValue::from_static("")),
     ];
-    // Decompress data
     if need_decompress {
-        // TODO: work out if we can stream this instead of loading whole file into memory
-        let mut decoder = GzDecoder::new(attachment.data.as_slice());
-        let mut decompressed_data = Vec::new();
-        decoder.read_to_end(&mut decompressed_data).map_err(|e| {
-            WebError::internal_server_error(format!("Failed to decompress attachment data: {}", e))
-        })?;
-        Ok((StatusCode::OK, headers, decompressed_data).into_response())
+        let body = stream_gzip_decompressed_body(attachment.data)?;
+        let mut res = Response::new(body);
+        *res.status_mut() = StatusCode::OK;
+        res.headers_mut().extend(headers);
+        Ok(res)
     } else {
         let mut headers_vec = headers.to_vec();
         headers_vec.push((CONTENT_ENCODING, HeaderValue::from_static("gzip")));
@@ -341,8 +412,6 @@ pub async fn view_attachment(
         let mut res = Response::new(Body::from(attachment.data));
         *res.status_mut() = StatusCode::OK;
         res.headers_mut().extend(headers_vec);
-        res.headers_mut()
-            .extend([(CONTENT_ENCODING, HeaderValue::from_static("gzip"))]);
         Ok(res)
     }
 }

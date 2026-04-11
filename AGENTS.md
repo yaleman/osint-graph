@@ -33,6 +33,7 @@ The backend uses **SeaORM** as the ORM layer with SQLite:
 - **Entities**: Type-safe database models in `src/entity/` (project, node, nodelink, attachment)
 - **Operations**: Database operations use `ConnectionTrait` for query execution
 - **Foreign Keys**: Automatic cascade delete/update for referential integrity
+- **NodeLink Integrity**: `node_link.left` and `node_link.right` have foreign key references to `node.id`
 - **Connection**: `DatabaseConnection` type replaces direct sqlx usage
 
 ## Node System
@@ -86,9 +87,9 @@ Each node can have multiple file attachments stored in the database with automat
 The OpenAPI schema is available on the CLI by running `just openapi_schema`, or at `/api/v1/openapi.json`.
 
 - `POST /api/v1/node/{id}/attachment` - Upload file (multipart/form-data)
-- `GET /api/v1/node/{node_id}/attachment/{attachment_id}` - Download file
-- `GET /api/v1/node/{node_id}/attachment/{attachment_id}/view` - View file inline
-- `DELETE /api/v1/node/{node_id}/attachment/{attachment_id}` - Delete attachment
+- `GET /api/v1/attachment/{attachment_id}` - Download file
+- `GET /api/v1/attachment/{attachment_id}/view` - View file inline
+- `DELETE /api/v1/attachment/{attachment_id}` - Delete attachment
 - `GET /api/v1/node/{id}/attachments` - List all attachments for node
 
 ### Attachment Model
@@ -108,7 +109,8 @@ pub struct Model {
 ### Features
 
 - **Compression**: All files automatically compressed with gzip before storage
-- **Decompression**: Transparent decompression on download/view
+- **Decompression**: Transparent decompression on download/view with chunked streaming responses
+- **Size Validation**: 100MB upload cap enforced in backend and pre-validated in frontend with consistent error messaging
 - **Content-Type Preservation**: Original MIME types maintained
 - **Inline Viewing**: Images, PDFs, and text files can be viewed in browser
 - **Download**: All files can be downloaded with proper Content-Disposition headers
@@ -221,12 +223,13 @@ Backend serves:
 - API endpoints:
   - `GET/POST /api/v1/projects` - Project management
   - `GET/POST/PUT/DELETE /api/v1/project/{id}` - Individual project operations
+  - `POST /api/v1/project/import?mode=new|overwrite|merge` - Import project data with ID remapping
   - `GET/POST/PUT/DELETE /api/v1/node/{id}` - Node CRUD operations
   - `POST /api/v1/node/{id}/attachment` - File upload
   - `GET /api/v1/node/{id}/attachments` - List attachments
-  - `GET /api/v1/node/{node_id}/attachment/{attachment_id}` - Download file
-  - `GET /api/v1/node/{node_id}/attachment/{attachment_id}/view` - View file inline
-  - `DELETE /api/v1/node/{node_id}/attachment/{attachment_id}` - Delete file
+  - `GET /api/v1/attachment/{attachment_id}` - Download file
+  - `GET /api/v1/attachment/{attachment_id}/view` - View file inline
+  - `DELETE /api/v1/attachment/{attachment_id}` - Delete file
   - `GET/POST/DELETE /api/v1/nodelink` - Node link operations
   - `GET /api/v1/project/{id}/export` - Export project data
 - Uses `Arc<RwLock<AppState>>` for thread-safe shared state
@@ -261,6 +264,12 @@ Backend serves:
   - View current project name
   - Switch between projects
   - Create new projects
+- **Project Import**: JSON import in Project Settings with `new`, `merge`, and `overwrite` modes
+- **Overwrite Safety**: Explicit confirmation checkbox required before overwrite imports
+- **Import Result Handling**: After import, graph reloads and a toast shows imported node/link/attachment counts
+- **Accessible Tabs**: Project Settings tabs use ARIA `tab`/`tabpanel` semantics with arrow-key and Home/End keyboard navigation
+- **Duplicate Submission Guard**: Long-running project actions (export/import/delete and Mermaid export/view) are protected against duplicate triggers while in flight
+- **Reusable UI Styling**: Project dialogs/search/selector UI use CSS classes for styling and avoid JSX inline styles
 - **Toast Notifications**: User-friendly error and success messages via react-hot-toast
 - **Data Integrity**: SQLite foreign key constraints prevent orphaned nodes
 - **Backend Validation**: Node operations validate project exists before saving
@@ -275,6 +284,8 @@ Backend serves:
 - UUID generation via `uuid` crate
 - Color-coded nodes for visual type identification
 - Database migrations run automatically on startup
+- On startup, OIDC provider discovery failures are retried in the background every 30 seconds
+- `SIGHUP` performs graceful shutdown; runtime configuration reload is not supported
 
 ## Code Quality Requirements
 

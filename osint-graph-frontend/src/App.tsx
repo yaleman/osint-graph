@@ -19,6 +19,9 @@ import "reactflow/dist/style.css";
 import toast, { Toaster } from "react-hot-toast";
 import { v4 as uuidv4 } from "uuid";
 import {
+	ATTACHMENT_MAX_UPLOAD_BYTES,
+	ATTACHMENT_MAX_UPLOAD_ERROR,
+	ATTACHMENT_MAX_UPLOAD_MB,
 	createNode,
 	createNodeLink,
 	createProject,
@@ -29,6 +32,7 @@ import {
 	exportProject,
 	exportProjectMermaid,
 	fetchProjects,
+	getApiErrorMessage,
 	listAttachments,
 	setAuthFailureCallback,
 	setQueueRequestCallback,
@@ -44,8 +48,18 @@ import { ProjectManagementDialog } from "./components/ProjectManagementDialog";
 import { ProjectMismatchDialog } from "./components/ProjectMismatchDialog";
 import { ProjectSelector } from "./components/ProjectSelector";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import type { Attachment, OSINTNode, Project } from "./types";
-import { getNodeColor, hasSyncedValue, NodeTypeInfo } from "./types";
+import type {
+	Attachment,
+	OSINTNode,
+	Project,
+	ProjectImportResult,
+} from "./types";
+import {
+	getNodeColor,
+	getNodeColorClass,
+	hasSyncedValue,
+	NodeTypeInfo,
+} from "./types";
 import "./osint-graph.css";
 
 const initialNodes: Node[] = [];
@@ -90,6 +104,7 @@ function AppContent() {
 	// Refs for debouncing node updates
 	const pendingUpdatesRef = useRef<Map<string, number>>(new Map());
 	const latestNodeDataRef = useRef<Map<string, OSINTNode>>(new Map());
+	const contextMenuRef = useRef<HTMLDivElement | null>(null);
 
 	// History state for undo/redo (max 10 levels)
 	const [history, setHistory] = useState<{
@@ -593,6 +608,19 @@ function AppContent() {
 		}
 	}, [setNodes, setEdges]);
 
+	const handleProjectImport = useCallback(
+		async (result: ProjectImportResult) => {
+			const reloadedProject = await loadProjectData(result.project.id);
+			localStorage.setItem(PROJECT_ID_KEY, result.project.id);
+			setCurrentProject(reloadedProject);
+			setShowProjectManagement(false);
+			toast.success(
+				`Import complete: ${result.imported_nodes} nodes, ${result.imported_nodelinks} links, ${result.imported_attachments} attachments`,
+			);
+		},
+		[loadProjectData],
+	);
+
 	const handleProjectChange = useCallback(
 		async (projectId: string) => {
 			try {
@@ -883,6 +911,14 @@ function AppContent() {
 		return undefined;
 	}, [contextMenu]);
 
+	useEffect(() => {
+		if (!contextMenu || !contextMenuRef.current) {
+			return;
+		}
+		contextMenuRef.current.style.top = `${contextMenu.y}px`;
+		contextMenuRef.current.style.left = `${contextMenu.x}px`;
+	}, [contextMenu]);
+
 	const cancelNodeEdit = useCallback(() => {
 		if (!editingNode) return;
 
@@ -1062,6 +1098,13 @@ function AppContent() {
 				toast.error("No file selected for upload");
 				return;
 			}
+
+			if (file.size > ATTACHMENT_MAX_UPLOAD_BYTES) {
+				toast.error(ATTACHMENT_MAX_UPLOAD_ERROR);
+				event.target.value = "";
+				return;
+			}
+
 			setUploadingAttachment(true);
 
 			try {
@@ -1072,7 +1115,7 @@ function AppContent() {
 				toast.success(`Uploaded ${file.name}`);
 			} catch (error) {
 				console.error("Failed to upload attachment:", error);
-				toast.error("Failed to upload file");
+				toast.error(getApiErrorMessage(error, "Failed to upload file"));
 			} finally {
 				setUploadingAttachment(false);
 				// Reset input so the same file can be uploaded again
@@ -1381,6 +1424,7 @@ function AppContent() {
 					currentProject={currentProject}
 					onProjectUpdate={handleProjectUpdate}
 					onProjectDelete={handleProjectDelete}
+					onProjectImport={handleProjectImport}
 				/>
 			)}
 
@@ -1425,8 +1469,7 @@ function AppContent() {
 							type="button"
 							key={type}
 							onClick={() => createOSINTNode(type)}
-							className="node-type-button"
-							style={{ background: getNodeColorCallBack(type) }}
+							className={`node-type-button ${getNodeColorClass(type)}`}
 						>
 							{NodeTypeInfo[type]?.label ?? type}
 						</button>
@@ -1590,6 +1633,9 @@ function AppContent() {
 										className="upload-input-hidden"
 									/>
 								</label>
+								<div className="upload-limit-text">
+									Maximum file size: {ATTACHMENT_MAX_UPLOAD_MB} MB
+								</div>
 							</div>
 						)}
 
@@ -1626,11 +1672,15 @@ function AppContent() {
 			{/* Context menu for URL and domain nodes */}
 			{contextMenu && (
 				<div
-					role="menuitem"
+					role="menu"
+					ref={contextMenuRef}
 					className="context-menu"
-					style={{ top: contextMenu.y, left: contextMenu.x }}
 					onClick={(e) => e.stopPropagation()}
-					onKeyDown={() => {}}
+					onKeyDown={(event) => {
+						if (event.key === "Escape") {
+							setContextMenu(null);
+						}
+					}}
 					tabIndex={0}
 				>
 					<ContextMenuItem

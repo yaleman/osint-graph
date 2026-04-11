@@ -16,6 +16,7 @@ pub mod tls;
 
 use attachment::{
     delete_attachment, download_attachment, list_attachments, upload_attachment, view_attachment,
+    MAX_ATTACHMENT_MULTIPART_REQUEST_BYTES,
 };
 use axum::{
     body::Body,
@@ -29,8 +30,8 @@ use axum::{
 use osint_graph_shared::{error::OsintError, Urls};
 use project::{
     delete_node, delete_nodelink, delete_project, export_project_mermaid, get_node,
-    get_nodelinks_by_project, get_nodes_by_project, get_project, get_projects, post_node,
-    post_nodelink, post_project, search_global, update_project,
+    get_nodelinks_by_project, get_nodes_by_project, get_project, get_projects, import_project,
+    post_node, post_nodelink, post_project, search_global, update_project,
 };
 use sea_orm::DatabaseConnection;
 use sqlx::{Pool, Sqlite};
@@ -125,7 +126,9 @@ pub async fn build_app(
         )
         .route(
             "/api/v1/node/{id}/attachment",
-            post(upload_attachment).layer(DefaultBodyLimit::max(100 * 1024 * 1024)), // 100MB limit
+            post(upload_attachment).layer(DefaultBodyLimit::max(
+                MAX_ATTACHMENT_MULTIPART_REQUEST_BYTES,
+            )),
         )
         .route("/api/v1/node/{id}/attachments", get(list_attachments))
         .route(
@@ -145,6 +148,7 @@ pub async fn build_app(
             get(get_nodelinks_by_project),
         )
         .route("/api/v1/project", post(post_project))
+        .route("/api/v1/project/import", post(import_project))
         .route(
             "/api/v1/project/{id}",
             get(get_project).put(update_project).delete(delete_project),

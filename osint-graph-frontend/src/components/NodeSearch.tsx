@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Node } from "reactflow";
 import { searchGlobal } from "../api";
 import type { SearchResult } from "../types";
-import { getNodeColor } from "../types";
+import { getNodeColorClass } from "../types";
 
 interface NodeSearchProps {
 	nodes: Node[];
@@ -170,7 +170,6 @@ export function NodeSearch({
 									node_type?: string;
 								};
 								const nodeType = osintNode?.node_type || "unknown";
-								const nodeColor = getNodeColor(nodeType);
 								return (
 									<button
 										key={node.id}
@@ -183,8 +182,7 @@ export function NodeSearch({
 										</div>
 										<div className="node-search-result-meta">
 											<span
-												className="node-search-result-type"
-												style={{ backgroundColor: nodeColor, color: "white" }}
+												className={`node-search-result-type ${getNodeColorClass(nodeType)}`}
 											>
 												{nodeType}
 											</span>
@@ -210,24 +208,22 @@ export function NodeSearch({
 							</div>
 							{results.map((result) => {
 								// Determine node type and color based on result_type
-								let nodeType: string | null = null;
-								let nodeColor = "#6b7280"; // default gray
 								let typeLabel = "";
+								let typeClassName = "node-color-unknown";
 
 								if (
 									typeof result.result_type === "object" &&
 									"Node" in result.result_type
 								) {
 									// It's a Node result
-									nodeType = result.result_type.Node;
-									nodeColor = getNodeColor(nodeType);
-									typeLabel = nodeType;
+									typeLabel = result.result_type.Node;
+									typeClassName = getNodeColorClass(typeLabel);
 								} else if (result.result_type === "Project") {
 									typeLabel = "project";
-									nodeColor = "#3b82f6"; // blue for projects
+									typeClassName = "node-color-project";
 								} else if (result.result_type === "Attachment") {
 									typeLabel = "attachment";
-									nodeColor = "#8b5cf6"; // purple for attachments
+									typeClassName = "node-color-attachment";
 								}
 
 								return (
@@ -245,11 +241,7 @@ export function NodeSearch({
 										<div className="node-search-result-meta">
 											{typeLabel && (
 												<span
-													className="node-search-result-type"
-													style={{
-														backgroundColor: nodeColor,
-														color: "white",
-													}}
+													className={`node-search-result-type ${typeClassName}`}
 												>
 													{typeLabel}
 												</span>

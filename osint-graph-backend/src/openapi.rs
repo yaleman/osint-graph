@@ -9,6 +9,7 @@ use utoipa_swagger_ui::SwaggerUi;
         crate::project::get_projects,
         crate::project::get_project,
         crate::project::post_project,
+        crate::project::import_project,
         crate::project::update_project,
         crate::project::delete_project,
         crate::project::export_project,

@@ -5,12 +5,10 @@ use sea_orm::FromJsonQueryResult;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-pub mod attachment;
 pub mod data;
 pub mod error;
 pub mod node;
 pub mod nodelink;
-pub mod storage;
 
 pub struct AddrInfo {
     pub addr: String,
@@ -71,33 +69,6 @@ impl AddrInfo {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_addrinfo() {
-        let testval = AddrInfo {
-            addr: "1.2.3.4".to_string(),
-            port: 12345,
-            https: true,
-        };
-
-        assert_eq!(testval.as_url(), "https://1.2.3.4:12345".to_string());
-        assert_eq!(testval.as_addr(), "1.2.3.4:12345".to_string());
-
-        let testval = AddrInfo {
-            addr: "1.2.3.4".to_string(),
-            port: 12345,
-            https: false,
-        };
-        assert_eq!(testval.as_url(), "http://1.2.3.4:12345".to_string());
-
-        let _ = AddrInfo::from_env();
-        let _ = AddrInfo::test();
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult, ToSchema)]
 #[schema(value_type = Vec<String>)]
 pub struct StringVec(pub Vec<String>);
@@ -132,5 +103,32 @@ impl Urls {
 impl AsRef<str> for Urls {
     fn as_ref(&self) -> &str {
         self.as_str()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_addrinfo() {
+        let testval = AddrInfo {
+            addr: "1.2.3.4".to_string(),
+            port: 12345,
+            https: true,
+        };
+
+        assert_eq!(testval.as_url(), "https://1.2.3.4:12345".to_string());
+        assert_eq!(testval.as_addr(), "1.2.3.4:12345".to_string());
+
+        let testval = AddrInfo {
+            addr: "1.2.3.4".to_string(),
+            port: 12345,
+            https: false,
+        };
+        assert_eq!(testval.as_url(), "http://1.2.3.4:12345".to_string());
+
+        let _ = AddrInfo::from_env();
+        let _ = AddrInfo::test();
     }
 }

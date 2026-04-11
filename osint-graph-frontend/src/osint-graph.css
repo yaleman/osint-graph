@@ -55,6 +55,8 @@ body,
 	flex-direction: column;
 	box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 	overflow: hidden;
+	position: relative;
+	z-index: 1000;
 }
 
 .mermaid-content {
@@ -96,6 +98,9 @@ body,
 .dialog-tab {
 	padding: 10px 20px;
 	cursor: pointer;
+	background: transparent;
+	border: none;
+	font: inherit;
 	border-bottom: 0.2rem solid transparent;
 	color: #6b7280;
 	font-weight: 400;
@@ -106,6 +111,15 @@ body,
 	border-bottom-color: var(--colour-primary-blue);
 	color: var(--colour-primary-blue);
 	font-weight: 600;
+}
+
+.dialog-tab:focus-visible {
+	outline: 2px solid var(--colour-primary-blue);
+	outline-offset: -2px;
+}
+
+.dialog-tabpanel {
+	padding-top: 0.25rem;
 }
 
 .dialog-content {
@@ -220,6 +234,19 @@ body,
 	font-weight: var(--default-font-weight);
 }
 
+.project-selector-container {
+	position: fixed;
+	top: 10px;
+	left: 10px;
+	z-index: 1000;
+}
+
+.project-selector-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
 .btn-transparent {
 	/* mostly used for the x on the dialog */
 	background: none;
@@ -300,11 +327,28 @@ body,
 	padding: 40px;
 	text-align: center;
 	color: #6b7280;
+	margin: 12px 0;
+}
+
+.import-dropzone-active {
+	border-color: var(--colour-primary-blue);
+	background-color: #eff6ff;
 }
 
 .import-dropzone-title {
 	margin-bottom: 10px;
 	font-weight: var(--default-font-weight);
+}
+
+.import-file-input {
+	display: none;
+}
+
+.import-overwrite-confirm {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	color: #7f1d1d;
 }
 
 /* Delete Tab */
@@ -438,9 +482,18 @@ body,
 	border-bottom: 1px solid #eee;
 }
 
+.project-selector-base:focus-visible {
+	outline: 2px solid var(--colour-primary-blue);
+	outline-offset: -2px;
+}
+
 .project-selector-selected {
 	margin-top: 0.25rem;
 	font-weight: 600;
+}
+
+.project-selector-unselected:hover {
+	background: #f9fafb;
 }
 
 .project-selector-subhead {
@@ -779,6 +832,62 @@ body,
 		box-shadow 0.1s ease;
 }
 
+.node-color-person {
+	background-color: #3b82f6;
+}
+
+.node-color-domain {
+	background-color: #f59e0b;
+}
+
+.node-color-ip {
+	background-color: #ef4444;
+}
+
+.node-color-phone {
+	background-color: #8b5cf6;
+}
+
+.node-color-email {
+	background-color: #ec4899;
+}
+
+.node-color-url {
+	background-color: #06b6d4;
+}
+
+.node-color-image {
+	background-color: #10b981;
+}
+
+.node-color-location {
+	background-color: #84cc16;
+}
+
+.node-color-organisation {
+	background-color: #f97316;
+}
+
+.node-color-document {
+	background-color: #6b7280;
+}
+
+.node-color-currency {
+	background-color: #c7c400;
+}
+
+.node-color-project {
+	background-color: #3b82f6;
+}
+
+.node-color-attachment {
+	background-color: #8b5cf6;
+}
+
+.node-color-unknown {
+	background-color: #6b7280;
+}
+
 .btn:hover,
 .node-type-button:hover {
 	transform: translateY(-2px);
@@ -854,6 +963,12 @@ body,
 
 .upload-input-hidden {
 	display: none;
+}
+
+.upload-limit-text {
+	margin-top: 8px;
+	font-size: 0.85rem;
+	color: #6b7280;
 }
 
 /* Modal button groups */
@@ -963,6 +1078,7 @@ body,
 	font-size: 0.75rem;
 	text-transform: capitalize;
 	font-weight: 500;
+	color: white;
 }
 
 .node-search-result-value {

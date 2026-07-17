@@ -1108,7 +1108,7 @@ pub async fn export_project_mermaid(
 
         // Add value (truncate if too long)
         let value_display = if node_model.value.len() > 50 {
-            format!("{}...", &sanitize_mermaid(&node_model.value[..50]))
+            format!("{}...", sanitize_mermaid(&node_model.value[..50]))
         } else {
             sanitize_mermaid(&node_model.value)
         };
@@ -1117,7 +1117,7 @@ pub async fn export_project_mermaid(
         // Add notes if present
         if let Some(notes) = &node_model.notes {
             let notes_display = if notes.len() > 50 {
-                format!("{}...", &sanitize_mermaid(&notes[..50]))
+                format!("{}...", sanitize_mermaid(&notes[..50]))
             } else {
                 sanitize_mermaid(notes)
             };

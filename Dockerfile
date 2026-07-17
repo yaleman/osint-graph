@@ -5,7 +5,7 @@ WORKDIR /build
 COPY osint-graph-frontend/package.json osint-graph-frontend/pnpm-lock.yaml ./
 
 # Install pnpm using corepack (built into Node.js)
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@11.13.1 --activate
 RUN pnpm install --frozen-lockfile
 
 COPY osint-graph-frontend/ ./

@@ -2,7 +2,7 @@
 FROM node:22-slim AS frontend-builder
 
 WORKDIR /build
-COPY osint-graph-frontend/package.json osint-graph-frontend/pnpm-lock.yaml ./
+COPY osint-graph-frontend/package.json osint-graph-frontend/pnpm-*.yaml ./
 
 # Install pnpm using corepack (built into Node.js)
 RUN corepack enable && corepack prepare pnpm@latest --activate

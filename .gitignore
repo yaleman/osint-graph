@@ -1,4 +1,5 @@
 dist/*
+**/node_modules/**
 /target
 osint-graph/.DS_Store
 .DS_Store
